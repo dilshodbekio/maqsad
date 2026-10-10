@@ -25,11 +25,13 @@ from sklearn.model_selection import StratifiedGroupKFold, cross_val_predict
 from sklearn.tree import DecisionTreeClassifier, export_text
 
 from .build import OUT_ROOT
+from ml.money_trail.features import build_features
+from ml.money_trail.metrics import BUDGET, recall_at_budget
+
 from .config import MATCHING_OKED
 
 DAY = pd.Timedelta(days=1)
 FLAG_AUC = 0.90
-BUDGET = 0.20
 TYPOLOGIES = ("T1", "T2", "T3", "T4")
 
 # photo / geo inputs: evaluated separately, never used by the money-trail model
@@ -56,80 +58,9 @@ def _id_num(s: pd.Series) -> pd.Series:
 
 
 def features(t: dict) -> pd.DataFrame:
-    """Engineered features (money trail + graph + the photo module inputs in PHOTO_ENGINEERED)."""
+    """Money-trail features (single source: ml.money_trail.features) + the photo module inputs."""
+    F = build_features(t["loans"], t["transactions"], t["suppliers"], t["employees"])
     loans = t["loans"].set_index("loan_id")
-    tx, sup = t["transactions"], t["suppliers"].set_index("supplier_id")
-    emp = t["employees"].set_index("employee_id")
-    snap = loans["snapshot_date"].iloc[0]
-    amt = loans["amount_uzs"]
-    F = pd.DataFrame(index=loans.index)
-
-    bt = tx[tx.loan_id.notna()].copy()
-    bt["type"] = bt["type"].astype(str)
-    bt["day"] = (bt["ts"] - bt["loan_id"].map(loans["disbursed_at"])) / DAY
-
-    def share(mask, upto=None):
-        d = bt[mask] if upto is None else bt[mask & (bt["day"] <= upto)]
-        return (d.groupby("loan_id")["amount_uzs"].sum().reindex(loans.index).fillna(0) / amt)
-
-    cash = bt["type"] == "cash_withdrawal"
-    F["first_cash_days"] = bt[cash].groupby("loan_id")["day"].min().reindex(loans.index).fillna(400)
-    for k in (1, 7, 30):
-        F[f"cash_share_d{k}"] = share(cash, k)
-    F["cash_share_all"] = share(cash)
-    sp = bt["type"] == "supplier_payment"
-    F["sup_pay_share"] = share(sp)
-    F["sup_pay_flag"] = (F["sup_pay_share"] > 0).astype(float)
-    F["first_sup_pay_days"] = bt[sp].groupby("loan_id")["day"].min().reindex(loans.index).fillna(400)
-    paid = share(sp) * amt
-    F["invoice_gap"] = 1 - paid / loans["invoice_amount_uzs"]
-    leave = bt["type"].isin(["cash_withdrawal", "external_transfer", "p2p_out"])
-    F["leave_share_30"] = share(leave, 30)
-    F["p2p_out_count"] = bt[bt["type"] == "p2p_out"].groupby("loan_id").size().reindex(loans.index).fillna(0)
-    F["p2p_in_count"] = bt[bt["type"] == "p2p_in"].groupby("loan_id").size().reindex(loans.index).fillna(0)
-
-    inb = bt[bt["type"].isin(["p2p_in", "income"])]
-    big = inb.sort_values("amount_uzs").groupby("loan_id").tail(1).set_index("loan_id")
-    F["big_inbound_share"] = (big["amount_uzs"] / amt).reindex(loans.index).fillna(0)
-    F["big_inbound_day"] = big["day"].reindex(loans.index).fillna(-1)
-    F["big_inbound_person"] = (big["counterparty_kind"].astype(str) == "person").astype(float).reindex(loans.index).fillna(0)
-    # cash leaving within 5 days after the biggest inbound, relative to it
-    m = bt[cash | (bt["type"] == "external_transfer")].join(big[["day", "amount_uzs"]].add_prefix("b_"), on="loan_id")
-    m = m[(m["day"] >= m["b_day"]) & (m["day"] <= m["b_day"] + 5)]
-    post = m.groupby("loan_id")["amount_uzs"].sum().reindex(loans.index).fillna(0)
-    F["post_inbound_exit"] = (post / (big["amount_uzs"].reindex(loans.index))).fillna(0)
-    inc = bt[bt["type"] == "income"]
-    F["income_count"] = inc.groupby("loan_id").size().reindex(loans.index).fillna(0)
-    last_inc = inc.groupby("loan_id")["ts"].max().reindex(loans.index)
-    F["days_since_income"] = ((snap - last_inc) / DAY).fillna(400)
-    F["income_stopped_after_inbound"] = (
-        ((last_inc.isna()) | (last_inc < loans["disbursed_at"] + pd.to_timedelta(F["big_inbound_day"].clip(lower=0), unit="D")))
-        & (F["big_inbound_share"] > 0.1)).astype(float)
-
-    # --- supplier / graph features
-    sid = loans["supplier_id"]
-    F["sup_in_degree"] = sid.map(sid.value_counts())
-    received = tx[(tx["type"].astype(str) == "supplier_payment")].groupby("counterparty_id")["amount_uzs"].sum()
-    acct = tx[tx.loan_id.isna()].copy()
-    acct["supplier_id"] = acct["account_id"].str.replace("ACC-", "", regex=False)
-    acct["type"] = acct["type"].astype(str)
-    acct = acct[acct["type"] != "income"]            # supplier ledger inflows; only outflows count here
-    s_cash = acct[acct["type"] == "cash_withdrawal"].groupby("supplier_id")["amount_uzs"].sum()
-    s_exit = acct.groupby("supplier_id")["amount_uzs"].sum()
-    rec = sid.map(received)
-    F["sup_cash_share"] = (sid.map(s_cash).fillna(0) / rec).fillna(0).clip(upper=1.5)
-    F["sup_exit_share"] = (sid.map(s_exit).fillna(0) / rec).fillna(0).clip(upper=1.5)
-    first_rec = tx[(tx["type"].astype(str) == "supplier_payment")].groupby("counterparty_id")["ts"].min()
-    first_cash = acct[acct["type"] == "cash_withdrawal"].groupby("supplier_id")["ts"].min()
-    F["sup_cash_lag_days"] = ((sid.map(first_cash) - sid.map(first_rec)) / DAY).fillna(400)
-    F["sup_in_deg_x_cash"] = F["sup_in_degree"] * F["sup_cash_share"]   # combination feature
-    linked = sid.map(sup["linked_employee_id"])
-    F["sup_employee_link"] = linked.notna().astype(float)
-    F["emp_branch_match"] = (linked.map(emp["branch_id"]) == loans["branch_id"]).astype(float)
-    oked = sid.map(sup["oked_code"])
-    F["oked_mismatch"] = [float(o not in MATCHING_OKED[pu]) for o, pu in zip(oked, loans["purpose"].astype(str))]
-    F["sup_recent"] = ((loans["disbursed_at"] - sid.map(sup["registered_at"])) / DAY < 365).astype(float)
-
     # --- geo / photo (inputs of ml/photo; reported in a separate section)
     dkm = 111.0 * np.hypot(loans["photo_lat"] - loans["borrower_lat"],
                            (loans["photo_lon"] - loans["borrower_lon"]) * np.cos(np.radians(loans["borrower_lat"])))
@@ -262,18 +193,6 @@ def oof_target_encode(cat: pd.Series, y: np.ndarray, folds, m: float = 10.0) -> 
 def sym_auc(y, x):
     a = roc_auc_score(y, x)
     return max(a, 1 - a), ("+" if a >= 0.5 else "-")
-
-
-def recall_at_budget(score: np.ndarray, y: np.ndarray, budget=BUDGET) -> float:
-    """Recall in the top `budget` share; ties broken at random (expected value)."""
-    n, B = len(y), budget * len(y)
-    order = np.argsort(-score, kind="stable")
-    s, yy = score[order], y[order]
-    thr = s[int(B) - 1]
-    above = s > thr
-    tied = s == thr
-    tp = yy[above].sum() + (B - above.sum()) * yy[tied].mean()
-    return float(tp / y.sum())
 
 
 def rule_score(F: pd.DataFrame) -> np.ndarray:

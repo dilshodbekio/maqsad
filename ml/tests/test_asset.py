@@ -191,7 +191,8 @@ def test_portfolio_photos_carry_the_asset_check(P):
     assert all(i.get("asset") for i in idx.images)
     lid = next(iter(idx.by_loan))
     ph = api.get_loan(lid)["photos"][0]
-    assert set(ph["asset_match"]) == {"label", "score", "matches_purpose", "label_uz"}
+    assert "asset_match" not in ph                                    # not part of the backend's Photo schema (contract v1.4 shape)
+    assert set(idx.photos_of(lid)[0]["asset_match"]) == {"label", "score", "matches_purpose", "label_uz"}
 
 
 def test_warm_up_loads_clip():

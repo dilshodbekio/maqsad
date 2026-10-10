@@ -204,7 +204,7 @@ def render_asset() -> list[str]:
       "The reason text follows the same rule: a different thing found -> 'Rasmda kredit maqsadiga mos aktiv aniqlanmadi (aniqlangan: ...)'; the right class with low "
       "confidence -> 'Rasmdagi aktiv ishonchli aniqlanmadi (eng ehtimoliy: ..., ishonch past)'; never 'no matching asset' when the label equals the purpose. "
       "The probe is trained on every library image, "
-      "so the asset results shown for the **portfolio** photos (`photos[].asset_match`) are in-sample (training images) and say nothing about accuracy.")
+      "so the asset results of the **portfolio** photos (in the photo index) are in-sample (training images) and say nothing about accuracy.")
     w("")
     w("**Robustness** (seed 0 folds; each transformed copy is classified by the probe / zero-shot of its CV fold; 'label kept' = same predicted class "
       "as the untransformed image):")
@@ -461,7 +461,7 @@ def render() -> str:
       "OpenAI's model card calls any deployed use of the model out of scope. Production at a bank needs a legal review or a LAION-trained OpenCLIP checkpoint "
       "(for example `ViT-B-32` / `laion2b_s34b_b79k`) with its own weight licence; the probe would have to be re-trained and re-evaluated for it.")
     w("- **Portfolio `asset_match` is in-sample:** the asset probe is fitted on every library image, including all portfolio photos, so the asset results "
-      "shown for the demo portfolio's own photos (`photos[].asset_match`, 90 of 90 'matches') say nothing about accuracy and "
+      "of the demo portfolio's own photos (photo index: 90 of 90 'matches') say nothing about accuracy and "
       "`PHOTO_ASSET_MISMATCH` never fires on the default portfolio; it fires for uploads.")
     w("- **Toy and model objects:** the library labels a toy sewing machine (`tikuv_dastgohi_01`) and a model of a poultry pen (`parranda_08`) as assets, so the "
       "probe accepts such look-alikes; a picture of a cow or a toy would pass the asset check.")

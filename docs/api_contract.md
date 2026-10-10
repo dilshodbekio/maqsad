@@ -82,7 +82,7 @@ GET  /api/scenario_presets  → [{id, title_uz, description_uz, scenario}]
 |---|---|
 | `loan` | `{loan_id, borrower_id, borrower_name_masked, purpose, amount_uzs, term_months, disbursed_at, snapshot_date, region, branch_id, supplier_id, invoice_amount_uzs}` |
 | `transactions[]` | `{txn_id, ts, type, amount_uzs, counterparty_id, counterparty_kind}`; `type` ∈ `disbursement, cash_withdrawal, supplier_payment, p2p_out, p2p_in, external_transfer, income` |
-| `photos[]` | ml: `{photo_id, path, purpose, captured_at, lat, lon, duplicate_of[], asset_match, source: "portfolio"}` (`asset_match` as in `check_photo`; for portfolio photos it is **in-sample**: the probe was trained on these images) (only for loans that have a photo; `path` repo-relative, under `ml/assets/`); backend adds `url`. Borrower uploads of the caller's sandbox: `{photo_id, url, captured_at (server time), client_captured_at, lat, lon, source: "borrower_upload", check}` |
+| `photos[]` | ml: `{photo_id, path, purpose, captured_at, lat, lon, duplicate_of[], source: "portfolio"}` (no `asset_match` here: the asset result of a portfolio photo is in-sample, the probe was trained on these images; it only shows up as `evidence[].data.asset_match` when it escalates) (only for loans that have a photo; `path` repo-relative, under `ml/assets/`); backend adds `url`. Borrower uploads of the caller's sandbox: `{photo_id, url, captured_at (server time), client_captured_at, lat, lon, source: "borrower_upload", check}` |
 | `invoice?` | `{supplier_name, supplier_oked, oked_matches_purpose, invoice_amount_uzs}` |
 | `reasons[]` | top 3 money-trail reasons `{code, text_uz, weight, evidence_refs[]}` (`weight` = share of the loan's risk-raising push, 0..1) + policy reasons `{code, text_uz, weight: null, evidence_refs[], source: "fusion_policy"}`; plain Uzbek, never accusatory; every `evidence_refs` value is an `evidence[].ref`. `score_loan` reasons have no `evidence_refs` |
 | `escalations[]` | `{code, min_color, text_uz, evidence_refs[], raises_color}` (see "Evidence fusion") |
@@ -260,7 +260,7 @@ build and runtime), `HF_HUB_OFFLINE=1`, `MAQSAD_ASSET_CHECK=off` (switch the ass
 2. `ml.api.warm_up()` qo'shildi: portfel + yuz detektori + CLIP; `get_queue()` o'rniga shuni chaqirish tavsiya etiladi. CLIP yuklanmasa
    (`clip_loaded: false`) servis ishlayveradi: `asset_match: null`, eskalatsiya yo'q, so'rov vaqtida hech narsa yuklab olinmaydi.
 3. `ml.api.InvalidRequestError` (noto'g'ri `sandbox_id`) → 400.
-4. `photos[].asset_match` va `evidence[kind=photo].data.asset_match` qo'shildi (portfel rasmlari uchun in-sample).
+4. `evidence[kind=photo].data.asset_match` qo'shildi. `photos[]` shakli o'zgarmadi (portfel rasmlarining `asset_match`i in-sample bo'lgani uchun HTTP shaklida yo'q).
 5. CLIP vaznlari build vaqtida oldindan yuklanadi, `MAQSAD_*` o'zgaruvchilari va Dockerfile: `ml/README.md`.
 6. HTTP qatlami (v1.4) o'zgarishsiz: `/api` prefiksi, `{items, total, counts}`, `{detail}` xato shakli, health, admin, session.
 

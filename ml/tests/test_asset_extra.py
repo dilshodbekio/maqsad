@@ -89,7 +89,8 @@ def test_portfolio_view_sandbox_view_and_check_photo_agree(P):
     idx = get_index()
     im = next(i for i in idx.images if len(i["loans"]) == 1 and i["purpose"] == "chorva")
     owner = im["loans"][0]
-    ph = api.get_loan(owner)["photos"][0]["asset_match"]
+    assert "asset_match" not in api.get_loan(owner)["photos"][0]      # not in the HTTP photo shape; it lives in the index
+    ph = idx.photos_of(owner)[0]["asset_match"]
     assert ph == im["asset"]
     wrong = free_loan(P, "tikuv_dastgohi", skip=2)                      # a cow uploaded for a sewing-machine loan
     r = api.check_photo(wrong, image(im["file"]), sandbox_id="S")["asset_match"]

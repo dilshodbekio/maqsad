@@ -1,0 +1,7 @@
+# Backend runtime dependencies (ML deps live in ml/requirements.txt; Dockerfile installs both).
+fastapi==0.115.6
+starlette==0.41.3
+uvicorn[standard]==0.32.1
+pydantic==2.10.6
+python-multipart==0.0.20
+httpx==0.28.1

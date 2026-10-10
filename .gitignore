@@ -223,3 +223,9 @@ node_modules/
 data/generated/
 data/raw/
 *.parquet
+
+# Maqsad runtime data (SQLite, sandbox photos) and frontend build
+data_runtime/
+frontend/dist/
+*.tsbuildinfo
+.venv/

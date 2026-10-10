@@ -124,7 +124,8 @@ def test_template_edge_cases():
     assert "to'lov tushmagan" in T["sup_age_at_first_payment_days"](-1, {})
     assert "atigi 0" not in T["sup_active_span_days"](-1, {}) and "hali harakat" in T["sup_active_span_days"](-1, {})
     assert T["invoice_gap"](-1, {}) == "Hisob-faktura mavjud emas" and "to'lanmagan" in T["invoice_gap"](1.0, {})
-    assert "130 foizini" in T["sup_cash_share"](1.3, {}) and "150 foiz va undan ko'pini" in T["sup_exit_share"](1.5, {})
+    assert "100 foizdan ko'pini" in T["sup_cash_share"](1.3, {}) and "100 foizdan ko'pini" in T["sup_exit_share"](1.5, {})
+    assert "100 foizini" in T["sup_cash_share"](1.0, {}) and "foizdan" not in T["sup_cash_share"](1.0, {})        # exactly 100% is a percentage
     assert "78 foizi" in T["cash_share_d1"](0.78, {}) and "24 soat" in T["cash_share_d1"](0.78, {})
     assert "hisob-fakturasida ko'rsatilgan" in T["sup_in_degree"](7, {})
     assert "naqd yechish qayd etilmagan" in T["first_cash_days"](NEVER, {})

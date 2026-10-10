@@ -1,4 +1,4 @@
-"""Pydantic schemas — 1:1 with docs/api_contract.md (v1.1).
+"""Pydantic schemas — 1:1 with docs/api_contract.md (v1.2).
 
 Inner shapes (Loan, Transaction, Photo, Invoice, Evidence, LoanReason) match the REAL ml.api output exactly
 (get_loan / check_photo of ml money_trail_v1 + photo module). Unknown extra keys from ml are dropped
@@ -26,8 +26,21 @@ class Reason(BaseModel):
     weight: float
 
 
-class LoanReason(Reason):
+class LoanReason(BaseModel):
+    code: str
+    text_uz: str
+    weight: Optional[float] = None  # None for evidence-fusion policy reasons
     evidence_refs: List[str] = []  # each is an evidence[].ref of the same loan
+    source: Optional[Literal["fusion_policy"]] = None
+
+
+class Escalation(BaseModel):
+    """Evidence-fusion policy: a photo finding that raises the queue colour (never the risk)."""
+    code: str  # PHOTO_DUPLICATE | PHOTO_FAR | PHOTO_TIME | PHOTO_ASSET_MISMATCH
+    min_color: Color
+    text_uz: str
+    evidence_refs: List[str] = []
+    raises_color: bool
 
 
 # ---------- inner shapes of GET /loan/{id} (= ml.api.get_loan output) ----------
@@ -101,7 +114,7 @@ class Invoice(BaseModel):
 
 class Evidence(BaseModel):
     ref: str
-    kind: Literal["txn", "invoice", "graph"]
+    kind: Literal["txn", "invoice", "graph", "photo"]
     summary_uz: Optional[str] = None
     data: Any = None
 
@@ -122,8 +135,11 @@ class QueueItem(BaseModel):
     amount_uzs: int
     region: str
     risk: Risk
-    color: Color
+    color: Color  # after evidence fusion (>= base_color)
     top_reason: str
+    base_color: Color  # money-trail colour
+    priority: float  # queue sort key: colour rank (green 0, yellow 1, red 2) + risk
+    escalations: List[Escalation] = []
 
 
 class LoanDetail(BaseModel):
@@ -133,6 +149,9 @@ class LoanDetail(BaseModel):
     invoice: Optional[Invoice] = None
     risk: Risk
     color: Color
+    base_color: Color
+    priority: float
+    escalations: List[Escalation] = []
     reasons: List[LoanReason]
     evidence: List[Evidence]
     model_version: str

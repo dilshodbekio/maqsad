@@ -26,9 +26,10 @@ def test_queue_sorted_and_complete(client):
     assert r.status_code == 200
     items = r.json()
     assert len(items) == 40
-    assert [i["risk"] for i in items] == sorted((i["risk"] for i in items), reverse=True)
+    assert [i["priority"] for i in items] == sorted((i["priority"] for i in items), reverse=True)
     assert set(items[0]) == {"loan_id", "borrower_name_masked", "purpose", "amount_uzs", "region",
-                             "risk", "color", "top_reason"}
+                             "risk", "color", "top_reason", "base_color", "priority", "escalations"}
+    assert all(i["base_color"] == i["color"] and i["escalations"] == [] for i in items)  # stub: no fusion
     assert {i["color"] for i in items} == {"green", "yellow", "red"}
     assert len({i["purpose"] for i in items}) == 5
 

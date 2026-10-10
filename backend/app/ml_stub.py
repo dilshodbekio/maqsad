@@ -4,6 +4,8 @@
   No hand-written answers in code.
 - Every response that carries a model version says "stub"; /api/health reports ml_mode="stub"
   and the frontend shows a visible STUB banner.
+- No evidence fusion in the stub: base_color == color, escalations == [], priority = colour rank + risk
+  (same formula as ml, so the queue order logic is the same).
 - check_photo does only what it can honestly compute without a model:
   exact-byte duplicate search inside the caller's sandbox, a coarse Uzbekistan bounding-box
   geo check and a client-vs-server clock check. asset_match is None (no classifier),
@@ -28,6 +30,11 @@ MAX_CLOCK_SKEW_S = 15 * 60
 _loans: Optional[dict] = None
 _lock = threading.Lock()
 _photo_index: dict = {}  # sandbox_id -> list[(loan_id, sha256)]
+COLOR_RANK = {"green": 0, "yellow": 1, "red": 2}
+
+
+def _fusion_fields(it: dict) -> dict:
+    return {"base_color": it["color"], "priority": COLOR_RANK[it["color"]] + it["risk"], "escalations": []}
 
 
 def _data() -> dict:
@@ -45,7 +52,7 @@ def _item(loan_id: str) -> dict:
         raise KeyError(loan_id) from None
 
 
-def get_queue() -> list:
+def get_queue(sandbox_id: Optional[str] = None) -> list:
     items = []
     for it in _data().values():
         loan = it["loan"]
@@ -58,13 +65,14 @@ def get_queue() -> list:
             "risk": it["risk"],
             "color": it["color"],
             "top_reason": it["reasons"][0]["text_uz"],
+            **_fusion_fields(it),
         })
-    return sorted(items, key=lambda x: -x["risk"])
+    return sorted(items, key=lambda x: -x["priority"])
 
 
-def get_loan(loan_id: str) -> dict:
+def get_loan(loan_id: str, sandbox_id: Optional[str] = None) -> dict:
     it = _item(loan_id)
-    return {**it, "model_version": MODEL_VERSION}
+    return {**it, **_fusion_fields(it), "model_version": MODEL_VERSION}
 
 
 def score_loan(loan_id: str) -> dict:

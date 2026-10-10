@@ -13,8 +13,9 @@ Loading:
 Per-function status (shown by /api/health): "real" | "stub" | "not_ready" (NotImplementedError -> 503)
 | "missing" (not defined in ml.api -> 503).
 
-Optional ml features (both paths work): `sandbox_id` is passed to check_photo only if its signature
-accepts it; `blurred_image` is taken from check_photo's result if present, otherwise nothing is stored.
+Optional ml features (both paths work): `sandbox_id` is passed to get_queue / get_loan / check_photo only
+if the function's signature accepts it; `blurred_image` is taken from check_photo's result if present,
+otherwise nothing is stored.
 """
 from __future__ import annotations
 
@@ -115,8 +116,8 @@ class MLAdapter:
             f: "stub" if mode == "stub" else ("real" if callable(getattr(impl, f, None)) else "missing")
             for f in FUNCTIONS
         }
-        cp = getattr(impl, "check_photo", None)
-        self._check_photo_takes_sandbox = callable(cp) and _accepts_kw(cp, "sandbox_id")
+        self._takes_sandbox = {f: callable(getattr(impl, f, None)) and _accepts_kw(getattr(impl, f), "sandbox_id")
+                               for f in ("get_queue", "get_loan", "check_photo")}
 
     @property
     def model_version(self) -> str:
@@ -196,11 +197,14 @@ class MLAdapter:
             log.exception("ml.%s failed", name)
             raise MLFailure(f"{type(e).__name__}: {e}") from e
 
-    def get_queue(self) -> list:
-        return self._call("get_queue")
+    def _sandbox_kw(self, name: str, sandbox_id: Optional[str]) -> dict:
+        return {"sandbox_id": sandbox_id} if self._takes_sandbox.get(name) else {}
 
-    def get_loan(self, loan_id: str) -> dict:
-        return self._call("get_loan", loan_id)
+    def get_queue(self, sandbox_id: Optional[str] = None) -> list:
+        return self._call("get_queue", **self._sandbox_kw("get_queue", sandbox_id))
+
+    def get_loan(self, loan_id: str, sandbox_id: Optional[str] = None) -> dict:
+        return self._call("get_loan", loan_id, **self._sandbox_kw("get_loan", sandbox_id))
 
     def score_loan(self, loan_id: str) -> dict:
         return self._call("score_loan", loan_id)
@@ -208,9 +212,7 @@ class MLAdapter:
     def check_photo(self, loan_id: str, image_bytes: bytes, lat=None, lon=None, captured_at=None,
                     sandbox_id: Optional[str] = None) -> Tuple[dict, Optional[bytes]]:
         """Returns (result without blurred_image, blurred_image bytes or None)."""
-        kwargs = dict(lat=lat, lon=lon, captured_at=captured_at)
-        if self._check_photo_takes_sandbox:
-            kwargs["sandbox_id"] = sandbox_id
+        kwargs = dict(lat=lat, lon=lon, captured_at=captured_at, **self._sandbox_kw("check_photo", sandbox_id))
         raw = dict(self._call("check_photo", loan_id, image_bytes, **kwargs))
         blurred = raw.pop("blurred_image", None)
         if blurred is not None and not isinstance(blurred, (bytes, bytearray)):

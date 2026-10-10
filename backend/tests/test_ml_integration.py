@@ -18,8 +18,8 @@ from fastapi.testclient import TestClient
 from backend.app.config import REPO_ROOT, Settings
 from backend.app.main import create_app
 from backend.app.ml_adapter import FUNCTIONS, MLAdapter
-from backend.app.schemas import (CheckPhotoResponse, Evidence, Invoice, Loan, LoanDetail, LoanReason, Photo,
-                                 QueueItem, Transaction)
+from backend.app.schemas import (CheckPhotoResponse, Escalation, Evidence, Invoice, Loan, LoanDetail, LoanReason,
+                                 Photo, QueueItem, Transaction)
 
 
 @pytest.fixture(scope="module")
@@ -60,7 +60,9 @@ def test_health_all_real(client):
 def test_ml_output_matches_schemas(adapter, photo_loan):
     q = adapter.get_queue()
     _keys_declared(QueueItem, q[:50])
-    for lid in (q[0]["loan_id"], q[-1]["loan_id"], photo_loan[0]):
+    _keys_declared(Escalation, [e for i in q for e in i["escalations"]])
+    escalated = next(i["loan_id"] for i in q if i["escalations"])  # fusion reasons (weight None) + photo evidence
+    for lid in (q[0]["loan_id"], q[-1]["loan_id"], photo_loan[0], escalated):
         raw = adapter.get_loan(lid)
         assert set(raw) == set(LoanDetail.model_fields)
         LoanDetail.model_validate(raw)
@@ -80,7 +82,8 @@ def test_queue_loan_score_end_to_end(client):
     q = client.get("/api/queue")
     assert q.status_code == 200
     items = q.json()
-    assert len(items) > 0 and [i["risk"] for i in items] == sorted((i["risk"] for i in items), reverse=True)
+    assert len(items) > 0 and [i["priority"] for i in items] == sorted((i["priority"] for i in items), reverse=True)
+    assert all(i["color"] in ("green", "yellow", "red") and i["base_color"] for i in items)
     lid = items[0]["loan_id"]
     d = client.get(f"/api/loan/{lid}").json()
     assert d["model_version"] == ml_api.MODEL_VERSION and d["risk"] == items[0]["risk"]
@@ -138,3 +141,36 @@ def test_admin_reset_with_real_ml(client, photo_loan):
     # after reset the sandbox upload is forgotten: only portfolio duplicates remain
     r = client.post("/api/check_photo", data={"loan_id": q[1]}, files={"image": ("a.jpg", img, "image/jpeg")})
     assert q[0] not in {x["loan_id"] for x in r.json()["duplicate_of"]}
+
+
+def test_escalated_loan_served_by_api(client):
+    """Loans with fusion reasons (weight null) and photo evidence must not 502."""
+    q = client.get("/api/queue").json()
+    lid = next(i["loan_id"] for i in q if i["escalations"])
+    d = client.get(f"/api/loan/{lid}")
+    assert d.status_code == 200, d.text
+    d = d.json()
+    assert any(r.get("source") == "fusion_policy" and r["weight"] is None for r in d["reasons"])
+    assert any(e["kind"] == "photo" for e in d["evidence"])
+
+
+def test_sandbox_upload_escalates_only_own_view_until_reset(client, photo_loan):
+    owner, im = photo_loan
+    img = (REPO_ROOT / "ml" / "assets" / "photos" / im["file"]).read_bytes()
+    q = client.get("/api/queue").json()
+    target = next(i for i in q if i["loan_id"] != owner and i["color"] == "green" and not i["escalations"])
+    r = client.post("/api/check_photo", data={"loan_id": target["loan_id"]},
+                    files={"image": ("a.jpg", img, "image/jpeg")})
+    assert r.status_code == 200 and r.json()["duplicate_of"]
+
+    mine = client.get(f"/api/loan/{target['loan_id']}").json()
+    assert mine["color"] == "red" and mine["base_color"] == "green"
+    assert "PHOTO_DUPLICATE" in {e["code"] for e in mine["escalations"]}
+    assert mine["risk"] == target["risk"]  # the photo never changes risk
+
+    other = TestClient(client.app).get(f"/api/loan/{target['loan_id']}").json()
+    assert other["color"] == "green" and other["escalations"] == []  # other sandboxes unaffected
+
+    assert client.post("/api/admin/reset", headers={"X-Admin-Token": "t"}).status_code == 200
+    after = client.get(f"/api/loan/{target['loan_id']}").json()
+    assert after["color"] == "green" and after["escalations"] == []

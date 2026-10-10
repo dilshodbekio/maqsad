@@ -130,17 +130,41 @@ def test_invalid_image_error_mapping(make_client, message, status):
 
 # ---------- admin reset -> ml.reset_sandbox ----------
 
-def test_admin_reset_calls_ml_reset_sandbox(make_client):
+def test_admin_reset_calls_ml_reset_sandbox_none(make_client):
     resets = []
     c = make_client(adapter=MLAdapter(_fake_ml(reset_sandbox=resets.append), "real"), admin_token="t")
     resets.clear()  # drop the warm-up probe call
     lid = c.get("/api/queue").json()[0]["loan_id"]
     _upload(c, lid)
-    other = TestClient(c.app)
-    _upload(other, lid)
+    _upload(TestClient(c.app), lid)
     assert c.post("/api/admin/reset", headers={"X-Admin-Token": "t"}).status_code == 200
-    assert set(resets[:-1]) == {c.cookies.get("sandbox_id"), other.cookies.get("sandbox_id")}
-    assert resets[-1] is None
+    assert resets == [None]  # one call: None = every sandbox (contract v1.2)
+
+
+def test_sandbox_id_passed_to_queue_and_loan(make_client):
+    seen = []
+
+    def get_queue(sandbox_id=None):
+        seen.append(("queue", sandbox_id))
+        return ml_stub.get_queue()
+
+    def get_loan(loan_id, sandbox_id=None):
+        seen.append(("loan", sandbox_id))
+        return ml_stub.get_loan(loan_id)
+
+    c = make_client(adapter=MLAdapter(_fake_ml(get_queue=get_queue, get_loan=get_loan), "real"))
+    seen.clear()  # warm-up / probes
+    lid = c.get("/api/queue").json()[0]["loan_id"]
+    c.get(f"/api/loan/{lid}")
+    sid = c.cookies.get("sandbox_id")
+    assert seen == [("queue", sid), ("loan", sid)]
+
+
+def test_old_ml_signature_without_sandbox_still_works(make_client):
+    m = _fake_ml(get_queue=lambda: ml_stub.get_queue(), get_loan=lambda loan_id: ml_stub.get_loan(loan_id))
+    c = make_client(adapter=MLAdapter(m, "real"))
+    lid = c.get("/api/queue").json()[0]["loan_id"]
+    assert c.get(f"/api/loan/{lid}").status_code == 200
 
 
 # ---------- portfolio photos from ml/assets ----------

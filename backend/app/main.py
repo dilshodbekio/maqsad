@@ -213,13 +213,13 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
                 "warmup": adapter.warmup_state, "functions": dict(adapter.status)}
 
     @api.get("/queue", response_model=List[QueueItem])
-    def queue():
-        items = _validated(List[QueueItem], adapter.get_queue())
-        return sorted(items, key=lambda x: -x.risk)
+    def queue(request: Request):
+        items = _validated(List[QueueItem], adapter.get_queue(request.state.sandbox_id))
+        return sorted(items, key=lambda x: -x.priority)  # ml already sorts; keep the contract even if it did not
 
     @api.get("/loan/{loan_id}", response_model=LoanDetail)
     def loan(loan_id: LoanIdPath, request: Request):
-        data = dict(adapter.get_loan(loan_id))
+        data = dict(adapter.get_loan(loan_id, request.state.sandbox_id))
         portfolio = [{**ph, "url": _asset_url(ph.get("path")), "source": "portfolio"}
                      for ph in data.get("photos") or []]
         own = [{
@@ -314,7 +314,7 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
     @api.post("/draft_report", response_model=DraftReport)
     def draft_report(body: DraftReportRequest, request: Request):
         rate_check(request, "draft_report")
-        data = adapter.get_loan(body.loan_id)
+        data = adapter.get_loan(body.loan_id, request.state.sandbox_id)
         if not settings.llm_configured:
             raise HTTPException(503, f"{MSG_REPORT_NOT_READY}: LLM ulanmagan. Kredit sahifasi undan mustaqil ishlaydi.")
         try:
@@ -341,7 +341,7 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
 
     @api.get("/audit", response_model=List[AuditEntry])
     def audit(loan_id: LoanIdQuery, request: Request):
-        adapter.get_loan(loan_id)  # 404 for unknown loan
+        adapter.get_loan(loan_id, request.state.sandbox_id)  # 404 for unknown loan
         return db.audit_list(request.state.sandbox_id, loan_id)
 
     @api.post("/admin/reset", response_model=ResetResponse)
@@ -349,9 +349,7 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         if not settings.admin_token or not x_admin_token or not hmac.compare_digest(
                 x_admin_token.encode(), settings.admin_token.encode()):
             raise HTTPException(403, "Ruxsat yo'q: X-Admin-Token noto'g'ri yoki ADMIN_TOKEN sozlanmagan.")
-        for sid in db.photo_sandboxes():  # every sandbox that uploaded through this backend
-            adapter.reset_sandbox(sid)
-        adapter.reset_sandbox(None)  # ml: None = all sandboxes (agreed contract v1.1)
+        adapter.reset_sandbox(None)  # ml: None = every sandbox (contract v1.2)
         db.reset_sandbox_data()
         limiter.reset()
         log.warning("admin reset done")

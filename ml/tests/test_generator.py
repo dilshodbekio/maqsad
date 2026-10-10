@@ -287,3 +287,14 @@ def test_runtime_5000_loans():
     out = build(dataclasses.replace(TRAIN, n_loans=5000))
     assert time.perf_counter() - t0 < 60
     assert len(out["loans"]) == 5000
+
+
+def test_honest_suppliers_with_short_active_window(big_train):
+    m = big_train["labels"].merge(big_train["loans"], on="loan_id")
+    sup_honest = m[~m.is_fraud].groupby("supplier_id")
+    n = sup_honest.size()
+    span = (sup_honest.disbursed_at.max() - sup_honest.disbursed_at.min()) / pd.Timedelta(days=1)
+    multi = n >= 2
+    assert multi.sum() > 100
+    # ring suppliers burst within <= 150 days; a visible minority of honest multi-loan suppliers does too
+    assert 0.10 <= (span[multi] <= 120).mean() <= 0.45

@@ -76,6 +76,7 @@ class Params:
     t3_max_day: float = 150.0               # resale happens U(20, t3_max_day) days after disbursement
     # --- honest ---
     honest_employee_link: float = 0.025
+    honest_short_window_share: float = 0.18  # honest suppliers (>= 2 borrowers) active in a short window only
     honest_link_same_branch: float = 0.75   # linked employee works in a borrower's branch (rings: 0.80)
     honest_mismatch: float = 0.07           # share of honest loans with OKED mismatch
     seller_scale: float = 1.0               # scales honest livestock/poultry sellers (~5% of loans)

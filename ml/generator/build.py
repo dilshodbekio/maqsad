@@ -201,6 +201,38 @@ def _plan_suppliers(p, rng, pl, rings):
     return sup, sup_of
 
 
+def _short_windows(p, rng, pl, sup, sup_of):
+    """A share of honest suppliers is only active in a short window, like a ring burst but legitimate:
+    newly registered suppliers (registered right before their first payment) and, for parranda /
+    issiqxona, seasonal suppliers (spring-summer only). Moves the disbursement dates of ALL their loans."""
+    snap_s = _snap_s(p)
+    lo, hi = snap_s - 365 * DAY, snap_s - 2 * DAY
+    members = [[] for _ in sup]
+    for i, j in enumerate(sup_of):
+        members[j].append(i)
+    year = pd.Timestamp(p.snapshot_date).year
+    for j, s in enumerate(sup):
+        if s["group"] not in ("honest", "generic", "unrelated") or len(members[j]) < 2:
+            continue
+        if rng.random() >= p.honest_short_window_share:
+            continue
+        m = members[j]
+        top = pd.Series(pl["purpose"][m]).mode().iloc[0]
+        if top in ("parranda", "issiqxona") and rng.random() < 0.5:        # seasonal: Mar 1 - Aug 31
+            best = max(((max(a, lo), min(b, hi)) for a, b in (
+                (int(pd.Timestamp(f"{y}-03-01").timestamp()), int(pd.Timestamp(f"{y}-08-31").timestamp()))
+                for y in (year - 1, year))), key=lambda ab: ab[1] - ab[0])
+            if best[1] - best[0] >= 30 * DAY:
+                pl["disb"][m] = rng.integers(best[0], best[1], len(m))
+                s["short_window"] = "seasonal"
+                continue
+        w = rng.uniform(20, 120) * DAY                                     # newly registered supplier
+        start = rng.uniform(lo, hi - w)
+        pl["disb"][m] = (start + rng.uniform(0, w, len(m))).astype(np.int64)
+        s["short_window"] = "new"
+        s["new_gap_days"] = rng.uniform(3, 45)
+
+
 def _ids(prefix, n, off, rng, width=6):
     perm = rng.permutation(n)
     return np.array([f"{prefix}{off + int(x):0{width}d}" for x in perm], dtype=object)
@@ -223,6 +255,7 @@ def build(p: Params) -> dict:
     sup = [sup[o] for o in used]
     sup_of = np.array([remap[int(x)] for x in sup_of])
     S = len(sup)
+    _short_windows(p, rng, pl, sup, sup_of)
 
     # ---- employees and ids (random permutations: row order carries no label information)
     n_branch = len(REGIONS) * BRANCHES_PER_REGION
@@ -251,7 +284,8 @@ def build(p: Params) -> dict:
     # ---- supplier registration (relative to the supplier's first loan)
     first_disb = np.full(S, np.iinfo(np.int64).max)
     np.minimum.at(first_disb, sup_of, pl["disb"])
-    age_days = np.array([rng.uniform(10, 330) if s["recent"] else 365 + rng.exponential(5 * 365)
+    age_days = np.array([s["new_gap_days"] if "new_gap_days" in s else
+                         rng.uniform(10, 330) if s["recent"] else 365 + rng.exponential(5 * 365)
                          for s in sup])
     registered = first_disb - (age_days * DAY).astype(np.int64)
 

@@ -37,9 +37,12 @@ PHOTO_ENGINEERED = ["photo_far_km", "photo_dup_count", "photo_gap_days"]
 PHOTO_RAW = ["photo_lat", "photo_lon", "borrower_lat", "borrower_lon", "photo_id_num",
              "photo_age_days", "photo_gap_days", "photo_gap_neg", "photo_far_km",
              "photo_coord_dup_count", "borrower_coord_dup_count", "photo_id_dup_count"]
-# the cash features a T1 (fast cash-out) detector is SUPPOSED to separate on - not flagged for T1
+# the features a T1 (fast cash-out) detector is SUPPOSED to separate on - not flagged for T1:
+# fast cash-out, and "no supplier payment" (T1's definition; invoice_gap is its complement), and the
+# timing of the first outflow
 INTENDED_T1 = {"first_cash_days", "cash_share_d1", "cash_share_d7", "cash_share_d30",
-               "cash_share_all", "leave_share_30", "n_cash_withdrawal", "share_cash_withdrawal"}
+               "cash_share_all", "leave_share_30", "n_cash_withdrawal", "share_cash_withdrawal",
+               "sup_pay_share", "invoice_gap", "share_supplier_payment", "first_tx_day"}
 
 
 def load(split: str, root: Path = OUT_ROOT) -> dict:

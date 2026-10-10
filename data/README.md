@@ -56,6 +56,7 @@ Assumption: honest livestock/poultry sellers are ~5% of loans, cash-heavy rural 
 Assumption: 25-35% of T1/T2 are "stealth" (look clean); 25% of T4 use a matching-OKED supplier.
 Assumption: ring size is 4 + Poisson(3) (train) / Poisson(2.5) (test), stealth rings have 2-3 borrowers; 40% / 33% of ring suppliers link to a bank employee, 2.5% of honest suppliers do. A linked employee works in the branch of one of the supplier's borrowers with probability 80% (rings) / 75% train, 70% test (honest suppliers).
 Assumption: 35% of fraud loans (both splits) and 2% of honest loans reuse a photo; 25% of fraud and 4% of honest photos are taken far from the borrower. These rates are the same for all typologies and not shifted between train and test.
+Assumption: 18% (both splits) of honest suppliers with >= 2 borrowers are active in a short window only (20-120 days): newly registered suppliers (registered 3-45 days before their first payment) and, for parranda / issiqxona, seasonal suppliers (March-August). Ring suppliers burst within 30-150 days (brief §2 case 3), so supplier activity span alone is a strong but not decisive T2 signal (single-feature AUC ~0.84).
 Assumption: all supplier-account flows are derived from loan payments only (no other business activity is simulated).
 Assumption: all numbers measured on this synthetic data say nothing about real accuracy; real accuracy is measured in the pilot.
 

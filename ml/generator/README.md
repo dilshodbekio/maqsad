@@ -32,9 +32,13 @@ Photos: only `photo_id` + manifest for now (`image_file` / `license` filled when
 - **Ledgers never go negative:** `flows.cap_outflows` replays each account in time order and caps every outflow at the
   balance (borrower accounts first; supplier accounts are then built from the settled supplier payments, shown as
   `income` rows, plus their own outflows). Tested in `ml/tests/test_generator.py`.
+- **Short-window honest suppliers:** `honest_short_window_share` (0.18) of honest suppliers with >= 2 borrowers are only
+  active for 20-120 days (new suppliers, or seasonal for parranda / issiqxona), so the T2 ring burst is not a free signal
+  (`sup_tx_ts_span_days` T2 AUC ~0.84, intentionally below the 0.90 flag).
 - **Leakage check:** `check_leakage.py` covers (A) engineered money-trail features, (B) all raw columns of the four tables
   plus derived ones, (C) a depth-2 tree on B (supplier-grouped CV), (D) photo module inputs. It flags AUC >= 0.90
-  except the intended T1 cash features. Re-run it after every generator change.
+  except the intended T1 features (fast cash-out, "no supplier payment" = `sup_pay_share` / `invoice_gap` /
+  `share_supplier_payment`, first-outflow timing). Re-run it after every generator change.
 - Project-level documentation (method, assumptions, licenses): `data/README.md`.
 
 ## Known limitations

@@ -283,10 +283,14 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
 
     @api.get("/photo/{photo_id}", include_in_schema=False)
     def photo(photo_id: Annotated[str, Path(pattern=r"^[0-9a-f]{32}$")], request: Request):
+        # only the owner sandbox can read its photo; anyone else gets the same 404 as a missing photo
         p = db.photo_file(request.state.sandbox_id, photo_id)
         if p is None:
             raise HTTPException(404, "Rasm topilmadi.")
-        return FileResponse(p, media_type=sniff_image(p.read_bytes()[:16]) or "application/octet-stream")
+        with p.open("rb") as f:
+            head = f.read(16)
+        return FileResponse(p, media_type=sniff_image(head) or "application/octet-stream",
+                            headers={"Cache-Control": "private, no-store"})
 
     @api.post("/draft_report", response_model=DraftReport)
     def draft_report(body: DraftReportRequest, request: Request):

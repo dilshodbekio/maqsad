@@ -68,6 +68,32 @@ def test_real_ml_with_sandbox_and_blur(make_client):
     assert stored == [b"BLURRED" + img]
 
 
+def test_photo_visible_only_to_owner_sandbox(make_client):
+    from fastapi.testclient import TestClient
+
+    def check_photo(loan_id, image_bytes, lat=None, lon=None, captured_at=None, sandbox_id=None):
+        return {**RESULT, "blurred_image": image_bytes}
+
+    owner = make_client(adapter=MLAdapter(_fake_ml(check_photo), "real"))
+    lid = owner.get("/api/queue").json()[0]["loan_id"]
+    owner.post("/api/check_photo", data={"loan_id": lid}, files={"image": ("a.png", png_bytes(), "image/png")})
+    url = owner.get(f"/api/loan/{lid}").json()["photos"][0]["url"]
+
+    r = owner.get(url)
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/png"
+    assert r.headers["cache-control"] == "private, no-store"
+
+    other = TestClient(owner.app)  # another visitor: new sandbox cookie
+    assert other.get(f"/api/loan/{lid}").json()["photos"] == []
+    r = other.get(url)
+    assert r.status_code == 404 and r.json()["detail"] == "Rasm topilmadi."
+    anon = TestClient(owner.app, cookies={"sandbox_id": "not-a-uuid"})  # forged/invalid cookie
+    assert anon.get(url).status_code == 404
+    assert owner.get("/api/photo/" + "0" * 32).status_code == 404  # unknown id, same answer
+    assert owner.get("/api/photo/..%2Fmaqsad.sqlite3").status_code in (404, 422)  # id must be 32 hex
+
+
 def test_ml_exception_is_502(make_client):
     def check_photo(*a, **k):
         raise RuntimeError("model crashed")

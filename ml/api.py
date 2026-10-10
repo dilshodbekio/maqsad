@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from ml.errors import InvalidImageError, LoanNotFoundError, ScenarioError  # noqa: F401  (re-exported for the backend)
+from ml.errors import InvalidImageError, InvalidRequestError, LoanNotFoundError, ScenarioError  # noqa: F401  (re-exported for the backend)
 from ml.money_trail.model import MODEL_VERSION
 from ml.money_trail.service import get_portfolio
 

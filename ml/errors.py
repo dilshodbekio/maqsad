@@ -10,5 +10,9 @@ class InvalidImageError(ValueError):
     """Image is empty, corrupted, not an image, or too large. Backend → HTTP 400/413."""
 
 
+class InvalidRequestError(ValueError):
+    """A request argument is invalid (e.g. a malformed sandbox_id); message in Uzbek. Backend -> HTTP 400."""
+
+
 class ScenarioError(ValueError):
     """The scenario given to score_scenario is invalid (message in Uzbek). Backend -> HTTP 400."""

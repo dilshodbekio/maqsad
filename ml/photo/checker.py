@@ -14,6 +14,7 @@ from math import asin, cos, radians, sin, sqrt
 from typing import Optional
 
 from ml.errors import LoanNotFoundError
+from ml.sandbox import validate_sandbox_id
 
 from . import config, hashing, imageio
 from .faces import FaceDetector, blur_faces
@@ -25,14 +26,24 @@ _lock = threading.Lock()
 _sandboxes: "OrderedDict[str, dict]" = OrderedDict()
 
 
-@lru_cache(maxsize=1)
+_init_lock = threading.Lock()
+_detector_obj: Optional[FaceDetector] = None
+
+
 def _detector() -> FaceDetector:
-    return FaceDetector()
+    """The shared face detector, created once (thread-safe)."""
+    global _detector_obj
+    if _detector_obj is None:
+        with _init_lock:
+            if _detector_obj is None:
+                _detector_obj = FaceDetector()
+    return _detector_obj
 
 
 def reset_sandbox(sandbox_id: Optional[str]) -> None:
     """Forget every photo uploaded in this sandbox (idempotent). `None` clears ALL sandboxes.
     The portfolio index is never touched."""
+    validate_sandbox_id(sandbox_id)
     with _lock:
         if sandbox_id is None:
             _sandboxes.clear()
@@ -72,27 +83,25 @@ def _time_ok(captured_at, loan) -> Optional[bool]:
     return t >= loan["disbursed_at"].to_pydatetime()
 
 
-def _sandbox_matches(sandbox_id, h, loan_id) -> list[dict]:
+def _match_and_remember(sandbox_id, loan_id, h, geo_ok, distance_km, time_ok, asset=None) -> list[dict]:
+    """ATOMIC (one critical section): the earlier uploads of this sandbox that duplicate `h`, then this upload is
+    stored. Two concurrent uploads of the same photo therefore always see each other in exactly one direction."""
     idx = get_index()
-    with _lock:
-        mine = list(_sandboxes.get(sandbox_id, {}).get("entries", ()))
-    out = []
-    for e in mine:
-        d = hashing.distance(idx.variant, h, e["hash"])
-        if d <= idx.max_distance and e["loan_id"] != loan_id:
-            out.append(dict(loan_id=e["loan_id"], similarity=round(1 - d, 4)))
-    return out
-
-
-def _remember(sandbox_id, loan_id, h, geo_ok, distance_km, time_ok):
     with _lock:
         sb = _sandboxes.setdefault(sandbox_id, dict(n=0, entries=[]))
         _sandboxes.move_to_end(sandbox_id)
+        out = []
+        for e in sb["entries"]:
+            d = hashing.distance(idx.variant, h, e["hash"])
+            if d <= idx.max_distance and e["loan_id"] != loan_id:
+                out.append(dict(loan_id=e["loan_id"], similarity=round(1 - d, 4)))
         sb["n"] += 1
-        sb["entries"].append(dict(seq=sb["n"], loan_id=loan_id, hash=h, geo_ok=geo_ok, distance_km=distance_km, time_ok=time_ok))
+        sb["entries"].append(dict(seq=sb["n"], loan_id=loan_id, hash=h, geo_ok=geo_ok, distance_km=distance_km,
+                                  time_ok=time_ok, asset=asset))
         del sb["entries"][:-MAX_PER_SANDBOX]
         while len(_sandboxes) > MAX_SANDBOXES:
             _sandboxes.popitem(last=False)
+    return out
 
 
 def sandbox_signals(sandbox_id: Optional[str]) -> dict[str, list[dict]]:
@@ -100,7 +109,7 @@ def sandbox_signals(sandbox_id: Optional[str]) -> dict[str, list[dict]]:
     Duplicates are computed now, against the portfolio index and against the sandbox's other uploads
     (a photo uploaded for two loans escalates both). Other sandboxes and portfolio mode are unaffected."""
     from ml.fusion import photo_signals
-    if sandbox_id is None:
+    if validate_sandbox_id(sandbox_id) is None:
         return {}
     with _lock:
         entries = list(_sandboxes.get(sandbox_id, {}).get("entries", ()))
@@ -127,6 +136,7 @@ def check_photo(loan_id: str, image_bytes: bytes, lat: Optional[float] = None, l
                 captured_at: Optional[datetime] = None, sandbox_id: Optional[str] = None) -> dict:
     from ml.money_trail.service import get_portfolio
     t0 = time.perf_counter()
+    validate_sandbox_id(sandbox_id)                                  # InvalidRequestError before anything else
     P = get_portfolio()
     P._check(loan_id)
     loan = P.loans.loc[loan_id]
@@ -135,13 +145,12 @@ def check_photo(loan_id: str, image_bytes: bytes, lat: Optional[float] = None, l
 
     geo_ok, km = _geo(lat, lon, loan)
     time_ok = _time_ok(captured_at, loan)
-    dups = get_index().matches(h, exclude_loan=loan_id)
-    if sandbox_id is not None:
-        dups = sorted(dups + _sandbox_matches(sandbox_id, h, loan_id), key=lambda x: (-x["similarity"], x["loan_id"]))
-        _remember(sandbox_id, loan_id, h, geo_ok, km, time_ok)
-
     blurred, n_faces = blur_faces(_detector(), rgb)
     jpeg = imageio.encode_jpeg(blurred)                              # re-encoding drops EXIF / metadata
+    dups = get_index().matches(h, exclude_loan=loan_id)
+    if sandbox_id is not None:
+        dups = sorted(dups + _match_and_remember(sandbox_id, loan_id, h, geo_ok, km, time_ok),
+                      key=lambda x: (-x["similarity"], x["loan_id"]))
     return dict(
         asset_match=None,                                            # CLIP asset check comes later
         duplicate_of=dups,

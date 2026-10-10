@@ -18,6 +18,7 @@ import pandas as pd
 
 from ml import fusion
 from ml.errors import LoanNotFoundError
+from ml.sandbox import validate_sandbox_id
 from ml.generator.build import build
 from ml.generator.config import MATCHING_OKED, SPLITS
 
@@ -170,7 +171,7 @@ class Portfolio:
         """Queue sorted by priority (colour rank, then risk). With a sandbox_id the escalations from that sandbox's
         uploaded photos are included; other sandboxes and the default view are unaffected."""
         items = copy.deepcopy(self._queue)          # callers may edit what they get; the cache must stay intact
-        if sandbox_id is None:
+        if validate_sandbox_id(sandbox_id) is None:
             return items
         from ml.photo.checker import sandbox_signals
         extra = sandbox_signals(sandbox_id)
@@ -205,6 +206,7 @@ class Portfolio:
                 for p in get_index().photos_of(loan_id)]
 
     def loan(self, loan_id: str, sandbox_id=None) -> dict:
+        validate_sandbox_id(sandbox_id)
         self._check(loan_id)
         ctx = self._context(loan_id)
         risk = float(self.risk[loan_id])

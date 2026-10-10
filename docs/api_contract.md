@@ -3,7 +3,7 @@
 Source: `docs/brief.md` §5. Any change requires agreement from both sides (via PR).
 During development the backend may return mock responses; **in the demo only the real model runs**.
 `ml/` serves the **demo** portfolio (generator split `demo`, seed 7), generated in memory on the first call
-(~6 s including imports; warm the service at start-up by calling `get_queue()` once).
+(~6 s including imports). Call `ml.api.warm_up()` once at service start: it loads the demo portfolio, the face detector and CLIP (~25 s in total on the development machine, ~1.4 GB memory); it returns the seconds each part took and `clip_loaded`.
 
 ```
 GET  /queue?sandbox_id=...            (sandbox_id optional)
@@ -27,7 +27,7 @@ GET  /scenario_presets
   → [{id, title_uz, description_uz, scenario}]     (inputs only; scores are always computed live)
 
 POST /check_photo       {loan_id, image (base64 or multipart), lat?, lon?, captured_at, sandbox_id?}
-  → {asset_match: {label, score} | null, duplicate_of: [{loan_id, similarity}],
+  → {asset_match: {label, score, matches_purpose, label_uz} | null, duplicate_of: [{loan_id, similarity}],
      geo_ok: bool | null, time_ok: bool | null, faces_blurred: bool, faces_count: int, latency_ms}
      (the blurred JPEG is returned by `ml` as `blurred_image: bytes` for the backend to store; it is NOT part of the HTTP response)
 
@@ -57,6 +57,8 @@ GET  /audit?loan_id=...
 | `POST /decision`, `GET /audit` | backend (audit log) | backend |
 
 Exceptions: `ml.api.LoanNotFoundError` (unknown or invalid `loan_id`, any type → HTTP 404),
+`ml.api.InvalidRequestError` (a `ValueError`; malformed `sandbox_id`: not a string, empty, > 64 characters or characters outside
+`[A-Za-z0-9_.:-]` → HTTP 400),
 `ml.api.InvalidImageError` (empty / not an image / corrupted / > 10 MB → HTTP 400/413) and
 `ml.api.ScenarioError` (a `ValueError`; invalid scenario, message in Uzbek → HTTP 400).
 
@@ -81,7 +83,7 @@ priority and never changes `risk`:
 | `PHOTO_DUPLICATE` | red | the loan's photo duplicates another loan's photo (portfolio index, or the same sandbox) |
 | `PHOTO_FAR` | yellow | `geo_ok == false` |
 | `PHOTO_TIME` | yellow | `time_ok == false` |
-| `PHOTO_ASSET_MISMATCH` | yellow | asset match below a threshold (inactive until the CLIP step exists) |
+| `PHOTO_ASSET_MISMATCH` | yellow | `asset_match.matches_purpose == false`: the photo does not show the asset the loan was for (CLIP + linear probe) |
 
 - `priority` = colour rank (green 0, yellow 1, red 2) + `risk`: the queue sort key.
 - `escalations[]` item: `{code, min_color, text_uz, evidence_refs, raises_color}` (`raises_color` = it raised the colour).
@@ -107,13 +109,14 @@ priority and never changes `risk`:
 - `txn`: `ref` = transaction id; `data` = `{txn_id, ts, type, amount_uzs, counterparty_id}`.
 - `invoice`: `ref` = `invoice:<loan_id>`; `data` = `{supplier_name, supplier_oked, oked_matches_purpose, invoice_amount_uzs}`.
 - `graph`: `ref` = `graph:<supplier_id>`; `data` = `{supplier_name, in_degree, cash_share, exit_share, active_span_days, employee_link}`.
-- `photo`: `ref` = `photo:<photo_id>` (portfolio) or `photo:sandbox:<loan_id>:<n>` (upload); `data` = `{photo, uploaded, duplicate_of, geo_ok, distance_km, time_ok}`.
+- `photo`: `ref` = `photo:<photo_id>` (portfolio) or `photo:sandbox:<loan_id>:<n>` (upload); `data` = `{photo, uploaded, duplicate_of, geo_ok, distance_km, time_ok, asset_match}`.
 `ref` is what `/draft_report` cites as `evidence_ref`.
 
 `invoice`: `{supplier_name, supplier_oked, oked_matches_purpose, invoice_amount_uzs}`.
 
 `photos[]` (only for the subset of loans that have a photo, otherwise `[]`):
-`{photo_id, path, purpose, captured_at, lat, lon, duplicate_of: [{loan_id, similarity}], source: "portfolio"}`;
+`{photo_id, path, purpose, captured_at, lat, lon, duplicate_of: [{loan_id, similarity}], asset_match, source: "portfolio"}`;
+`asset_match` has the shape described under check_photo; for the portfolio photos it is **in-sample** (the probe was trained on these images);
 `path` is relative to the repository root (the backend serves the file).
 
 ## Scenario scoring
@@ -159,9 +162,12 @@ inside a copy of the demo portfolio's context; the cached portfolio is never mod
 - The original image is never written anywhere: faces are blurred, EXIF is dropped by re-encoding, only the blurred JPEG
   (`blurred_image`, internal) and a perceptual hash are kept.
 - `faces_count` = faces found; `faces_blurred` = `faces_count > 0` (faces were found and blurred).
-- `asset_match` is `null` until the CLIP step is added. `geo_ok` / `time_ok` are `null` when the input is missing.
+- `asset_match` = `{label, score, matches_purpose, label_uz}` from OpenCLIP ViT-B-32 (CPU) + a linear probe: `label` is the most likely of the 5 loan
+  purposes or `other`, `score` its probability, `matches_purpose` = probability of the loan's own purpose >= a threshold chosen in cross-validation,
+  `label_uz` an Uzbek name of what was found (for non-assets one of a few everyday categories, e.g. "avtomobil"). It is `null` only if the CLIP
+  stack / weights are unavailable (a warning is logged once and no `PHOTO_ASSET_MISMATCH` is raised). `geo_ok` / `time_ok` are `null` when the input is missing.
 - The photo result does **not** change the money-trail `risk`. It can only raise the queue colour / priority through the evidence-fusion
   policy below (`ml/fusion.py`); `score_loan` and `score_scenario` stay money-trail only.
 
 ## Open points (to agree)
-- Photo asset match (CLIP) is not wired yet; `PHOTO_ASSET_MISMATCH` stays inactive until it is.
+- None open for the photo module; the asset check is a flag for the officer, not proof (see `docs/metrics.md` for its measured limits).

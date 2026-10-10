@@ -184,8 +184,10 @@ def build_reasons(model_features: list[str], x: np.ndarray, contrib: np.ndarray,
         if group is not None and group in used:
             continue                                  # same fact already shown by a stronger feature
         used.add(group)
-        item = dict(code=code, text_uz=TEMPLATES[code](float(x[i]), c),
-                    weight=round(float(contrib[i]) / total, 3))
+        weight = round(float(contrib[i]) / total, 3)
+        if weight <= 0:
+            continue                                  # a share that rounds to 0.0 is not a reason
+        item = dict(code=code, text_uz=TEMPLATES[code](float(x[i]), c), weight=weight)
         if with_refs:
             item["evidence_refs"] = _refs(code, c)[:MAX_REFS]
         out.append(item)

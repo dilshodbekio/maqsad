@@ -101,7 +101,8 @@ class PhotoIndex:
         out = []
         for im in self.by_loan.get(loan_id, []):
             out.append(dict(photo_id=im["photo_id"], path=f"ml/assets/photos/{im['file']}", purpose=im["purpose"],
-                            duplicate_of=self.matches(im["hash"], exclude_loan=loan_id), asset_match=im.get("asset")))
+                            duplicate_of=self.matches(im["hash"], exclude_loan=loan_id),
+                            asset_match=dict(im["asset"]) if im.get("asset") else None))
         return out
 
 

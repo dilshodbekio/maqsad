@@ -36,6 +36,8 @@ def hash_image(rgb: np.ndarray) -> dict[str, int]:
     g = _gray(rgb)
     h, w = g.shape
     c = g[int(h * 0.1):int(h * 0.9), int(w * 0.1):int(w * 0.9)]
+    if c.shape[0] < 1 or c.shape[1] < 1:          # tiny image (e.g. 1 pixel): the central crop is the image itself
+        c = g
     return dict(p=phash(g), d=dhash(g), pc=phash(c), dc=dhash(c))
 
 

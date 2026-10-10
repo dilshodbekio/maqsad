@@ -45,7 +45,7 @@ def photo_signals(*, ref: str, photo_label: str, duplicates: list[dict], geo_ok,
     out = []
     data = dict(photo=photo_label, uploaded=uploaded, duplicate_of=duplicates, geo_ok=geo_ok,
                 distance_km=None if distance_km is None else round(float(distance_km), 1), time_ok=time_ok,
-                asset_match=asset_match)
+                asset_match=dict(asset_match) if asset_match else None)
 
     def add(code, text):
         if POLICY[code]["active"]:

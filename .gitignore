@@ -222,3 +222,4 @@ __marimo__/
 node_modules/
 data/generated/
 data/raw/
+*.parquet

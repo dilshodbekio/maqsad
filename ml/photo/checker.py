@@ -167,7 +167,7 @@ def check_photo(loan_id: str, image_bytes: bytes, lat: Optional[float] = None, l
     asset = _asset_match(rgb, str(loan["purpose"]))                  # on the (unblurred) pixels, in memory
     dups = get_index().matches(h, exclude_loan=loan_id)
     if sandbox_id is not None:
-        dups = sorted(dups + _match_and_remember(sandbox_id, loan_id, h, geo_ok, km, time_ok, asset),
+        dups = sorted(dups + _match_and_remember(sandbox_id, loan_id, h, geo_ok, km, time_ok, dict(asset) if asset else None),
                       key=lambda x: (-x["similarity"], x["loan_id"]))
     return dict(
         asset_match=asset,                                           # {label, score, matches_purpose, label_uz} | None

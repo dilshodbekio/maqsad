@@ -135,6 +135,10 @@ def render_latency() -> list[str]:
     return L
 
 
+def _sp(d, f=pct):
+    return f"{f(d['mean'])} ({f(d['min'])} - {f(d['max'])})"
+
+
 def render_asset() -> list[str]:
     a = _load(RES_ASSET)
     L = []
@@ -150,61 +154,74 @@ def render_asset() -> list[str]:
     w(f"Produced by `python -m ml.eval.eval_asset`. Library: {a['n']} images, " + ", ".join(f"{k} {v}" for k, v in a["counts"].items()) +
       " (`other` = random things: rooms, vehicles, phones / laptops, food, landscapes, documents, animals, people; all openly licensed, "
       "`ml/assets/photos/manifest.csv`). Zero-shot = cosine similarity to English prompts per class; probe = logistic regression on the CLIP image "
-      f"embeddings. **Stratified {a['folds']}-fold cross-validation**; the threshold tau of the 'matches the loan purpose' decision (probability of the loan's purpose >= tau) "
-      "is chosen inside every training fold (inner out-of-fold probabilities, best F1), never on the test fold. These are tiny, hand-picked "
-      "Wikimedia images: the numbers say how the method behaves on this library, not on real borrower photos.")
+      "embeddings.")
+    w("")
+    w(f"**Leakage control.** The library has series of photos of one object by the same author (near-duplicates for CLIP). Every split is therefore "
+      f"**grouped by author** ({a['n_groups']} groups; `author` in the manifest): stratified-grouped {a['folds']}-fold CV, repeated with seeds "
+      f"{', '.join(map(str, a['seeds']))} (values below: mean, in brackets the range over seeds). The threshold tau of the 'matches the loan purpose' decision "
+      "(probability of the loan's purpose >= tau) is chosen inside every training fold (inner grouped out-of-fold probabilities, best F1), never on the "
+      f"test fold. An earlier ungrouped run gave 98.6% accuracy; grouping lowers it, as expected. C = {a['c']:g} and the choice of the probe over zero-shot "
+      "were made on this same CV (there is no untouched test set), so the numbers are optimistic by that amount. These are tiny, hand-picked Wikimedia "
+      "images: they say how the method behaves on this library, not on real borrower photos.")
     w("")
     w("**6-class accuracy (what is in the photo)**")
     w("")
-    w("| Class | n | zero-shot | linear probe (CV) |")
+    w("| Class | n | zero-shot | linear probe (grouped CV, mean of seeds) |")
     w("|---|---|---|---|")
     for c in cls:
         w(f"| {c} | {a['counts'][c]} | {pct(z['per_class'][c])} | {pct(p['per_class'][c])} |")
-    w(f"| **all** | {a['n']} | **{pct(z['acc'])}** | **{pct(p['acc'])}** |")
+    w(f"| **all** | {a['n']} | **{pct(z['acc'])}** | **{_sp(p['acc'])}** |")
     w("")
-    zb, pb = z["binary"], p["binary"]
     w("**Binary task: the photo matches the loan purpose** (every image paired with each of the 5 purposes; positive = the image shows that purpose; "
-      f"{pb['n_pos']} positive and {pb['n_neg']} negative pairs, pooled over the CV test folds)")
+      f"{p['binary_seed0']['n_pos']} positive and {p['binary_seed0']['n_neg']} negative pairs per seed, pooled over the CV test folds)")
     w("")
-    w("| Method | tau per fold | precision | recall | F1 | TP / FP / FN |")
+    w("| Method | precision | recall | F1 |")
+    w("|---|---|---|---|")
+    w(f"| zero-shot (tau chosen in the training folds) | {_sp(z['binary']['precision'])} | {_sp(z['binary']['recall'])} | {_sp(z['binary']['f1'])} |")
+    w(f"| linear probe | {_sp(p['binary']['precision'])} | {_sp(p['binary']['recall'])} | {_sp(p['binary']['f1'])} |")
+    w("")
+    w("| Seed | probe 6-class accuracy | precision | recall | F1 | TP / FP / FN |")
     w("|---|---|---|---|---|---|")
-    for name, d, taus in (("zero-shot", zb, z["taus"]), ("linear probe", pb, p["taus"])):
-        w(f"| {name} | {', '.join(f'{t:.2f}' for t in taus)} | {pct(d['precision'])} | {pct(d['recall'])} | {pct(d['f1'])} | {d['tp']} / {d['fp']} / {d['fn']} |")
+    for r in p["per_seed"]:
+        w(f"| {r['seed']} | {pct(r['acc'])} | {pct(r['precision'])} | {pct(r['recall'])} | {pct(r['f1'])} | {r['tp']} / {r['fp']} / {r['fn']} |")
     w("")
-    w("False matches on photos of random things (the situation of a judge photographing something else): out of "
-      f"{fm['probe']['other_pairs']} pairs (an `other` image x a purpose) the probe says 'matches' "
-      f"{pct(fm['probe']['other_rate'])} of the time, zero-shot {pct(fm['zero_shot']['other_rate'])}; for assets of a different purpose "
+    w("False matches (mean over seeds) on `other` images, which come from the same 20 search categories as the negatives the probe is trained on "
+      f"(so this is an in-distribution rate, not the rate for any random photo): out of {fm['probe']['other_pairs']} pairs (an `other` image x a purpose) "
+      f"the probe says 'matches' {pct(fm['probe']['other_rate'])} of the time, zero-shot {pct(fm['zero_shot']['other_rate'])}; for assets of a different purpose "
       f"({fm['probe']['wrong_asset_pairs']} pairs) {pct(fm['probe']['wrong_asset_rate'])} (probe) and {pct(fm['zero_shot']['wrong_asset_rate'])} (zero-shot).")
     w("")
     hb, hz = h["probe_binary"], h["zero_shot_binary"]
-    w(f"**The {h['n']} images left out of the portfolio photo index** (probe trained on the other images, tau chosen on them): probe accuracy "
-      f"{pct(h['probe_acc'])} ({round(h['probe_acc'] * h['n'])}/{h['n']}), zero-shot {pct(h['zero_shot_acc'])} ({round(h['zero_shot_acc'] * h['n'])}/{h['n']}); "
-      f"binary task probe TP/FP/FN {hb['tp']}/{hb['fp']}/{hb['fn']} (n_pos {hb['n_pos']}, n_neg {hb['n_neg']}), zero-shot {hz['tp']}/{hz['fp']}/{hz['fn']}. "
-      "With 10 images these are counts, not rates to rely on.")
+    w(f"**The {h['n']} images left out of the portfolio photo index.** The probe is trained on the other images without any photo of the same author "
+      f"({h['n_dropped_same_author']} images dropped for that reason, {h['n_train']} left) and tau is chosen on them: probe accuracy {pct(h['probe_acc'])} "
+      f"({round(h['probe_acc'] * h['n'])}/{h['n']}), zero-shot {pct(h['zero_shot_acc'])} ({round(h['zero_shot_acc'] * h['n'])}/{h['n']}); binary task probe "
+      f"TP/FP/FN {hb['tp']}/{hb['fp']}/{hb['fn']} (n_pos {hb['n_pos']}, n_neg {hb['n_neg']}), zero-shot {hz['tp']}/{hz['fp']}/{hz['fn']}. "
+      f"With {h['n']} images these are counts, not rates to rely on.")
     w("")
-    w(f"Deployed: the probe fitted on all {a['n']} images, tau = {a['tau_final']:.2f} (from all-data out-of-fold probabilities); artifact "
+    w(f"Deployed: the probe fitted on all {a['n']} images, tau = {a['tau_final']:.2f} (all-data grouped out-of-fold probabilities); artifact "
       "`ml/artifacts/asset_probe_v1.npz` (+ `.json`). `check_photo().asset_match = {label, score, matches_purpose, label_uz}`; "
-      "`matches_purpose == false` escalates the loan to at least yellow (`PHOTO_ASSET_MISMATCH`, section 5).")
+      "`matches_purpose == false` escalates the loan to at least yellow (`PHOTO_ASSET_MISMATCH`, section 5). The probe is trained on every library image, "
+      "so the asset results shown for the **portfolio** photos (`photos[].asset_match`) are in-sample (training images) and say nothing about accuracy.")
     w("")
-    w("**Robustness** (same transforms as the duplicate test; each transformed copy is classified by the probe / zero-shot of its CV fold; "
-      "'label kept' = same predicted class as the untransformed image):")
+    w("**Robustness** (seed 0 folds; each transformed copy is classified by the probe / zero-shot of its CV fold; 'label kept' = same predicted class "
+      "as the untransformed image):")
     w("")
     w("| Transform | probe accuracy | probe label kept | zero-shot accuracy | zero-shot label kept |")
     w("|---|---|---|---|---|")
     for t, d in a["robustness"].items():
         w(f"| {t} | {pct(d['probe_correct'])} | {pct(d['probe_same'])} | {pct(d['zs_correct'])} | {pct(d['zs_same'])} |")
-    w(f"| (no transform) | {pct(p['acc'])} | 100.0% | {pct(z['acc'])} | 100.0% |")
     w("")
     cl, wu = a["clip_load"], a["warm_up_total"]
-    w("**Warm-up and memory** (fresh processes, 3 runs; CLIP weights already in the cache directory; the one-off 354 MB weights download is not included): "
-      f"loading CLIP (imports + model + prompts) {min(c['seconds'] for c in cl):.1f} - {max(c['seconds'] for c in cl):.1f} s, process memory after loading CLIP "
+    w("**Warm-up and memory** (fresh processes, 3 runs; CLIP weights already in the cache directory; the one-off 354 MB weights download is not included; "
+      "memory = process working set after loading, not the peak): "
+      f"loading CLIP (imports + model + prompts) {min(c['seconds'] for c in cl):.1f} - {max(c['seconds'] for c in cl):.1f} s, memory "
       f"{min(c['rss_mb'] for c in cl):.0f} - {max(c['rss_mb'] for c in cl):.0f} MB; full `ml.api.warm_up()` (portfolio + face detector + CLIP) "
-      f"{min(c['seconds'] for c in wu):.1f} - {max(c['seconds'] for c in wu):.1f} s, memory {min(c['rss_mb'] for c in wu):.0f} - {max(c['rss_mb'] for c in wu):.0f} MB. "
-      "Both are within the deploy limits we set (warm-up <= 30 s, memory <= 4 GB). `check_photo` latency with CLIP is in the photo latency table above; "
-      "CPU time per component and cost per 1 000 checks: [`docs/cost.md`](cost.md).")
+      f"{min(c['seconds'] for c in wu):.1f} - {max(c['seconds'] for c in wu):.1f} s, memory {min(c['rss_mb'] for c in wu):.0f} - {max(c['rss_mb'] for c in wu):.0f} MB "
+      f"({'within' if max(c['seconds'] for c in wu) <= 30 and max(c['rss_mb'] for c in wu) <= 4096 else 'OVER'} the limits we set: warm-up <= 30 s, memory <= 4 GB). "
+      "`check_photo` latency with CLIP is in the photo latency table above; CPU time per component and cost per 1 000 checks: [`docs/cost.md`](cost.md). "
+      "CLIP inference runs under one lock (about 200 ms of single-thread CPU per image), so concurrent uploads queue up.")
     w("")
     bad = a["misclassified"]
-    w(f"**Failure cases measured on this library** ({len(bad)} of {a['n']} images are wrong for the probe (CV) or for zero-shot):")
+    w(f"**Failure cases measured on this library** (seed 0; {len(bad)} of {a['n']} images are wrong for the probe (grouped CV) or for zero-shot):")
     w("")
     w("| Image | true | probe (CV) | zero-shot |")
     w("|---|---|---|---|")
@@ -213,9 +230,11 @@ def render_asset() -> list[str]:
     if len(bad) > 14:
         w(f"| ... | | | ({len(bad) - 14} more in `ml/artifacts/eval_asset.json`) |")
     w("")
-    w("Not measured but expected: a toy or a picture / painting of a cow or a sewing machine looks like the real thing to CLIP; a cluttered workshop with "
-      "several objects; poultry vs wild birds; a screen showing a photo; the probe only knows 6 classes, so the name in `label_uz` for non-assets "
-      "comes from a separate zero-shot list of 13 everyday categories and can be wrong. The check is a flag for the officer, not proof.")
+    w("Known weak spots (some measured above, some only expected): the library contains a toy sewing machine and a model of a poultry pen labelled as "
+      "assets, so the probe accepts such look-alikes; a picture or painting of a cow, a cluttered workshop with several objects, poultry vs wild birds and a "
+      "screen showing a photo were not tested; the probe only knows 6 classes, so the name in `label_uz` for non-assets comes from a separate zero-shot list "
+      "of 13 everyday categories and can be wrong; `label` is the most likely class while `matches_purpose` uses the lower threshold tau, so in rare "
+      "cases they disagree. The check is a flag for the officer, not proof.")
     w("")
     return L
 

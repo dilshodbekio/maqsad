@@ -1,5 +1,5 @@
 // All requests are relative (/api/...); the same FastAPI service serves the API and this build.
-// Contract: docs/api_contract.md (v1.4).
+// Contract: docs/api_contract.md (v1.5).
 
 export type FunctionStatus = "real" | "stub" | "not_ready" | "missing";
 
@@ -8,6 +8,7 @@ export type Health = {
   model_version: string;
   warmup: "pending" | "running" | "done" | "failed";
   functions: Record<string, FunctionStatus>;
+  clip_loaded?: boolean;
 };
 
 export type Color = "red" | "yellow" | "green";
@@ -103,8 +104,11 @@ export type Transaction = {
 
 export type Duplicate = { loan_id: string; similarity: number };
 
+// CLIP asset check (v1.5); null when CLIP is unavailable. score is a model score, not shown as %.
+export type AssetMatch = { label: string; score: number; matches_purpose: boolean; label_uz: string };
+
 export type CheckPhotoResult = {
-  asset_match: { label: string; score: number } | null;
+  asset_match: AssetMatch | null;
   duplicate_of: Duplicate[];
   geo_ok: boolean | null;
   time_ok: boolean | null;
@@ -121,6 +125,7 @@ export type Photo = {
   lat?: number | null;
   lon?: number | null;
   duplicate_of: Duplicate[];
+  asset_match?: AssetMatch | null;
   url?: string | null;
   source: "portfolio" | "borrower_upload";
   client_captured_at?: string | null;
@@ -235,6 +240,10 @@ function query(params: Record<string, string | number | undefined>): string {
 
 export const QUEUE_PAGE_SIZE = 50;
 
+async function postForm<T>(path: string, form: FormData): Promise<T> {
+  return request<T>(path, { method: "POST", body: form });
+}
+
 export const api = {
   health: () => getJson<Health>("/api/health"),
   queue: (filters: QueueFilters, offset = 0, limit = QUEUE_PAGE_SIZE) =>
@@ -244,6 +253,7 @@ export const api = {
   loan: (loanId: string) => getJson<LoanDetail>(`/api/loan/${encodeURIComponent(loanId)}`),
   session: () => getJson<Session>("/api/session"),
   audit: (loanId: string) => getJson<AuditEntry[]>(`/api/audit${query({ loan_id: loanId })}`),
+  checkPhoto: (form: FormData) => postForm<CheckPhotoResult>("/api/check_photo", form),
   draftReport: (loanId: string) => postJson<DraftReport>("/api/draft_report", { loan_id: loanId }),
   decision: (body: { loan_id: string; officer_id: string; action: DecisionAction; comment: string }) =>
     postJson<{ audit_id: number }>("/api/decision", body),

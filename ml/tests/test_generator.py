@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from ml.generator.build import build
-from ml.generator.config import MATCHING_OKED, TEST, TRAIN
+from ml.generator.config import DEMO, DEV, HOLDOUT, MATCHING_OKED, TRAIN
 
 N = 500
 FEATURE_TABLES = ("loans", "transactions", "suppliers", "employees")
@@ -30,8 +30,8 @@ def train():
 
 
 @pytest.fixture(scope="module")
-def test():
-    return build(dataclasses.replace(TEST, n_loans=N))
+def dev():
+    return build(dataclasses.replace(DEV, n_loans=N))
 
 
 # 1. determinism
@@ -50,8 +50,8 @@ def test_different_seed_differs(train):
 
 # 2. no label columns
 @pytest.mark.parametrize("table", FEATURE_TABLES)
-def test_no_label_columns(train, test, table):
-    for t in (train, test):
+def test_no_label_columns(train, dev, table):
+    for t in (train, dev):
         bad = [c for c in t[table].columns if _tokens(c) & LABEL_TOKENS]
         assert not bad, f"label-like columns in {table}: {bad}"
 
@@ -67,10 +67,10 @@ def test_no_label_values_in_categoricals(train):
 
 
 # 3. snapshot
-@pytest.mark.parametrize("fx", ["train", "test"])
+@pytest.mark.parametrize("fx", ["train", "dev"])
 def test_snapshot_respected(request, fx):
     t = request.getfixturevalue(fx)
-    snap = pd.Timestamp((TRAIN if fx == "train" else TEST).snapshot_date)
+    snap = pd.Timestamp((TRAIN if fx == "train" else DEV).snapshot_date)
     assert (t["loans"].snapshot_date == snap).all()
     assert t["transactions"].ts.max() <= snap
     assert t["loans"].disbursed_at.max() <= snap
@@ -78,7 +78,7 @@ def test_snapshot_respected(request, fx):
 
 
 # 4. one disbursement per loan
-@pytest.mark.parametrize("fx", ["train", "test"])
+@pytest.mark.parametrize("fx", ["train", "dev"])
 def test_one_disbursement_per_loan(request, fx):
     t = request.getfixturevalue(fx)
     loans, tx = t["loans"], t["transactions"]
@@ -92,7 +92,7 @@ def test_one_disbursement_per_loan(request, fx):
 
 
 # 5. unique ids and foreign keys
-@pytest.mark.parametrize("fx", ["train", "test"])
+@pytest.mark.parametrize("fx", ["train", "dev"])
 def test_unique_ids_and_fks(request, fx):
     t = request.getfixturevalue(fx)
     loans, tx, sup, emp = t["loans"], t["transactions"], t["suppliers"], t["employees"]
@@ -111,16 +111,19 @@ def test_unique_ids_and_fks(request, fx):
 
 
 # 6. disjoint pools
-def test_train_test_disjoint(train, test):
-    for table, col in (("suppliers", "supplier_id"), ("loans", "loan_id"),
-                       ("loans", "borrower_id"), ("employees", "employee_id")):
-        assert not set(train[table][col]) & set(test[table][col]), (table, col)
-    assert not set(train["transactions"].txn_id) & set(test["transactions"].txn_id)
-    assert not set(train["loans"].photo_id) & set(test["loans"].photo_id)
+def test_splits_disjoint():
+    built = {n: build(dataclasses.replace(p, n_loans=300)) for n, p in (('train', TRAIN), ('dev', DEV), ('holdout', HOLDOUT), ('demo', DEMO))}
+    names = list(built)
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            for table, col in (("suppliers", "supplier_id"), ("loans", "loan_id"), ("loans", "borrower_id"),
+                               ("employees", "employee_id"), ("loans", "photo_id")):
+                assert not set(built[a][table][col]) & set(built[b][table][col]), (a, b, table, col)
+            assert not set(built[a]["transactions"].txn_id) & set(built[b]["transactions"].txn_id)
 
 
 # 7. fraud rate and typologies
-@pytest.mark.parametrize("fx,params", [("train", TRAIN), ("test", TEST)])
+@pytest.mark.parametrize("fx,params", [("train", TRAIN), ("dev", DEV)])
 def test_fraud_rate_and_typologies(request, fx, params):
     t = request.getfixturevalue(fx)
     lab = t["labels"]
@@ -131,7 +134,7 @@ def test_fraud_rate_and_typologies(request, fx, params):
     assert lab.typology.isna().sum() == (~lab.is_fraud).sum()
 
 
-@pytest.mark.parametrize("fx", ["train", "test"])
+@pytest.mark.parametrize("fx", ["train", "dev"])
 def test_t3_in_chorva_and_tikuv(request, fx):
     t = request.getfixturevalue(fx)
     m = t["labels"].merge(t["loans"][["loan_id", "purpose"]], on="loan_id")
@@ -140,7 +143,7 @@ def test_t3_in_chorva_and_tikuv(request, fx):
 
 
 # 8. honest OKED mismatch
-@pytest.mark.parametrize("fx,params", [("train", TRAIN), ("test", TEST)])
+@pytest.mark.parametrize("fx,params", [("train", TRAIN), ("dev", DEV)])
 def test_honest_oked_mismatch_rate(request, fx, params):
     t = request.getfixturevalue(fx)
     m = (t["labels"].merge(t["loans"][["loan_id", "purpose", "supplier_id"]], on="loan_id")
@@ -154,7 +157,7 @@ def test_honest_oked_mismatch_rate(request, fx, params):
 
 
 # 9. amounts
-@pytest.mark.parametrize("fx", ["train", "test"])
+@pytest.mark.parametrize("fx", ["train", "dev"])
 def test_amounts_int64_positive(request, fx):
     t = request.getfixturevalue(fx)
     for df, col in ((t["loans"], "amount_uzs"), (t["loans"], "invoice_amount_uzs"),
@@ -173,7 +176,7 @@ def _min_balances(tx: pd.DataFrame) -> pd.Series:
     return tx.groupby("account_id").signed.cumsum().groupby(tx.account_id).min()
 
 
-@pytest.mark.parametrize("fx", ["train", "test"])
+@pytest.mark.parametrize("fx", ["train", "dev"])
 def test_no_account_goes_negative(request, fx):
     t = request.getfixturevalue(fx)
     tx = t["transactions"]
@@ -188,7 +191,7 @@ def test_no_account_goes_negative(request, fx):
 
 
 # ring loans are drawn from the same date range as everyone else
-@pytest.mark.parametrize("fx", ["train", "test"])
+@pytest.mark.parametrize("fx", ["train", "dev"])
 def test_loan_age_within_range_and_term(request, fx):
     loans = request.getfixturevalue(fx)["loans"]
     age = (loans.snapshot_date - loans.disbursed_at) / pd.Timedelta(days=1)
@@ -196,7 +199,7 @@ def test_loan_age_within_range_and_term(request, fx):
     assert (age <= loans.term_months * 30.4375).all()
 
 
-@pytest.mark.parametrize("fx", ["train", "test"])
+@pytest.mark.parametrize("fx", ["train", "dev"])
 def test_ring_loans_not_older_than_others(request, fx):
     t = request.getfixturevalue(fx)
     m = t["labels"].merge(t["loans"], on="loan_id")
@@ -207,7 +210,7 @@ def test_ring_loans_not_older_than_others(request, fx):
 
 
 # reused photo: only the image is shared; time and place belong to the loan
-@pytest.mark.parametrize("fx", ["train", "test"])
+@pytest.mark.parametrize("fx", ["train", "dev"])
 def test_photo_reuse_keeps_own_time_and_place(request, fx):
     t = request.getfixturevalue(fx)
     loans, lab = t["loans"], t["labels"]

@@ -25,7 +25,7 @@ from ml.generator.config import MATCHING_OKED, SPLITS
 from .features import build_features
 from .colors import color_of, rank_thresholds
 from .model import MODEL_VERSION, MoneyTrailModel, load_model
-from .reasons import NO_REASON_UZ, TEMPLATES, build_evidence, build_reasons
+from .reasons import NO_REASON_UZ, TEMPLATES, build_evidence, build_reasons, is_skipped
 
 DEMO_SPLIT = "demo"
 LOAN_FIELDS = ["loan_id", "borrower_id", "borrower_name_masked", "purpose", "amount_uzs", "term_months",
@@ -111,7 +111,7 @@ class Portfolio:
             ctx = {"supplier_oked": oked[i]}
             if C[i, j] <= 1e-9:
                 text = NO_REASON_UZ
-            elif feats[j] == "income_rate_per_month" and X[i, j] < 0:      # not a shown fact: take the full path
+            elif is_skipped(feats[j], float(X[i, j])):                     # not a shown fact: take the full path
                 rs = build_reasons(feats, X[i], C[i], ctx, with_refs=False)
                 text = rs[0]["text_uz"] if rs else NO_REASON_UZ
             else:

@@ -1,4 +1,4 @@
-# API contract (Dilshodbek ↔ Oybek) — v1.3
+# API contract (Dilshodbek ↔ Oybek) — v1.4
 
 Source: `docs/brief.md` §5. Any change requires agreement from both sides (via PR).
 During development the backend may fall back to a visible STUB; **in the demo only the real model runs**.
@@ -53,6 +53,10 @@ POST /api/decision          {loan_id, officer_id, action: "approve|reject|visit"
 
 GET  /api/audit?loan_id=...
   → [{ts, actor, action, ai_recommendation, model_version, inputs_hash}]
+                                      (view of the caller's sandbox; the hash chain itself is global)
+
+GET  /api/session                     → {officer_id}   demo: "Xodim-XXXX", stable per sandbox cookie
+                                      (hash of sandbox_id, never the id itself); production: from the bank's SSO
 
 POST /api/admin/reset       header X-Admin-Token  → {ok: true}
 GET  /api/photo/{photo_id}  → blurred JPEG of a borrower upload (owner sandbox only)
@@ -216,6 +220,14 @@ the cached portfolio is never modified.
 3. `GET /api/queue/legend` → `ml.api.get_color_thresholds()` 1:1 (rang legendasi). Yangi ml funksiyasi kerak emas.
 4. `/api/health` `functions` ichiga `get_color_thresholds` qo'shildi.
 5. ml tomonda o'zgarish yo'q: `get_queue(sandbox_id)` va `get_color_thresholds()` avvalgidek chaqiriladi.
+
+## v1.4 o'zgarishlar (kredit sahifasi)
+
+1. `GET /api/session` → `{officer_id}` qo'shildi (faqat backend, ml'da o'zgarish yo'q). Demo'da `/decision` uchun
+   `officer_id` shu yerdan olinadi; sandbox cookie `httponly` bo'lgani uchun frontend uni o'qiy olmaydi.
+2. `/api/audit` — chaqiruvchi sandbox'ining ko'rinishi (avval ham shunday ishlagan, endi yozib qo'yildi); hash-zanjir
+   barcha sandbox'lar uchun bitta (global).
+3. `/api/queue`, `/api/loan` shakli o'zgarmadi.
 
 ## Open points
 - Photo asset match (CLIP) is not wired yet; `PHOTO_ASSET_MISMATCH` stays inactive until it is.

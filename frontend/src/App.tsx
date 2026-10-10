@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import { HealthStatus, type HealthState } from "./components/HealthStatus";
 import { StubBanner } from "./components/StubBanner";
-import { LoanPlaceholder } from "./pages/LoanPlaceholder";
+import { LoanPage } from "./pages/loan/LoanPage";
 import { QueuePage } from "./pages/QueuePage";
 import { onLinkClick, useLocation } from "./router";
 
@@ -35,7 +35,7 @@ export default function App() {
     return () => clearTimeout(t);
   }, [warming, state]);
 
-  // the queue is requested once the model is warm (or health is unknown: then the queue shows its own error)
+  // the queue / loan is requested once the model is warm (or health is unknown: then the queue shows its own error)
   const ready = state.kind === "error" || (state.kind === "ok" && !warming);
   const loanMatch = loc.path.match(/^\/loan\/([^/]+)\/?$/);
 
@@ -53,7 +53,7 @@ export default function App() {
       </header>
       <main className="container">
         {loanMatch ? (
-          <LoanPlaceholder loanId={safeDecode(loanMatch[1])} />
+          <LoanPage key={loanMatch[1]} loanId={safeDecode(loanMatch[1])} ready={ready} />
         ) : loc.path === "/" ? (
           <QueuePage search={loc.search} ready={ready} />
         ) : (

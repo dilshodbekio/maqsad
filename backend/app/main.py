@@ -1,4 +1,4 @@
-"""Maqsad API: FastAPI app serving /api/* (docs/api_contract.md v1.3) and the frontend build
+"""Maqsad API: FastAPI app serving /api/* (docs/api_contract.md v1.4) and the frontend build
 (frontend/dist) at /.
 
 Run:  uvicorn backend.app.main:create_app --factory --port 8000   (from the repo root)
@@ -32,7 +32,7 @@ from .ratelimit import RateLimiter
 from .schemas import (
     LOAN_ID_PATTERN, AuditEntry, CheckPhotoFields, CheckPhotoJSON, CheckPhotoResponse, Color, ColorLegend,
     DecisionRequest, DecisionResponse, DraftReport, DraftReportRequest, Health, LoanDetail, QueueFacets, QueueItem,
-    QueuePage, ResetResponse, ScoreRequest, ScoreResponse,
+    QueuePage, ResetResponse, ScoreRequest, ScoreResponse, SessionInfo,
 )
 
 log = logging.getLogger("maqsad.api")
@@ -214,6 +214,10 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         return {"ml_mode": adapter.mode, "model_version": adapter.model_version,
                 "warmup": adapter.warmup_state, "functions": dict(adapter.status)}
 
+    @api.get("/session", response_model=SessionInfo)
+    def session(request: Request):
+        return {"officer_id": demo_officer_id(request.state.sandbox_id)}
+
     def full_queue(request: Request) -> List[QueueItem]:
         items = _validated(List[QueueItem], adapter.get_queue(request.state.sandbox_id))
         return sorted(items, key=lambda x: -x.priority)  # ml already sorts; keep the contract even if it did not
@@ -353,10 +357,14 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
 
     @api.post("/decision", response_model=DecisionResponse)
     def decision(body: DecisionRequest, request: Request):
-        # the decision is human; the AI recommendation is stored separately next to it
+        # the decision is human; the AI recommendation is stored separately next to it. It is what the officer
+        # saw on the loan page: the sandbox view's colour after evidence fusion (+ the money-trail colour if raised)
         try:
-            score = adapter.score_loan(body.loan_id)  # MLNotFound -> 404
-            ai_rec = f"{score['color']} (risk={float(score['risk']):.3f})"
+            view = adapter.get_loan(body.loan_id, request.state.sandbox_id)  # MLNotFound -> 404
+            score = {k: view.get(k) for k in ("risk", "color", "base_color", "model_version")}
+            score["escalations"] = [e.get("code") for e in view.get("escalations") or [] if e.get("raises_color")]
+            base = f", base={score['base_color']}" if score["base_color"] and score["base_color"] != score["color"] else ""
+            ai_rec = f"{score['color']} (risk={float(score['risk']):.3f}{base})"
             model_version = str(score.get("model_version") or adapter.model_version)
         except MLFailure:
             score, ai_rec, model_version = None, None, adapter.model_version
@@ -430,6 +438,11 @@ def _asset_url(path: Optional[str]) -> Optional[str]:
     if len(parts) < 3 or parts[:2] != ("ml", "assets") or ".." in parts:
         return None
     return "/api/asset/" + "/".join(parts[2:])
+
+
+def demo_officer_id(sandbox_id: str) -> str:
+    """Demo only: a stable 'Xodim-XXXX' per sandbox. A hash, so the sandbox id (the key to its photos) never leaks."""
+    return "Xodim-" + sha256_hex(sandbox_id.encode())[:4].upper()
 
 
 def _too_large_msg(settings: Settings) -> str:

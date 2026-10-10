@@ -229,3 +229,7 @@ data_runtime/
 frontend/dist/
 *.tsbuildinfo
 .venv/
+
+# Claude Code local settings
+.claude/*
+!.claude/agents/

@@ -43,3 +43,24 @@ export function onLinkClick(e: MouseEvent, to: string): void {
   e.preventDefault();
   navigate(to);
 }
+
+// The last queue URL (with its filters), so "← Navbatga qaytish" keeps them even after loan -> loan links
+// or a page reload. sessionStorage may be unavailable (private mode): then the plain queue opens.
+const QUEUE_URL_KEY = "maqsad:queue-url";
+
+export function rememberQueueUrl(url: string): void {
+  try {
+    window.sessionStorage.setItem(QUEUE_URL_KEY, url);
+  } catch {
+    // ignore
+  }
+}
+
+export function lastQueueUrl(): string {
+  try {
+    const url = window.sessionStorage.getItem(QUEUE_URL_KEY);
+    return url && url.startsWith("/") && !url.startsWith("//") ? url : "/";
+  } catch {
+    return "/";
+  }
+}

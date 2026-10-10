@@ -18,7 +18,7 @@ import {
   formatUzs,
   purposeName,
 } from "../format";
-import { navigate, onLinkClick } from "../router";
+import { navigate, onLinkClick, rememberQueueUrl } from "../router";
 
 type Load<T> = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; data: T };
 
@@ -64,6 +64,10 @@ export function QueuePage({ search, ready }: { search: string; ready: boolean })
   const seq = useRef(0); // ignores responses of outdated requests (filters changed meanwhile)
 
   const setFilters = (next: QueueFilters) => navigate(filtersToUrl(next), { replace: true });
+
+  useEffect(() => {
+    rememberQueueUrl(filterKey); // the loan page's back link returns here
+  }, [filterKey]);
 
   const loadFirst = useCallback(() => {
     const id = ++seq.current;

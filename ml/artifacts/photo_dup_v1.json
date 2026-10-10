@@ -1,0 +1,9 @@
+{
+ "variant": "pd_crop",
+ "max_distance": 0.2109375,
+ "similarity_threshold": 0.7891,
+ "tuned_on_images": 100,
+ "min_precision": 0.999,
+ "seed": 20260410,
+ "note": "deployed variant/threshold tuned on all library images at pooled precision >= 0.999; held-out numbers in docs/metrics.md (Photo module)"
+}

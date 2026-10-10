@@ -67,7 +67,11 @@ Assumption: all numbers measured on this synthetic data say nothing about real a
 | pandas 3.0.6 | generator, features | BSD-3-Clause |
 | pyarrow 26.0.0 | parquet I/O | Apache-2.0 |
 | scikit-learn 1.9.1 | leakage check, grouped CV, metrics | BSD-3-Clause |
-| Images (photo set, asset-type probe) | TBD | TBD (openly licensed only; each file to be listed here) |
+| Images: 111 photos from Wikimedia Commons (tikuv_dastgohi 20, chorva 20, issiqxona 20, parranda 20, asalarichilik 20, faces_test 11), saved as <= 512 px JPEG in `ml/assets/photos/` | demo photo index, duplicate-detection and face-blur tests | CC BY-SA 4.0 x60, CC BY 4.0 x13, CC0 x13, Public domain x8, CC BY-SA 3.0 x7, CC BY-SA 2.0 x5, CC BY 2.0 x5. Per-file title, author, license and source URL: [`ml/assets/photos/manifest.csv`](../ml/assets/photos/manifest.csv). Attribution (author + license + source link) is given there as required by CC BY / CC BY-SA; images were downscaled and re-encoded only. `faces_test` images show real people (openly licensed) and are used only to test face blurring. |
 | LightGBM 4.7.0 | money-trail model (`ml/money_trail/`) | MIT |
 | pytest 9.1.1 | tests | MIT |
+| opencv-python-headless 4.11.0.86 | image decode helpers, face detection (YuNet, Haar), blur | Apache-2.0 |
+| YuNet face detector `face_detection_yunet_2023mar.onnx` (OpenCV Zoo, 233 KB, `ml/photo/models/`) | face detection before blurring | MIT (Shiqi Yu) |
+| OpenCV Haar cascade `haarcascade_frontalface_default.xml` (shipped inside opencv) | fallback / second detector in tests | BSD-style (OpenCV / Intel license) |
+| Pillow 12.3.0 | image decode / re-encode | MIT-CMU (HPND) |
 | Models (CLIP, ...) | TBD | TBD |

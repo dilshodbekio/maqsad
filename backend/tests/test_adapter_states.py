@@ -46,7 +46,7 @@ def test_not_implemented_function_is_503_and_shown_in_health(make_client):
     assert h["ml_mode"] == "real" and h["warmup"] == "done"
     assert h["functions"]["check_photo"] == "not_ready"  # found by the warm-up probe
     assert h["functions"]["get_queue"] == "real"
-    lid = c.get("/api/queue").json()[0]["loan_id"]
+    lid = c.get("/api/queue").json()["items"][0]["loan_id"]
     r = _upload(c, lid)
     assert r.status_code == 503
     assert r.json()["detail"].startswith("Bu funksiya hali ulanmagan")
@@ -57,7 +57,7 @@ def test_missing_function_is_503(make_client):
     del m.score_loan
     c = make_client(adapter=MLAdapter(m, "real"))
     assert c.get("/api/health").json()["functions"]["score_loan"] == "missing"
-    lid = c.get("/api/queue").json()[0]["loan_id"]
+    lid = c.get("/api/queue").json()["items"][0]["loan_id"]
     assert c.post("/api/score_loan", json={"loan_id": lid}).status_code == 503
 
 
@@ -67,7 +67,7 @@ def test_get_queue_failure_switches_to_full_stub(make_client):
     assert h["ml_mode"] == "stub" and h["model_version"] == "stub" and h["warmup"] == "failed"
     assert set(h["functions"].values()) == {"stub"}
     q = c.get("/api/queue")
-    assert q.status_code == 200 and len(q.json()) == 40  # stub fixtures, STUB banner in UI
+    assert q.status_code == 200 and q.json()["total"] == 40  # stub fixtures, STUB banner in UI
 
 
 def test_get_queue_failure_with_require_real_is_fatal():
@@ -123,7 +123,7 @@ def test_invalid_image_error_mapping(make_client, message, status):
         raise ValueError(message)  # ml.errors.InvalidImageError is a ValueError
 
     c = make_client(adapter=MLAdapter(_fake_ml(check_photo=check_photo), "real"))
-    r = _upload(c, c.get("/api/queue").json()[0]["loan_id"])
+    r = _upload(c, c.get("/api/queue").json()["items"][0]["loan_id"])
     assert r.status_code == status
     assert "MB" in r.json()["detail"] if status == 413 else "Rasmni o'qib bo'lmadi" in r.json()["detail"]
 
@@ -134,7 +134,7 @@ def test_admin_reset_calls_ml_reset_sandbox_none(make_client):
     resets = []
     c = make_client(adapter=MLAdapter(_fake_ml(reset_sandbox=resets.append), "real"), admin_token="t")
     resets.clear()  # drop the warm-up probe call
-    lid = c.get("/api/queue").json()[0]["loan_id"]
+    lid = c.get("/api/queue").json()["items"][0]["loan_id"]
     _upload(c, lid)
     _upload(TestClient(c.app), lid)
     assert c.post("/api/admin/reset", headers={"X-Admin-Token": "t"}).status_code == 200
@@ -154,7 +154,7 @@ def test_sandbox_id_passed_to_queue_and_loan(make_client):
 
     c = make_client(adapter=MLAdapter(_fake_ml(get_queue=get_queue, get_loan=get_loan), "real"))
     seen.clear()  # warm-up / probes
-    lid = c.get("/api/queue").json()[0]["loan_id"]
+    lid = c.get("/api/queue").json()["items"][0]["loan_id"]
     c.get(f"/api/loan/{lid}")
     sid = c.cookies.get("sandbox_id")
     assert seen == [("queue", sid), ("loan", sid)]
@@ -163,7 +163,7 @@ def test_sandbox_id_passed_to_queue_and_loan(make_client):
 def test_old_ml_signature_without_sandbox_still_works(make_client):
     m = _fake_ml(get_queue=lambda: ml_stub.get_queue(), get_loan=lambda loan_id: ml_stub.get_loan(loan_id))
     c = make_client(adapter=MLAdapter(m, "real"))
-    lid = c.get("/api/queue").json()[0]["loan_id"]
+    lid = c.get("/api/queue").json()["items"][0]["loan_id"]
     assert c.get(f"/api/loan/{lid}").status_code == 200
 
 
@@ -187,7 +187,7 @@ def test_portfolio_photo_url_and_asset_serving(make_client, assets):
                                  "duplicate_of": [{"loan_id": "L0002", "similarity": 0.97}]}]}
 
     c = make_client(adapter=MLAdapter(_fake_ml(get_loan=get_loan), "real"), ml_assets_dir=assets)
-    lid = c.get("/api/queue").json()[0]["loan_id"]
+    lid = c.get("/api/queue").json()["items"][0]["loan_id"]
     ph = c.get(f"/api/loan/{lid}").json()["photos"][0]
     assert ph["url"] == "/api/asset/photos/chorva_00.jpg" and ph["source"] == "portfolio"
     assert ph["path"] == "ml/assets/photos/chorva_00.jpg" and ph["duplicate_of"][0]["similarity"] == 0.97
@@ -223,7 +223,7 @@ def test_asset_url_only_for_ml_assets_paths():
 
 def test_llm_ref_must_be_an_evidence_ref(make_client, monkeypatch):
     c = make_client(llm_base_url="http://llm.invalid/v1", llm_model="m")
-    lid = c.get("/api/queue").json()[0]["loan_id"]
+    lid = c.get("/api/queue").json()["items"][0]["loan_id"]
     d = c.get(f"/api/loan/{lid}").json()
     ev = d["evidence"][0]
     seen = {}

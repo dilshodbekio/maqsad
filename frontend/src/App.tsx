@@ -1,30 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, type FunctionStatus, type Health } from "./api";
+import { api } from "./api";
+import { HealthStatus, type HealthState } from "./components/HealthStatus";
 import { StubBanner } from "./components/StubBanner";
-
-type State =
-  | { kind: "loading" }
-  | { kind: "error"; message: string }
-  | { kind: "ok"; health: Health };
-
-const STATUS_UZ: Record<FunctionStatus, string> = {
-  real: "ulangan",
-  stub: "stub",
-  not_ready: "hali ulanmagan",
-  missing: "mavjud emas",
-};
-
-const WARMUP_UZ: Record<Health["warmup"], string> = {
-  pending: "kutilmoqda",
-  running: "model tayyorlanmoqda…",
-  done: "tayyor",
-  failed: "xato (stub ishlatilmoqda)",
-};
+import { LoanPlaceholder } from "./pages/LoanPlaceholder";
+import { QueuePage } from "./pages/QueuePage";
+import { onLinkClick, useLocation } from "./router";
 
 const WARMUP_POLL_MS = 2000;
 
 export default function App() {
-  const [state, setState] = useState<State>({ kind: "loading" });
+  const [state, setState] = useState<HealthState>({ kind: "loading" });
+  const loc = useLocation();
 
   const load = useCallback(() => {
     setState({ kind: "loading" });
@@ -49,46 +35,44 @@ export default function App() {
     return () => clearTimeout(t);
   }, [warming, state]);
 
+  // the queue is requested once the model is warm (or health is unknown: then the queue shows its own error)
+  const ready = state.kind === "error" || (state.kind === "ok" && !warming);
+  const loanMatch = loc.path.match(/^\/loan\/([^/]+)\/?$/);
+
   return (
     <>
       <StubBanner health={state.kind === "ok" ? state.health : null} />
       <header className="topbar">
-        <h1>Maqsad</h1>
+        <div className="topbar-inner">
+          <a className="brand" href="/" onClick={(e) => onLinkClick(e, "/")}>
+            Maqsad
+          </a>
+          <HealthStatus state={state} onRetry={load} />
+        </div>
         <p className="subtitle">Imtiyozli kreditlarning maqsadli ishlatilishini masofadan tekshirish</p>
       </header>
       <main className="container">
-        <section className="card">
-          <h2>Tizim holati</h2>
-          {state.kind === "loading" && <p className="muted">Yuklanmoqda…</p>}
-          {state.kind === "error" && (
-            <div className="error">
-              <p>{state.message}</p>
-              <button onClick={load}>Qayta urinish</button>
-            </div>
-          )}
-          {state.kind === "ok" && (
-            <>
-              <dl className="kv">
-                <dt>ML rejimi</dt>
-                <dd>{state.health.ml_mode}</dd>
-                <dt>Model versiyasi</dt>
-                <dd>{state.health.model_version}</dd>
-                <dt>Model holati</dt>
-                <dd>{WARMUP_UZ[state.health.warmup]}</dd>
-              </dl>
-              <h3>Funksiyalar</h3>
-              <ul className="fn-list">
-                {Object.entries(state.health.functions).map(([name, status]) => (
-                  <li key={name}>
-                    <code>{name}</code>
-                    <span className={`fn-status fn-${status}`}>{STATUS_UZ[status]}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </section>
+        {loanMatch ? (
+          <LoanPlaceholder loanId={safeDecode(loanMatch[1])} />
+        ) : loc.path === "/" ? (
+          <QueuePage search={loc.search} ready={ready} />
+        ) : (
+          <section className="card">
+            <h2>Sahifa topilmadi</h2>
+            <a href="/" onClick={(e) => onLinkClick(e, "/")}>
+              Navbatga qaytish
+            </a>
+          </section>
+        )}
       </main>
     </>
   );
+}
+
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
 }

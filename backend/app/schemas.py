@@ -1,4 +1,4 @@
-"""Pydantic schemas — 1:1 with docs/api_contract.md (v1.2).
+"""Pydantic schemas — 1:1 with docs/api_contract.md (v1.3).
 
 Inner shapes (Loan, Transaction, Photo, Invoice, Evidence, LoanReason) match the REAL ml.api output exactly
 (get_loan / check_photo of ml money_trail_v1 + photo module). Unknown extra keys from ml are dropped
@@ -140,6 +140,39 @@ class QueueItem(BaseModel):
     base_color: Color  # money-trail colour
     priority: float  # queue sort key: colour rank (green 0, yellow 1, red 2) + risk
     escalations: List[Escalation] = []
+
+
+class QueueCounts(BaseModel):
+    red: int
+    yellow: int
+    green: int
+
+
+class QueuePage(BaseModel):
+    """GET /queue (v1.3): one page of the caller's sandbox queue, in ml priority order."""
+    items: List[QueueItem]
+    total: int  # items matching the filters (before limit / offset)
+    counts: QueueCounts  # whole queue of the sandbox, BEFORE filters
+
+
+class QueueFacets(BaseModel):
+    regions: List[str]
+    purposes: List[str]
+
+
+class ColorLegend(BaseModel):
+    """= ml.api.get_color_thresholds(): colour rule of the served portfolio (default view, no sandbox)."""
+    red: Risk  # risk score at the red rank boundary
+    yellow: Risk  # risk score at the yellow rank boundary
+    n_red: int  # red by risk
+    n_yellow: int  # yellow by risk
+    n_loans: int
+    rule: str  # English, for logs / docs; the UI builds its own Uzbek text from the numbers
+    n_escalated_to_red: int
+    n_escalated_to_yellow: int
+    n_red_total: int
+    n_yellow_total: int
+    note: str
 
 
 class LoanDetail(BaseModel):

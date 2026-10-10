@@ -38,7 +38,7 @@ def client(make_client) -> TestClient:
 
 @pytest.fixture
 def loan_id(client) -> str:
-    return client.get("/api/queue").json()[0]["loan_id"]
+    return client.get("/api/queue").json()["items"][0]["loan_id"]
 
 
 def png_bytes(rgb=(200, 30, 30)) -> bytes:

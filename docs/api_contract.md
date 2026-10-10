@@ -1,4 +1,4 @@
-# API contract (Dilshodbek ↔ Oybek) — v1.2
+# API contract (Dilshodbek ↔ Oybek) — v1.3
 
 Source: `docs/brief.md` §5. Any change requires agreement from both sides (via PR).
 During development the backend may fall back to a visible STUB; **in the demo only the real model runs**.
@@ -13,12 +13,24 @@ Code: HTTP schemas in `backend/app/schemas.py` (1:1 with this file), Python inte
 ```
 GET  /api/health
   → {ml_mode: "real|stub", model_version, warmup: "pending|running|done|failed",
-     functions: {get_queue|get_loan|score_loan|check_photo|reset_sandbox: "real|stub|not_ready|missing"}}
+     functions: {get_queue|get_loan|score_loan|check_photo|reset_sandbox|get_color_thresholds:
+                 "real|stub|not_ready|missing"}}
 
-GET  /api/queue                       (view of the caller's sandbox: sandbox_id comes from the cookie)
-  → [{loan_id, borrower_name_masked, purpose, amount_uzs, region, risk, color, top_reason,
-      base_color, priority, escalations[]}]
-     sorted by priority, descending (priority = colour rank + risk)
+GET  /api/queue?limit=50&offset=0&color=&region=&purpose=
+                                      (view of the caller's sandbox: sandbox_id comes from the cookie)
+  → {items: [{loan_id, borrower_name_masked, purpose, amount_uzs, region, risk, color, top_reason,
+              base_color, priority, escalations[]}],
+     total,                            items matching the filters (before limit/offset)
+     counts: {red, yellow, green}}     the whole queue of the sandbox, BEFORE filters
+     items in ml order: priority descending (priority = colour rank + risk); the backend never re-ranks.
+     limit 1..200 (default 50), offset ≥ 0; color ∈ red|yellow|green; region / purpose: exact match,
+     empty = no filter, unknown value = empty page (200); bad limit/offset/color → 422.
+
+GET  /api/queue/facets                → {regions: [], purposes: []}   distinct values in the queue, sorted
+GET  /api/queue/legend                → ml.api.get_color_thresholds() 1:1:
+     {red, yellow, n_red, n_yellow, n_loans, rule, n_escalated_to_red, n_escalated_to_yellow,
+      n_red_total, n_yellow_total, note}   (default view; `rule` / `note` are English, the UI writes its own
+      Uzbek text from the numbers; not connected → 503)
 
 GET  /api/loan/{loan_id}              (view of the caller's sandbox)
   → {loan, transactions[], photos[], invoice?,
@@ -104,12 +116,12 @@ Every error → `{detail: "<Uzbek message>"}`:
 
 | Endpoint | Backend calls | Owner |
 |---|---|---|
-| `GET /api/queue` | `ml.api.get_queue(sandbox_id)` | ml |
+| `GET /api/queue`, `GET /api/queue/facets` | `ml.api.get_queue(sandbox_id)` (paging / filters / counts in the backend) | ml |
 | `GET /api/loan/{id}` | `ml.api.get_loan(loan_id, sandbox_id)` | ml |
 | `POST /api/score_loan` | `ml.api.score_loan(loan_id)` | ml |
 | `POST /api/check_photo` | `ml.api.check_photo(loan_id, image_bytes, lat, lon, captured_at, sandbox_id)` → also returns internal `blurred_image: bytes` (stored by backend, never sent over HTTP) | ml |
 | `POST /api/admin/reset` | `ml.api.reset_sandbox(None)` (`None` = every sandbox) | ml |
-| colour legend (not exposed yet) | `ml.api.get_color_thresholds()` | ml |
+| `GET /api/queue/legend` | `ml.api.get_color_thresholds()` | ml |
 | `POST /api/score_scenario` (not exposed yet) | `ml.api.score_scenario(scenario)` | ml |
 | `GET /api/scenario_presets` (not exposed yet) | `ml.api.get_scenario_presets()` | ml |
 | `POST /api/draft_report` | backend (LLM) | backend |
@@ -194,6 +206,17 @@ the cached portfolio is never modified.
 6. `score_scenario`, `get_scenario_presets`, `ScenarioError` (→ 400) — ml'da tayyor, backend HTTP endpointi keyingi qadam.
 7. Istisnolar jadvali (yuqorida).
 
+## v1.3 o'zgarishlar (xodim paneli navbati)
+
+1. `GET /api/queue` endi sahifalangan obyekt qaytaradi: `{items, total, counts:{red, yellow, green}}` (avval ro'yxat edi).
+   Ixtiyoriy query: `limit` (1..200, default 50), `offset` (≥ 0), `color`, `region`, `purpose`.
+   Tartib — ml'dagi `priority` bo'yicha, backend o'zgartirmaydi. `counts` — filtrlardan **oldingi**, sandbox navbatining
+   to'liq soni; `total` — filtrdan keyingi soni (sahifalash uchun).
+2. `GET /api/queue/facets` → `{regions, purposes}` (navbatdagi qiymatlar, alifbo tartibida) — filtrlar uchun.
+3. `GET /api/queue/legend` → `ml.api.get_color_thresholds()` 1:1 (rang legendasi). Yangi ml funksiyasi kerak emas.
+4. `/api/health` `functions` ichiga `get_color_thresholds` qo'shildi.
+5. ml tomonda o'zgarish yo'q: `get_queue(sandbox_id)` va `get_color_thresholds()` avvalgidek chaqiriladi.
+
 ## Open points
 - Photo asset match (CLIP) is not wired yet; `PHOTO_ASSET_MISMATCH` stays inactive until it is.
-- Backend: expose `/api/score_scenario`, `/api/scenario_presets` and a colour legend from `get_color_thresholds()`.
+- Backend: expose `/api/score_scenario`, `/api/scenario_presets`.

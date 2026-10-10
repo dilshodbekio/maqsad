@@ -1,0 +1,473 @@
+{
+  "_note": "Synthetic data (train split, seed 42). Risk and reasons are produced by ml.api.",
+  "snapshot_date": "2026-03-31",
+  "loans": [
+    {
+      "loan": {
+        "loan_id": "L002427",
+        "borrower_id": "B000882",
+        "borrower_name_masked": "H*** H***",
+        "purpose": "issiqxona",
+        "amount_uzs": 82300000,
+        "term_months": 24,
+        "disbursed_at": "2025-08-20T19:03:43",
+        "snapshot_date": "2026-03-31T00:00:00",
+        "region": "Samarqand",
+        "branch_id": "BR-05",
+        "supplier_id": "S000905",
+        "invoice_amount_uzs": 84700000,
+        "borrower_lat": 39.9324493408,
+        "borrower_lon": 66.4972991943
+      },
+      "account_id": "ACC-B000882",
+      "transactions": [
+        {
+          "txn_id": "T000014919",
+          "account_id": "ACC-B000882",
+          "ts": "2025-08-20T19:03:43",
+          "type": "disbursement",
+          "amount_uzs": 82300000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000014959",
+          "account_id": "ACC-B000882",
+          "ts": "2025-08-21T01:21:39",
+          "type": "supplier_payment",
+          "amount_uzs": 82300000,
+          "counterparty_id": "S000905",
+          "counterparty_kind": "supplier"
+        },
+        {
+          "txn_id": "T000030189",
+          "account_id": "ACC-B000882",
+          "ts": "2025-11-18T13:32:06",
+          "type": "income",
+          "amount_uzs": 4728000,
+          "counterparty_id": "BZ978113",
+          "counterparty_kind": "business"
+        },
+        {
+          "txn_id": "T000035866",
+          "account_id": "ACC-B000882",
+          "ts": "2025-12-16T17:06:53",
+          "type": "income",
+          "amount_uzs": 8953000,
+          "counterparty_id": "BZ643200",
+          "counterparty_kind": "business"
+        },
+        {
+          "txn_id": "T000041469",
+          "account_id": "ACC-B000882",
+          "ts": "2026-01-12T19:35:17",
+          "type": "income",
+          "amount_uzs": 5614000,
+          "counterparty_id": "BZ951890",
+          "counterparty_kind": "business"
+        },
+        {
+          "txn_id": "T000051946",
+          "account_id": "ACC-B000882",
+          "ts": "2026-03-04T23:06:34",
+          "type": "income",
+          "amount_uzs": 5843000,
+          "counterparty_id": "BZ120717",
+          "counterparty_kind": "business"
+        }
+      ],
+      "supplier": {
+        "supplier_id": "S000905",
+        "name": "Sapfar Invest YaTT",
+        "oked_code": "46.90",
+        "region": "Samarqand",
+        "registered_at": "2024-05-12T03:31:35",
+        "linked_employee_id": null,
+        "in_degree": 1
+      },
+      "supplier_account_transactions": [
+        {
+          "txn_id": "T000014960",
+          "account_id": "ACC-S000905",
+          "ts": "2025-08-21T01:21:39",
+          "type": "income",
+          "amount_uzs": 82300000,
+          "counterparty_id": "B000882",
+          "counterparty_kind": "person"
+        },
+        {
+          "txn_id": "T000016287",
+          "account_id": "ACC-S000905",
+          "ts": "2025-08-29T18:15:38",
+          "type": "cash_withdrawal",
+          "amount_uzs": 6085000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000016475",
+          "account_id": "ACC-S000905",
+          "ts": "2025-08-30T20:09:06",
+          "type": "external_transfer",
+          "amount_uzs": 6587000,
+          "counterparty_id": "X927445",
+          "counterparty_kind": "external"
+        }
+      ],
+      "photos": [
+        {
+          "photo_id": "P001050",
+          "lat": 39.93226623535156,
+          "lon": 66.49758911132812,
+          "captured_at": "2025-08-23T10:03:51"
+        }
+      ]
+    },
+    {
+      "loan": {
+        "loan_id": "L003996",
+        "borrower_id": "B002913",
+        "borrower_name_masked": "D*** T***",
+        "purpose": "asalarichilik",
+        "amount_uzs": 19500000,
+        "term_months": 36,
+        "disbursed_at": "2025-09-15T23:19:38",
+        "snapshot_date": "2026-03-31T00:00:00",
+        "region": "Farg'ona",
+        "branch_id": "BR-08",
+        "supplier_id": "S000485",
+        "invoice_amount_uzs": 18600000,
+        "borrower_lat": 40.1472091675,
+        "borrower_lon": 71.5657577515
+      },
+      "account_id": "ACC-B002913",
+      "transactions": [
+        {
+          "txn_id": "T000019030",
+          "account_id": "ACC-B002913",
+          "ts": "2025-09-15T23:19:38",
+          "type": "disbursement",
+          "amount_uzs": 19500000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000019036",
+          "account_id": "ACC-B002913",
+          "ts": "2025-09-16T00:08:53",
+          "type": "supplier_payment",
+          "amount_uzs": 16220000,
+          "counterparty_id": "S000485",
+          "counterparty_kind": "supplier"
+        },
+        {
+          "txn_id": "T000029374",
+          "account_id": "ACC-B002913",
+          "ts": "2025-11-13T23:55:22",
+          "type": "income",
+          "amount_uzs": 329000,
+          "counterparty_id": "BZ819241",
+          "counterparty_kind": "business"
+        },
+        {
+          "txn_id": "T000034639",
+          "account_id": "ACC-B002913",
+          "ts": "2025-12-10T22:51:09",
+          "type": "income",
+          "amount_uzs": 565000,
+          "counterparty_id": "BZ190230",
+          "counterparty_kind": "business"
+        },
+        {
+          "txn_id": "T000041747",
+          "account_id": "ACC-B002913",
+          "ts": "2026-01-14T03:07:29",
+          "type": "income",
+          "amount_uzs": 1274000,
+          "counterparty_id": "BZ781099",
+          "counterparty_kind": "business"
+        },
+        {
+          "txn_id": "T000048638",
+          "account_id": "ACC-B002913",
+          "ts": "2026-02-17T02:10:28",
+          "type": "income",
+          "amount_uzs": 680000,
+          "counterparty_id": "BZ223284",
+          "counterparty_kind": "business"
+        },
+        {
+          "txn_id": "T000053812",
+          "account_id": "ACC-B002913",
+          "ts": "2026-03-13T12:55:20",
+          "type": "income",
+          "amount_uzs": 460000,
+          "counterparty_id": "BZ686252",
+          "counterparty_kind": "business"
+        }
+      ],
+      "supplier": {
+        "supplier_id": "S000485",
+        "name": "Hosil Servis MChJ",
+        "oked_code": "46.23",
+        "region": "Toshkent viloyati",
+        "registered_at": "2020-02-13T10:38:37",
+        "linked_employee_id": null,
+        "in_degree": 8
+      },
+      "supplier_account_transactions": [
+        {
+          "txn_id": "T000010586",
+          "account_id": "ACC-S000485",
+          "ts": "2025-07-19T23:06:31",
+          "type": "income",
+          "amount_uzs": 69835000,
+          "counterparty_id": "B003683",
+          "counterparty_kind": "person"
+        },
+        {
+          "txn_id": "T000010795",
+          "account_id": "ACC-S000485",
+          "ts": "2025-07-21T14:14:58",
+          "type": "income",
+          "amount_uzs": 44975000,
+          "counterparty_id": "B002283",
+          "counterparty_kind": "person"
+        },
+        {
+          "txn_id": "T000010844",
+          "account_id": "ACC-S000485",
+          "ts": "2025-07-21T23:58:21",
+          "type": "cash_withdrawal",
+          "amount_uzs": 21526000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000011083",
+          "account_id": "ACC-S000485",
+          "ts": "2025-07-23T14:57:12",
+          "type": "cash_withdrawal",
+          "amount_uzs": 8852000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000011100",
+          "account_id": "ACC-S000485",
+          "ts": "2025-07-23T18:25:24",
+          "type": "cash_withdrawal",
+          "amount_uzs": 27787000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000012906",
+          "account_id": "ACC-S000485",
+          "ts": "2025-08-06T13:24:14",
+          "type": "income",
+          "amount_uzs": 41627000,
+          "counterparty_id": "B000757",
+          "counterparty_kind": "person"
+        },
+        {
+          "txn_id": "T000013232",
+          "account_id": "ACC-S000485",
+          "ts": "2025-08-09T07:18:38",
+          "type": "cash_withdrawal",
+          "amount_uzs": 17309000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000013657",
+          "account_id": "ACC-S000485",
+          "ts": "2025-08-12T07:01:00",
+          "type": "cash_withdrawal",
+          "amount_uzs": 11581000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000018138",
+          "account_id": "ACC-S000485",
+          "ts": "2025-09-10T11:05:14",
+          "type": "income",
+          "amount_uzs": 51075000,
+          "counterparty_id": "B004364",
+          "counterparty_kind": "person"
+        },
+        {
+          "txn_id": "T000018272",
+          "account_id": "ACC-S000485",
+          "ts": "2025-09-11T08:03:59",
+          "type": "income",
+          "amount_uzs": 6289000,
+          "counterparty_id": "B001626",
+          "counterparty_kind": "person"
+        },
+        {
+          "txn_id": "T000018471",
+          "account_id": "ACC-S000485",
+          "ts": "2025-09-12T20:04:31",
+          "type": "cash_withdrawal",
+          "amount_uzs": 3502000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000018559",
+          "account_id": "ACC-S000485",
+          "ts": "2025-09-13T07:34:48",
+          "type": "income",
+          "amount_uzs": 36304000,
+          "counterparty_id": "B001626",
+          "counterparty_kind": "person"
+        },
+        {
+          "txn_id": "T000018609",
+          "account_id": "ACC-S000485",
+          "ts": "2025-09-13T12:50:11",
+          "type": "cash_withdrawal",
+          "amount_uzs": 947000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000019037",
+          "account_id": "ACC-S000485",
+          "ts": "2025-09-16T00:08:53",
+          "type": "income",
+          "amount_uzs": 16220000,
+          "counterparty_id": "B002913",
+          "counterparty_kind": "person"
+        },
+        {
+          "txn_id": "T000019078",
+          "account_id": "ACC-S000485",
+          "ts": "2025-09-16T06:26:51",
+          "type": "cash_withdrawal",
+          "amount_uzs": 26469000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000019108",
+          "account_id": "ACC-S000485",
+          "ts": "2025-09-16T10:57:55",
+          "type": "cash_withdrawal",
+          "amount_uzs": 14145000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000019534",
+          "account_id": "ACC-S000485",
+          "ts": "2025-09-19T03:35:18",
+          "type": "cash_withdrawal",
+          "amount_uzs": 11557000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000019615",
+          "account_id": "ACC-S000485",
+          "ts": "2025-09-19T12:30:55",
+          "type": "cash_withdrawal",
+          "amount_uzs": 8860000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000019688",
+          "account_id": "ACC-S000485",
+          "ts": "2025-09-20T00:39:29",
+          "type": "cash_withdrawal",
+          "amount_uzs": 11364000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000023571",
+          "account_id": "ACC-S000485",
+          "ts": "2025-10-12T15:53:25",
+          "type": "income",
+          "amount_uzs": 38425000,
+          "counterparty_id": "B004667",
+          "counterparty_kind": "person"
+        },
+        {
+          "txn_id": "T000023575",
+          "account_id": "ACC-S000485",
+          "ts": "2025-10-12T15:59:31",
+          "type": "income",
+          "amount_uzs": 37712000,
+          "counterparty_id": "B000279",
+          "counterparty_kind": "person"
+        },
+        {
+          "txn_id": "T000023698",
+          "account_id": "ACC-S000485",
+          "ts": "2025-10-13T09:40:20",
+          "type": "income",
+          "amount_uzs": 17622000,
+          "counterparty_id": "B000279",
+          "counterparty_kind": "person"
+        },
+        {
+          "txn_id": "T000023981",
+          "account_id": "ACC-S000485",
+          "ts": "2025-10-15T03:52:49",
+          "type": "cash_withdrawal",
+          "amount_uzs": 11064000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000024183",
+          "account_id": "ACC-S000485",
+          "ts": "2025-10-16T07:38:39",
+          "type": "cash_withdrawal",
+          "amount_uzs": 29230000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000024213",
+          "account_id": "ACC-S000485",
+          "ts": "2025-10-16T11:53:24",
+          "type": "cash_withdrawal",
+          "amount_uzs": 1619000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000024440",
+          "account_id": "ACC-S000485",
+          "ts": "2025-10-17T19:29:25",
+          "type": "cash_withdrawal",
+          "amount_uzs": 2825000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        },
+        {
+          "txn_id": "T000024476",
+          "account_id": "ACC-S000485",
+          "ts": "2025-10-17T23:48:26",
+          "type": "cash_withdrawal",
+          "amount_uzs": 15808000,
+          "counterparty_id": null,
+          "counterparty_kind": "none"
+        }
+      ],
+      "photos": [
+        {
+          "photo_id": "P002749",
+          "lat": 40.14680099487305,
+          "lon": 71.563720703125,
+          "captured_at": "2025-09-29T11:27:51"
+        }
+      ]
+    }
+  ]
+}

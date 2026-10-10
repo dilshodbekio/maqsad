@@ -102,6 +102,7 @@ def test_invalid_loan_id_types():
                 fn(bad)
 
 
+@pytest.mark.slow
 def test_reasons_do_not_repeat_a_fact_and_texts_are_sane(queue):
     from ml.money_trail.reasons import DUPLICATE_GROUPS
     for item in queue[:300] + queue[2000:2100]:

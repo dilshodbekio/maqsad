@@ -145,7 +145,7 @@ def _refs(code: str, c: dict) -> list[str]:
 
 
 def build_reasons(model_features: list[str], x: np.ndarray, contrib: np.ndarray, c: dict,
-                  with_refs: bool = True) -> list[dict]:
+                  with_refs: bool = True, exclude=frozenset()) -> list[dict]:
     """Top-K features pushing the risk UP -> [{code, text_uz, weight, evidence_refs}]. May be empty.
     `with_refs=False` skips the evidence lookup (then `c` only needs `supplier_oked`)."""
     pos = np.where(contrib > 1e-9)[0]
@@ -155,6 +155,8 @@ def build_reasons(model_features: list[str], x: np.ndarray, contrib: np.ndarray,
     out, used = [], set()
     for i in pos[np.argsort(-contrib[pos], kind="stable")]:
         code = model_features[i]
+        if code in exclude:
+            continue                                  # a fact the caller did not provide (e.g. a scenario without invoice)
         if code == "income_rate_per_month" and x[i] < 0:
             continue                                  # 'income not due yet' is not a fact worth showing
         group = _GROUP_OF.get(code)

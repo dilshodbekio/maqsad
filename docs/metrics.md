@@ -285,9 +285,9 @@ Example (`fast_cash_out` preset, only the day of the 42 000 000 so'm cash withdr
 | 1 | 0.9927 | red | 99.3 | 0.84 | Kredit tushgandan keyingi 24 soat ichida mablag'ning 84 foizi naqd yechilgan |
 | 30 | 0.5978 | yellow | 88.8 | 0.00 | Hisob-fakturadagi summaning 90 foizi ta'minotchiga to'lanmagan |
 
-Latency of `score_scenario` (3 runs x 60 calls over the 4 presets, inputs varied; Intel64 Family 6 Model 154 Stepping 3, GenuineIntel, Python 3.13.15), range across runs: p50 162 - 163 ms, p95 188 - 200 ms, slowest call 282 ms (limit in the tests: 500 ms). Produced by `python -m ml.eval.eval_scenario`.
+Latency of `score_scenario` (3 runs x 60 calls over the 4 presets, inputs varied; Intel64 Family 6 Model 154 Stepping 3, GenuineIntel, Python 3.13.15), range across runs: p50 140 - 142 ms, p95 160 - 165 ms, slowest call 196 ms (limit in the tests: 500 ms). Produced by `python -m ml.eval.eval_scenario`.
 
-Assumptions: the invoice amount equals the loan amount; a new supplier has no outflows of its own; for an existing supplier the real demo ledger gives the supplier-graph features (in-degree, downstream cash share); the context is restricted to the supplier's loans, which gives exactly the same features as a full copy (tested).
+Rules and assumptions: `snapshot_day` must be 2..364 (the model was trained on loans up to one year old); unknown keys, a single amount above 10 x the loan, total inflows above 20 x the loan, and outflows above the available balance are rejected (`ScenarioError`, never capped); without `invoice_amount_uzs` there is no invoice (training convention `-1`) and no invoice-gap reason; for a NEW supplier no reason about the supplier's own cash-out is shown (the scenario has no supplier ledger; the features still enter the model with 0); for an existing supplier the real demo ledger gives the supplier-graph features. The context is restricted to the supplier's loans, which gives exactly the same features as a full copy of the portfolio (`pytest -m slow`).
 
 ### Fusion policy (photo -> queue)
 
@@ -299,6 +299,8 @@ Assumptions: the invoice amount equals the loan amount; a new supplier has no ou
 | `PHOTO_FAR` | yellow | yes | geo_ok == False: the photo was taken more than 5 km from the borrower (assumed limit) |
 | `PHOTO_TIME` | yellow | yes | time_ok == False: captured before disbursement or in the future |
 | `PHOTO_ASSET_MISMATCH` | yellow | no (later) | asset_match below a threshold (switched on when the CLIP step is added) |
+
+**Colour budget (default queue of the demo portfolio):** 500 red by risk + 13 escalated to red by the photo policy = 513 red; 501 yellow (500 by risk, 5 green loans raised to yellow, the rest moved to red). The thresholds stay 10% / 10% by risk (500 red + 500 yellow); the photo policy adds 13 loans to red and 5 green loans to yellow, so the 20% inspection budget is exceeded by these escalations (`ml.api.get_color_thresholds()`). Reason order: policy reasons that raised the colour, then money-trail reasons, then the other policy reasons; the queue's `top_reason` is the first of them.
 
 The demo portfolio's own photos are evaluated with the same policy (duplicates in the index, distance, capture time); a sandbox's uploaded photos escalate loans only in that sandbox's view (`get_queue(sandbox_id)`, `get_loan(loan_id, sandbox_id)`) and `reset_sandbox` removes them. The 5 km distance limit and the photo rates of the generator are assumptions.
 

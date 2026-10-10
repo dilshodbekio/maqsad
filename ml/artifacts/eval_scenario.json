@@ -1,21 +1,21 @@
 {
  "runs": [
   {
-   "p50": 163.445,
-   "p95": 188.3858,
-   "max": 230.05,
+   "p50": 141.58350000000002,
+   "p95": 160.69629999999998,
+   "max": 195.999,
    "n": 60
   },
   {
-   "p50": 161.75900000000001,
-   "p95": 199.69115,
-   "max": 281.658,
+   "p50": 139.631,
+   "p95": 160.03775,
+   "max": 170.895,
    "n": 60
   },
   {
-   "p50": 163.3795,
-   "p95": 189.27675,
-   "max": 198.463,
+   "p50": 140.974,
+   "p95": 165.32035,
+   "max": 173.052,
    "n": 60
   }
  ],
@@ -46,5 +46,18 @@
   "asset_resale"
  ],
  "python": "3.13.15",
- "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel"
+ "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+ "thresholds": {
+  "red": 0.6670030982583434,
+  "yellow": 0.27436132749086406,
+  "n_red": 500,
+  "n_yellow": 500,
+  "n_loans": 5000,
+  "rule": "red = top 10% of the portfolio by risk, yellow = next 10%, green = rest (red + yellow = 20% inspection budget)",
+  "n_red_total": 513,
+  "n_yellow_total": 501,
+  "n_escalated_to_red": 13,
+  "n_escalated_to_yellow": 5,
+  "note": "500 red by risk + 13 escalated to red by the photo policy = 513 red; 501 yellow (500 by risk, 5 green loans raised to yellow, the rest moved to red)"
+ }
 }

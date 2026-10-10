@@ -68,9 +68,16 @@ def get_scenario_presets() -> list[dict]:
 def get_color_thresholds() -> dict:
     """Colour rule of the served portfolio: red = top 10% by risk, yellow = next 10%, green = rest.
 
-    Returns {red, yellow (risk scores at those ranks), n_red, n_yellow, n_loans, rule}.
+    Returns {red, yellow (risk scores at those ranks), n_red, n_yellow (by risk), n_loans, rule} plus the effect of the
+    photo policy on the default queue: n_escalated_to_red (loans raised to red), n_escalated_to_yellow (green -> yellow),
+    n_red_total, n_yellow_total and `note` - the 20% budget is exceeded by exactly these escalations.
     """
-    return dict(get_portfolio().thresholds)
+    P = get_portfolio()
+    c = P.fused_counts()
+    note = (f"{P.thresholds['n_red']} red by risk + {c['n_escalated_to_red']} escalated to red by the photo policy = "
+            f"{c['n_red_total']} red; {c['n_yellow_total']} yellow ({P.thresholds['n_yellow']} by risk, "
+            f"{c['n_escalated_to_yellow']} green loans raised to yellow, the rest moved to red)")
+    return {**P.thresholds, **c, "note": note}
 
 
 def score_loan(loan_id: str) -> dict:

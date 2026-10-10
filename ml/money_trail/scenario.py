@@ -7,7 +7,8 @@ supplier, their transactions and the supplier's ledger (every money-trail featur
 its own transactions and on its supplier's loans / ledger); tests assert that this gives exactly the same features
 as running on a full copy of the portfolio (`_features(..., full=True)`).
 
-Assumptions (documented in docs/api_contract.md): the invoice amount equals the loan amount; the borrower's
+Assumptions (documented in docs/api_contract.md): without `invoice_amount_uzs` there is no invoice (invoice_gap uses its
+-1 'no invoice' convention and no invoice-gap reason is shown); the borrower's
 supplier payments land on the supplier's account as `income` rows; a NEW supplier has no outflows of its own
 (there is nothing the form can say about them); the loan's branch is the supplier's most common branch for an
 existing supplier, otherwise the first branch of the chosen region (BR-00 without a region).
@@ -35,7 +36,14 @@ INFLOWS = {"p2p_in", "income"}
 CP_KINDS = ("person", "business", "external", "supplier", "none")
 DEFAULT_KIND = {"cash_withdrawal": "none", "supplier_payment": "supplier", "p2p_out": "person", "p2p_in": "person",
                 "external_transfer": "external", "income": "business"}
-MAX_TX, MAX_SNAPSHOT_DAY, MAX_AMOUNT = 60, 730, 10 ** 11
+MAX_TX, MAX_AMOUNT = 60, 10 ** 11
+SNAPSHOT_DAY_MIN, SNAPSHOT_DAY_MAX = 2, 364       # the model was trained on loans 2..364 days old at the snapshot
+MAX_SINGLE_X, MAX_INFLOW_X = 10, 20                # absurd inputs: one amount > 10 x loan, all inflows > 20 x loan
+KEYS_TOP = ("purpose", "amount_uzs", "region", "snapshot_day", "supplier", "transactions", "invoice_amount_uzs")
+KEYS_SUPPLIER = {"existing": ("mode", "supplier_id"), "new": ("mode", "oked", "registered_days_before")}
+KEYS_TX = ("day", "type", "amount_uzs", "counterparty_kind")
+# reasons about the supplier's own ledger are not shown for a NEW supplier (the scenario has no supplier ledger)
+NEW_SUPPLIER_HIDDEN = frozenset({"sup_cash_share", "sup_exit_share", "sup_cash_lag_days", "sup_active_span_days"})
 DAY = pd.Timedelta(days=1)
 
 
@@ -55,21 +63,37 @@ def _int(v, what, lo=None, hi=None) -> int:
     return v
 
 
+def _no_unknown(d: dict, allowed, where: str):
+    extra = [k for k in d if k not in allowed]
+    if extra:
+        raise ScenarioError(f"Noma'lum kalit(lar) {where}: {', '.join(sorted(map(str, extra)))}. Mumkin: {', '.join(allowed)}")
+
+
 def validate(scn, P) -> dict:
     """Normalised scenario or ScenarioError (Uzbek message)."""
     if not isinstance(scn, dict):
         raise ScenarioError("Ssenariy lug'at (dict) bo'lishi kerak")
+    _no_unknown(scn, KEYS_TOP, "ssenariyda")
     purpose = scn.get("purpose")
     if purpose not in PURPOSES:
         raise ScenarioError(f"Noma'lum kredit maqsadi: {purpose!r}. Mumkin: {', '.join(PURPOSES)}")
     amount = _int(scn.get("amount_uzs"), "Kredit summasi (amount_uzs)", 1, MAX_AMOUNT)
-    snap_day = _int(scn.get("snapshot_day"), "snapshot_day (kredit berilganidan baholash kunigacha kunlar)", 0, MAX_SNAPSHOT_DAY)
+    snap_day = _int(scn.get("snapshot_day"), "snapshot_day (kredit berilganidan baholash kunigacha kunlar)")
+    if not SNAPSHOT_DAY_MIN <= snap_day <= SNAPSHOT_DAY_MAX:
+        raise ScenarioError(f"snapshot_day {SNAPSHOT_DAY_MIN}..{SNAPSHOT_DAY_MAX} kun oralig'ida bo'lishi kerak: model bir yilgacha "
+                            "(2-364 kunlik) berilgan kreditlar bo'yicha o'qitilgan")
+    invoice = scn.get("invoice_amount_uzs")
+    if invoice is not None:
+        invoice = _int(invoice, "Hisob-faktura summasi (invoice_amount_uzs)", 1, MAX_AMOUNT)
+        if invoice > MAX_SINGLE_X * amount:
+            raise ScenarioError(f"Hisob-faktura summasi kredit summasidan {MAX_SINGLE_X} baravardan katta bo'lishi mumkin emas")
     region = scn.get("region")
     if region is not None and not (isinstance(region, str) and region in {r[0] for r in REGIONS}):
         raise ScenarioError(f"Noma'lum hudud: {region!r}")
     sup = scn.get("supplier")
     if not isinstance(sup, dict) or sup.get("mode") not in ("existing", "new"):
         raise ScenarioError("Ta'minotchi (supplier) 'mode': 'existing' yoki 'new' bo'lishi kerak")
+    _no_unknown(sup, KEYS_SUPPLIER[sup["mode"]], "ta'minotchida")
     if sup["mode"] == "existing":
         sid = sup.get("supplier_id")
         if not isinstance(sid, str) or sid not in P.suppliers.index:
@@ -77,7 +101,7 @@ def validate(scn, P) -> dict:
         supplier = dict(mode="existing", supplier_id=sid)
     else:
         oked = sup.get("oked")
-        if not isinstance(oked, str) or not re.fullmatch(r"\d{2}\.\d{2}", oked):
+        if not isinstance(oked, str) or not re.fullmatch(r"[0-9]{2}\.[0-9]{2}", oked):
             raise ScenarioError("Ta'minotchi OKED kodi 'NN.NN' ko'rinishida bo'lishi kerak (masalan 46.23)")
         supplier = dict(mode="new", oked=oked, registered_days_before=_int(
             sup.get("registered_days_before"), "registered_days_before", 0, 40_000))
@@ -90,6 +114,7 @@ def validate(scn, P) -> dict:
     for i, t in enumerate(txs, 1):
         if not isinstance(t, dict):
             raise ScenarioError(f"{i}-tranzaksiya lug'at bo'lishi kerak")
+        _no_unknown(t, KEYS_TX, f"{i}-tranzaksiyada")
         if t.get("type") not in TX_TYPES:
             raise ScenarioError(f"{i}-tranzaksiya: noma'lum tur {t.get('type')!r}. Mumkin: {', '.join(TX_TYPES)}")
         kind = t.get("counterparty_kind")
@@ -98,6 +123,14 @@ def validate(scn, P) -> dict:
         norm.append(dict(i=i, day=_int(t.get("day"), f"{i}-tranzaksiya kuni (day)", 0, snap_day),
                          type=t["type"], amount_uzs=_int(t.get("amount_uzs"), f"{i}-tranzaksiya summasi", 1, MAX_AMOUNT),
                          counterparty_kind=kind or DEFAULT_KIND[t["type"]]))
+    for t in norm:
+        if t["amount_uzs"] > MAX_SINGLE_X * amount:
+            raise ScenarioError(f"{t['i']}-tranzaksiya summasi ({_som(t['amount_uzs'])}) kredit summasidan {MAX_SINGLE_X} baravardan "
+                                "katta: ssenariy real emas")
+    inflow = sum(t["amount_uzs"] for t in norm if t["type"] in INFLOWS)
+    if inflow > MAX_INFLOW_X * amount:
+        raise ScenarioError(f"Barcha kirimlar yig'indisi ({_som(inflow)}) kredit summasidan {MAX_INFLOW_X} baravardan katta: "
+                            "ssenariy real emas")
     # balance check: the loan arrives on day 0; inflows are applied before outflows of the same day
     balance = amount
     for t in sorted(norm, key=lambda t: (t["day"], t["type"] not in INFLOWS, t["i"])):
@@ -108,7 +141,8 @@ def validate(scn, P) -> dict:
                 raise ScenarioError(f"{t['i']}-tranzaksiya ({t['day']}-kun): hisobda mablag' yetarli emas "
                                     f"(kerak: {_som(t['amount_uzs'])}, mavjud: {_som(balance)})")
             balance -= t["amount_uzs"]
-    return dict(purpose=purpose, amount_uzs=amount, snapshot_day=snap_day, region=region, supplier=supplier, transactions=norm)
+    return dict(purpose=purpose, amount_uzs=amount, snapshot_day=snap_day, region=region, supplier=supplier,
+                transactions=norm, invoice_amount_uzs=invoice)
 
 
 def _branch(P, scn) -> str:
@@ -135,7 +169,9 @@ def _scenario_frames(P, scn: dict):
                                       linked_employee_id=None)])
     loan = pd.DataFrame([dict(loan_id=SCENARIO_LOAN_ID, borrower_id=SCENARIO_BORROWER_ID, purpose=scn["purpose"],
                               amount_uzs=scn["amount_uzs"], disbursed_at=disb, snapshot_date=snap,
-                              branch_id=_branch(P, scn), supplier_id=sid, invoice_amount_uzs=scn["amount_uzs"])])
+                              branch_id=_branch(P, scn), supplier_id=sid,
+                              # 0 = no invoice: the feature builder then uses its training convention (invoice_gap = -1)
+                              invoice_amount_uzs=scn["invoice_amount_uzs"] or 0)])
     acct, rows = f"ACC-{SCENARIO_BORROWER_ID}", []
 
     def add(loan_id, account, day, typ, amount, cp, kind):
@@ -192,7 +228,13 @@ def score_scenario(scenario: dict) -> dict:
     risk = float(P.model.score(x)[0])
     contrib = P.model.contributions(x)[0]
     oked = scn["supplier"]["oked"] if scn["supplier"]["mode"] == "new" else P.suppliers.at[scn["supplier"]["supplier_id"], "oked_code"]
-    reasons = build_reasons(P.model.features, x.iloc[0].to_numpy(float), contrib, {"supplier_oked": oked}, with_refs=False)
+    hidden = set()
+    if scn["invoice_amount_uzs"] is None:
+        hidden.add("invoice_gap")                                    # no invoice was entered: no invoice-gap statement
+    if scn["supplier"]["mode"] == "new":
+        hidden |= NEW_SUPPLIER_HIDDEN                                 # no supplier ledger was entered
+    reasons = build_reasons(P.model.features, x.iloc[0].to_numpy(float), contrib, {"supplier_oked": oked},
+                            with_refs=False, exclude=hidden)
     pct = 100.0 * float(np.searchsorted(P.sorted_risk, risk, side="right")) / len(P.sorted_risk)
     return dict(risk=risk, color=color_of(risk, P.thresholds), reasons=reasons, model_version=MODEL_VERSION,
                 latency_ms=round((time.perf_counter() - t0) * 1000, 3), percentile=round(pct, 1),
@@ -207,26 +249,26 @@ def get_scenario_presets() -> list[dict]:
     return [
         dict(id="honest_purchase", title_uz="Ta'minotchidan oddiy xarid",
              description_uz="Kredit tushgach, summa ta'minotchiga o'tkaziladi; keyin oyiga bir marta kichik tushum.",
-             scenario=dict(purpose="tikuv_dastgohi", amount_uzs=40_000_000, region=None, snapshot_day=150,
+             scenario=dict(purpose="tikuv_dastgohi", amount_uzs=40_000_000, invoice_amount_uzs=40_000_000, region=None, snapshot_day=150,
                            supplier=dict(mode="new", oked="28.94", registered_days_before=2000),
                            transactions=[dict(day=3, type="supplier_payment", amount_uzs=39_000_000)] +
                            [dict(day=d, type="income", amount_uzs=1_500_000, counterparty_kind="business") for d in (45, 75, 105, 135)])),
         dict(id="fast_cash_out", title_uz="Kredit tushishi bilan tez naqdlashtirish",
              description_uz="Birinchi kuni mablag'ning katta qismi naqd yechiladi, ta'minotchiga atigi kichik summa o'tkaziladi. "
                             "Naqd yechish kunini (day) o'zgartirib ko'ring.",
-             scenario=dict(purpose="chorva", amount_uzs=50_000_000, region=None, snapshot_day=60,
+             scenario=dict(purpose="chorva", amount_uzs=50_000_000, invoice_amount_uzs=50_000_000, region=None, snapshot_day=60,
                            supplier=dict(mode="new", oked="01.41", registered_days_before=900),
                            transactions=[dict(day=1, type="cash_withdrawal", amount_uzs=42_000_000),
                                          dict(day=5, type="supplier_payment", amount_uzs=5_000_000)])),
         dict(id="supplier_ring", title_uz="Ko'p qarz oluvchi, bitta ta'minotchi, naqd chiqarish",
              description_uz="Ko'p kredit bitta ta'minotchiga to'lanadi va ta'minotchi pulni tez naqdlashtiradi (demo portfeldagi "
                             f"mavjud ta'minotchi {ring['supplier_id']}). Bu kredit shu ta'minotchining yana bir qarz oluvchisi.",
-             scenario=dict(purpose=ring["purpose"], amount_uzs=ring["amount"], region=None, snapshot_day=90,
+             scenario=dict(purpose=ring["purpose"], amount_uzs=ring["amount"], invoice_amount_uzs=ring["amount"], region=None, snapshot_day=90,
                            supplier=dict(mode="existing", supplier_id=ring["supplier_id"]),
                            transactions=[dict(day=2, type="supplier_payment", amount_uzs=int(ring["amount"] * 0.92))])),
         dict(id="asset_resale", title_uz="Aktiv sotib olinadi, keyin bir martalik tushum va naqd chiqarish",
              description_uz="Ta'minotchiga to'lov o'tkaziladi; ikki oy o'tib katta bir martalik tushum keladi va u naqd yechiladi.",
-             scenario=dict(purpose="chorva", amount_uzs=60_000_000, region=None, snapshot_day=120,
+             scenario=dict(purpose="chorva", amount_uzs=60_000_000, invoice_amount_uzs=60_000_000, region=None, snapshot_day=120,
                            supplier=dict(mode="new", oked="01.41", registered_days_before=1200),
                            transactions=[dict(day=3, type="supplier_payment", amount_uzs=58_000_000),
                                          dict(day=60, type="p2p_in", amount_uzs=40_000_000, counterparty_kind="person"),

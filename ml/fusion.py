@@ -61,19 +61,32 @@ def photo_signals(*, ref: str, photo_label: str, duplicates: list[dict], geo_ok,
 
 
 def apply_policy(base_color: str, signals: list[dict]) -> dict:
-    """{color, escalations[]}: the final colour is never below `base_color`; one escalation per policy code."""
-    final, seen, esc = COLOR_RANK[base_color], set(), []
+    """{color, escalations[]}: the final colour is never below `base_color`. One escalation (one reason) per policy
+    code; if several photos trigger the same code (a portfolio photo and a sandbox upload) their texts are joined and
+    ALL their evidence refs are kept."""
+    final, by_code = COLOR_RANK[base_color], {}
     for s in signals:
-        code = s["code"]
-        if code in seen:
-            continue
-        seen.add(code)
+        by_code.setdefault(s["code"], []).append(s)
+    esc = []
+    for code, group in by_code.items():
         minimum = COLOR_RANK[POLICY[code]["min_color"]]
-        esc.append(dict(code=code, min_color=POLICY[code]["min_color"], text_uz=s["text_uz"],
-                        evidence_refs=[s["evidence_ref"]], raises_color=minimum > COLOR_RANK[base_color]))
+        texts = [g["text_uz"] for g in group]
+        text = "; ".join([texts[0]] + [t[:1].lower() + t[1:] for t in texts[1:]])
+        esc.append(dict(code=code, min_color=POLICY[code]["min_color"], text_uz=text,
+                        evidence_refs=list(dict.fromkeys(g["evidence_ref"] for g in group)),
+                        raises_color=minimum > COLOR_RANK[base_color]))
         final = max(final, minimum)
     esc.sort(key=lambda e: (-COLOR_RANK[e["min_color"]], e["code"]))
     return dict(color=RANK_COLOR[final], escalations=esc)
+
+
+def order_reasons(policy_reasons: list[dict], model_reasons: list[dict], escalations: list[dict]) -> list[dict]:
+    """The one ordering of a loan's reasons (used by `get_loan().reasons` and by the queue's `top_reason`):
+    policy reasons that RAISED the colour first, then the money-trail reasons, then the policy reasons that did not
+    raise it (the colour was already that high). `policy_reasons[i]` belongs to `escalations[i]`."""
+    raised = [r for r, e in zip(policy_reasons, escalations) if e["raises_color"]]
+    rest = [r for r, e in zip(policy_reasons, escalations) if not e["raises_color"]]
+    return raised + list(model_reasons) + rest
 
 
 def policy_table() -> list[dict]:

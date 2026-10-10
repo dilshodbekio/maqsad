@@ -56,6 +56,7 @@ def test_fast_cash_out_scores_higher_than_honest_purchase(presets):
         api.score_scenario(presets["honest_purchase"]["scenario"])["risk"]
 
 
+@pytest.mark.slow
 def test_features_equal_the_full_portfolio_copy(presets, P):
     for p in presets.values():
         v = validate(p["scenario"], P)
@@ -94,7 +95,9 @@ def base():
     lambda s: s.update(amount_uzs="10"),
     lambda s: s.update(amount_uzs=True),
     lambda s: s.update(amount_uzs=1.5),
-    lambda s: s.update(snapshot_day=731),
+    lambda s: s.update(snapshot_day=365),
+    lambda s: s.update(snapshot_day=1),
+    lambda s: s.update(snapshot_day=730),
     lambda s: s.update(snapshot_day=-1),
     lambda s: s.update(region="Mars"),
     lambda s: s["supplier"].update(mode="other"),
@@ -143,13 +146,13 @@ def test_inflow_on_the_same_day_covers_an_outflow_and_valid_edge_values():
     s["snapshot_day"] = 5
     assert api.score_scenario(s)["risk"] >= 0
     s2 = base()
-    s2.update(snapshot_day=730, transactions=[])
+    s2.update(snapshot_day=364, transactions=[])
     assert api.score_scenario(s2)["features"]["first_cash_days"] == 400       # no cash withdrawal at all
 
 
 def test_young_loan_without_transactions_is_scored():
     s = base()
-    s.update(snapshot_day=0, transactions=[])
+    s.update(snapshot_day=2, transactions=[])
     r = api.score_scenario(s)
     assert 0 <= r["risk"] <= 1
 

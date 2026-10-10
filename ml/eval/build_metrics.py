@@ -164,9 +164,12 @@ def render_scenario_fusion() -> list[str]:
     else:
         w("_Not measured yet: `python -m ml.eval.eval_scenario`._")
     w("")
-    w("Assumptions: the invoice amount equals the loan amount; a new supplier has no outflows of its own; for an existing supplier the "
-      "real demo ledger gives the supplier-graph features (in-degree, downstream cash share); the context is restricted to the "
-      "supplier's loans, which gives exactly the same features as a full copy (tested).")
+    w("Rules and assumptions: `snapshot_day` must be 2..364 (the model was trained on loans up to one year old); unknown keys, a single amount "
+      "above 10 x the loan, total inflows above 20 x the loan, and outflows above the available balance are rejected (`ScenarioError`, never "
+      "capped); without `invoice_amount_uzs` there is no invoice (training convention `-1`) and no invoice-gap reason; for a NEW supplier no "
+      "reason about the supplier's own cash-out is shown (the scenario has no supplier ledger; the features still enter the model with 0); "
+      "for an existing supplier the real demo ledger gives the supplier-graph features. The context is restricted to the supplier's loans, "
+      "which gives exactly the same features as a full copy of the portfolio (`pytest -m slow`).")
     w("")
     w("### Fusion policy (photo -> queue)")
     w("")
@@ -181,6 +184,15 @@ def render_scenario_fusion() -> list[str]:
     for row in fusion.policy_table():
         w(f"| `{row['code']}` | {row['min_color']} | {'yes' if row['active'] else 'no (later)'} | {row['when']} |")
     w("")
+    sc2 = _load(RES_SCENARIO)
+    if sc2 and sc2.get("thresholds"):
+        t = sc2["thresholds"]
+        w(f"**Colour budget (default queue of the demo portfolio):** {t['note']}. The thresholds stay 10% / 10% by risk "
+          f"({t['n_red']} red + {t['n_yellow']} yellow); the photo policy adds {t['n_escalated_to_red']} loans to red and "
+          f"{t['n_escalated_to_yellow']} green loans to yellow, so the 20% inspection budget is exceeded by these escalations "
+          "(`ml.api.get_color_thresholds()`). Reason order: policy reasons that raised the colour, then money-trail reasons, then the "
+          "other policy reasons; the queue's `top_reason` is the first of them.")
+        w("")
     w("The demo portfolio's own photos are evaluated with the same policy (duplicates in the index, distance, capture time); a sandbox's "
       "uploaded photos escalate loans only in that sandbox's view (`get_queue(sandbox_id)`, `get_loan(loan_id, sandbox_id)`) and "
       "`reset_sandbox` removes them. The 5 km distance limit and the photo rates of the generator are assumptions.")

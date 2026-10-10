@@ -132,8 +132,10 @@ class Portfolio:
         res = fusion.apply_policy(item["base_color"], signals)
         item["color"], item["escalations"] = res["color"], res["escalations"]
         item["priority"] = fusion.priority(res["color"], item["risk"])
-        raised = [e for e in res["escalations"] if e["raises_color"]]
-        item["top_reason"] = raised[0]["text_uz"] if raised else self._base_reason[item["loan_id"]]
+        base = self._base_reason[item["loan_id"]]
+        ordered = fusion.order_reasons([dict(text_uz=e["text_uz"]) for e in res["escalations"]],
+                                       [] if base == NO_REASON_UZ else [dict(text_uz=base)], res["escalations"])
+        item["top_reason"] = ordered[0]["text_uz"] if ordered else NO_REASON_UZ     # == get_loan().reasons[0]
         return item
 
     def _portfolio_signals(self) -> dict:
@@ -156,6 +158,14 @@ class Portfolio:
         return out
 
     # ------------------------------------------------------------------ public
+    def fused_counts(self) -> dict:
+        """How the default queue's colours relate to the 10% / 10% rank rule: the photo policy can only add to it."""
+        q = self._queue
+        n = lambda f: sum(1 for x in q if f(x))
+        return dict(n_red_total=n(lambda x: x["color"] == "red"), n_yellow_total=n(lambda x: x["color"] == "yellow"),
+                    n_escalated_to_red=n(lambda x: x["color"] == "red" and x["base_color"] != "red"),
+                    n_escalated_to_yellow=n(lambda x: x["color"] == "yellow" and x["base_color"] == "green"))
+
     def queue(self, sandbox_id=None) -> list[dict]:
         """Queue sorted by priority (colour rank, then risk). With a sandbox_id the escalations from that sandbox's
         uploaded photos are included; other sandboxes and the default view are unaffected."""
@@ -211,13 +221,14 @@ class Portfolio:
         policy_reasons = [dict(code=e["code"], text_uz=e["text_uz"], weight=None, evidence_refs=e["evidence_refs"],
                                source="fusion_policy") for e in fused["escalations"]]
         photo_evidence = {s["evidence_ref"]: s["evidence"] for s in signals}
-        photo_items = copy.deepcopy([photo_evidence[r] for r in dict.fromkeys(e["evidence_refs"][0] for e in fused["escalations"])])
+        photo_items = copy.deepcopy([photo_evidence[r] for r in dict.fromkeys(r for e in fused["escalations"] for r in e["evidence_refs"])])
         return dict(
             loan={"loan_id": loan_id, **{k: _py(self.loans.at[loan_id, k]) for k in LOAN_FIELDS[1:]}},
             transactions=[{k: _py(r[k]) for k in TXN_FIELDS} for _, r in txs.iterrows()],
             photos=self._photos(loan_id), invoice=ctx["invoice"],
             risk=risk, color=fused["color"], base_color=base, priority=fusion.priority(fused["color"], risk),
-            escalations=fused["escalations"], reasons=policy_reasons + reasons,
+            escalations=fused["escalations"],
+            reasons=fusion.order_reasons(policy_reasons, reasons, fused["escalations"]),
             evidence=photo_items + build_evidence(refs, ctx), model_version=MODEL_VERSION)
 
 

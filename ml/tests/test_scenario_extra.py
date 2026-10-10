@@ -30,7 +30,7 @@ def base():
 
 def random_scenario(rng: random.Random, P) -> dict:
     amount = rng.randint(1, 200) * 1_000_000
-    snap = rng.choice([0, 1, 5, 30, 90, 400, 730])
+    snap = rng.choice([2, 3, 5, 30, 90, 200, 364])
     if rng.random() < 0.5:
         sup = dict(mode="existing", supplier_id=rng.choice(list(P.suppliers.index)))
     else:
@@ -55,6 +55,7 @@ def random_scenario(rng: random.Random, P) -> dict:
 
 
 # ---------------------------------------------------------------- equivalence with the full copy
+@pytest.mark.slow
 @pytest.mark.parametrize("seed", range(10))
 def test_random_scenarios_features_equal_full_copy(P, seed):
     scn = random_scenario(random.Random(seed), P)
@@ -64,6 +65,7 @@ def test_random_scenarios_features_equal_full_copy(P, seed):
     assert diff == 0, (scn, (fast.astype(float) - full.astype(float)).abs().sort_values().tail(3))
 
 
+@pytest.mark.slow
 def test_random_existing_supplier_scenarios_cover_all_branches(P):
     """Several different existing suppliers (incl. one without any demo loan, if present) match the full copy."""
     with_loans = set(P.loans["supplier_id"])
@@ -93,24 +95,25 @@ def test_input_is_not_mutated(P):
     assert scn == before
 
 
-def test_unknown_extra_keys_are_ignored_and_do_not_change_the_score():
-    s = base()
-    r0 = api.score_scenario(s)
-    s2 = base()
-    s2["label"] = "fraud"
-    s2["risk"] = 0.99
-    s2["supplier"]["foo"] = 1
-    s2["transactions"][0]["bar"] = "x"
-    r1 = api.score_scenario(s2)
-    assert r1["risk"] == r0["risk"] and r1["features"] == r0["features"]
+def test_unknown_keys_are_rejected_and_listed():
+    for where, mutate, name in (
+            ("ssenariyda", lambda s: s.update(label="fraud", risk=0.99), "label, risk"),
+            ("ta'minotchida", lambda s: s["supplier"].update(foo=1), "foo"),
+            ("1-tranzaksiyada", lambda s: s["transactions"][0].update(bar="x"), "bar"),
+            ("ssenariyda", lambda s: s.update(counterpartykind="x"), "counterpartykind")):
+        s = base()
+        mutate(s)
+        with pytest.raises(ScenarioError) as e:
+            api.score_scenario(s)
+        assert where in str(e.value) and name in str(e.value), str(e.value)
 
 
-def test_existing_supplier_ignores_new_supplier_fields():
+def test_existing_supplier_rejects_new_supplier_fields():
     P = get_portfolio()
     sid = sorted(set(P.loans["supplier_id"]))[0]
-    a = base(); a["supplier"] = dict(mode="existing", supplier_id=sid)
     b = base(); b["supplier"] = dict(mode="existing", supplier_id=sid, oked="99.99", registered_days_before=1)
-    assert api.score_scenario(a)["risk"] == api.score_scenario(b)["risk"]
+    with pytest.raises(ScenarioError, match="oked"):
+        api.score_scenario(b)
 
 
 # ---------------------------------------------------------------- validation rules
@@ -202,9 +205,13 @@ def test_day_boundaries_0_and_snapshot_day_are_valid_and_snapshot_plus_one_is_no
 
 
 def test_snapshot_and_amount_and_registration_boundaries():
-    for snap in (0, 730):
+    for snap in (2, 364):
         s = base(); s.update(snapshot_day=snap); s["transactions"][0]["day"] = 0
         api.score_scenario(s)
+    for snap in (0, 1, 365, 730):
+        s = base(); s.update(snapshot_day=snap)
+        with pytest.raises(ScenarioError, match="bir yilgacha"):
+            api.score_scenario(s)
     s = base(); s.update(amount_uzs=1, transactions=[]); api.score_scenario(s)
     s = base(); s.update(amount_uzs=10 ** 11, transactions=[]); api.score_scenario(s)
     s = base(); s["supplier"]["registered_days_before"] = 0; api.score_scenario(s)
@@ -219,6 +226,7 @@ def test_integer_valued_floats_and_numpy_ints_are_accepted():
     assert api.score_scenario(s)["risk"] == api.score_scenario(base())["risk"]
 
 
+@pytest.mark.slow
 def test_every_documented_region_is_accepted(P):
     for name in [r[0] for r in REGIONS]:
         s = base(); s["region"] = name

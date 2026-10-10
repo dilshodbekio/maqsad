@@ -64,7 +64,7 @@ Assumption: all numbers measured on this synthetic data say nothing about real a
 Assumption: there is no labelled data for photo signals, so photo evidence enters the queue through a **documented policy** (`ml/fusion.py`), not a learned model:
 a photo duplicate escalates a loan to at least red, a photo taken more than 5 km from the borrower (assumed limit) or with an implausible capture time to at least yellow;
 escalation never lowers the money-trail colour and never changes the money-trail `risk`. No accuracy is claimed for the policy.
-Assumption: scenario scoring (`ml.api.score_scenario`) treats the invoice amount as equal to the loan amount and gives a new supplier no outflows of its own.
+Assumption: scenario scoring (`ml.api.score_scenario`) gives a new supplier no outflows of its own; without an `invoice_amount_uzs` there is no invoice (the training convention for "no invoice" is used); scenarios are limited to loans 2-364 days old (the model's training range).
 
 ## 3. Licenses
 | Item | Use | License |

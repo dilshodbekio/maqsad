@@ -44,7 +44,7 @@ def main():
                             top_reason=r["reasons"][0]["text_uz"] if r["reasons"] else None,
                             cash_share_d1=r["features"]["cash_share_d1"], first_cash_days=r["features"]["first_cash_days"]))
     out = dict(runs=runs, example=example, presets=[p["id"] for p in presets], python=sys.version.split()[0],
-               cpu=platform.processor())
+               cpu=platform.processor(), thresholds=api.get_color_thresholds())
     RES.write_text(json.dumps(out, indent=1), encoding="utf-8", newline="\n")
     from ml.eval.build_metrics import main as build_metrics
     build_metrics()

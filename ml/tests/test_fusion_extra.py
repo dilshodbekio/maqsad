@@ -68,16 +68,18 @@ def check_consistent(item, d):
     assert item["priority"] == pytest.approx(fusion.priority(item["color"], item["risk"]))
     assert RANK[item["color"]] >= RANK[item["base_color"]]
     raised = [e for e in item["escalations"] if e["raises_color"]]
+    reasons = d["reasons"]
+    # the queue's top_reason IS the first reason of get_loan (one ordering function: fusion.order_reasons)
+    assert item["top_reason"] == (reasons[0]["text_uz"] if reasons else "Sezilarli xavf belgisi aniqlanmadi")
     if raised:
-        assert item["top_reason"] == raised[0]["text_uz"]
-        assert d["reasons"][0]["text_uz"] == d["escalations"][0]["text_uz"]
-    else:
-        assert item["top_reason"] and not item["top_reason"].startswith("Yuklangan rasm")
-    pol = [r for r in d["reasons"] if r["source"] == "fusion_policy"] if all("source" in r for r in d["reasons"]) else \
-        [r for r in d["reasons"] if r.get("source") == "fusion_policy"]
-    assert [r["code"] for r in pol] == [e["code"] for e in d["escalations"]]
+        assert reasons[0]["text_uz"] == raised[0]["text_uz"]
+    pol = [r for r in reasons if r.get("source") == "fusion_policy"]
+    assert sorted(r["code"] for r in pol) == sorted(e["code"] for e in d["escalations"])
     assert all(r["weight"] is None for r in pol)
-    assert d["reasons"][: len(pol)] == pol                                  # policy reasons come first
+    # order: policy reasons that raised the colour, then money-trail reasons, then the other policy reasons
+    n_raised = len(raised)
+    assert [r["code"] for r in reasons[:n_raised]] == [e["code"] for e in raised]
+    assert all(r.get("source") != "fusion_policy" for r in reasons[n_raised:len(reasons) - (len(pol) - n_raised)])
     refs = {e["ref"] for e in d["evidence"]}
     for e in d["escalations"]:
         assert set(e["evidence_refs"]) <= refs                               # every escalation is backed by an evidence item
@@ -228,6 +230,7 @@ def test_concurrent_same_image_in_one_sandbox_flags_all_loans(idx, images):
     assert {x["loan_id"] for x in api.get_queue() if x["color"] == "red"} & set(loans) == set()
 
 
+@pytest.mark.slow
 def test_concurrent_queue_reads_while_uploading(idx, images):
     loans = quiet(idx, 4)
     stop, errors = threading.Event(), []
@@ -249,6 +252,7 @@ def test_concurrent_queue_reads_while_uploading(idx, images):
 
 
 # ---------------------------------------------------------------- randomised: fusion never lowers a colour
+@pytest.mark.slow
 def test_fusion_never_lowers_any_colour_after_many_random_uploads(P, idx, images):
     rng = random.Random(2026)
     q0 = api.get_queue()

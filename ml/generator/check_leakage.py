@@ -137,7 +137,7 @@ def report(split: str) -> str:
     honest = ~lab.is_fraud
     w(f"\nSingle-feature AUC vs honest loans (sign-agnostic: max(AUC, 1-AUC); direction shown). "
       f"Flag threshold {FLAG_AUC}. Only fraud whose event is visible before the snapshot is used.")
-    flagged = []
+    flagged, summary = [], []
     for typ in ("T1", "T2", "T3", "T4", "ALL"):
         pos = (lab.is_fraud & lab.fraud_visible) if typ == "ALL" else (lab.typology == typ) & lab.fraud_visible
         mask = pos | honest
@@ -150,6 +150,7 @@ def report(split: str) -> str:
             a = roc_auc_score(y, x)
             rows.append((max(a, 1 - a), "+" if a >= 0.5 else "-", c))
         rows.sort(reverse=True)
+        summary.append((typ, int(pos.sum()), rows[0], dict((c, a) for a, _, c in rows).get('oked_mismatch')))
         w(f"\n[{typ}] n_fraud={int(pos.sum())}  top features:")
         for a, d, c in rows[:8]:
             flag = "  <-- LEAK? (>= %.2f)" % FLAG_AUC if a >= FLAG_AUC else ""
@@ -158,6 +159,11 @@ def report(split: str) -> str:
                 flagged.append((typ, c, a))
     w(f"\nFeatures with single-feature AUC >= {FLAG_AUC}: "
       + (", ".join(f"{t}:{c}({a:.3f})" for t, c, a in flagged) if flagged else "none"))
+
+    w("\nSUMMARY (best single-feature AUC per typology; visible fraud vs honest)")
+    for typ, n, (a, d, c), oked_a in summary:
+        extra = f"  oked_mismatch AUC={oked_a:.3f}" if typ == "T4" else ""
+        w(f"   {typ:<3s} n={n:4d}  best={c} AUC={a:.3f}{extra}")
 
     # recall@20% of each single feature on all fraud (visible or not), best direction
     y_all = lab.is_fraud.to_numpy().astype(int)

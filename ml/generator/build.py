@@ -162,8 +162,16 @@ def _plan_suppliers(p, rng, pl, rings):
               lambda r: str(r.choice(GENERIC_OKED)), 0.8)
     pool_draw(unrel, max(3, round(len(unrel) / 3)), "unrelated",
               lambda r: str(r.choice(UNRELATED_OKED)), 0.8)
-    # T4: dedicated pool, OKED never matches the purpose (unrelated 70% / generic 30%)
-    t4 = np.where(kind == "T4")[0]
+    # T4: dedicated pool; OKED mismatches the purpose (unrelated 70% / generic 30%) except the stealth 25%
+    t4_all = np.where(kind == "T4")[0]
+    # T4 stealth: ~25% route the fake invoice through a firm whose OKED matches the purpose
+    t4_st = t4_all[rng.random(len(t4_all)) < 0.25]
+    pl["stealth"][t4_st] = True
+    for k in PURPOSES:
+        m = t4_st[purpose[t4_st] == k]
+        pool_draw(m, max(2, round(len(m) / 2.2)), "t4",
+                  lambda r, k=k: str(r.choice(MATCHING_OKED[k])), 0, weights_uniform=True)
+    t4 = np.setdiff1d(t4_all, t4_st)
     pool_draw(t4, max(3, round(len(t4) / 2.2)), "t4",
               lambda r: str(r.choice(UNRELATED_OKED if r.random() < 0.7 else GENERIC_OKED)),
               0, weights_uniform=True)

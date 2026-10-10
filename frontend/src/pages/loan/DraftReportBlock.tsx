@@ -13,10 +13,10 @@ type State =
 export function DraftReportBlock({ loanId }: { loanId: string }) {
   const [state, setState] = useState<State>({ kind: "idle" });
 
-  const load = () => {
+  const load = (regenerate = false) => {
     setState({ kind: "loading" });
     api
-      .draftReport(loanId)
+      .draftReport(loanId, regenerate)
       .then((data) => setState({ kind: "ok", data }))
       .catch((e: Error) =>
         setState(
@@ -31,7 +31,7 @@ export function DraftReportBlock({ loanId }: { loanId: string }) {
     <section className="card" aria-labelledby="h-report">
       <h2 id="h-report">Dalolatnoma</h2>
       {state.kind !== "ok" && (
-        <button type="button" onClick={load} disabled={state.kind === "loading"}>
+        <button type="button" onClick={() => load()} disabled={state.kind === "loading"}>
           {state.kind === "loading" ? "Tayyorlanmoqda…" : "Dalolatnoma qoralamasi"}
         </button>
       )}
@@ -47,8 +47,8 @@ export function DraftReportBlock({ loanId }: { loanId: string }) {
           <p className="muted small">{state.detail}</p>
         </div>
       )}
-      {state.kind === "error" && <BlockError message={`Qoralama tayyorlanmadi: ${state.message}`} onRetry={load} />}
-      {state.kind === "ok" && <Report data={state.data} onRefresh={load} />}
+      {state.kind === "error" && <BlockError message={`Qoralama tayyorlanmadi: ${state.message}`} onRetry={() => load()} />}
+      {state.kind === "ok" && <Report data={state.data} onRefresh={() => load(true)} />}
     </section>
   );
 }
@@ -98,8 +98,12 @@ function Report({ data, onRefresh }: { data: DraftReport; onRefresh: () => void 
       {data.facts.length === 0 && <p className="muted small">Qoralamada alohida fakt ro'yxati yo'q.</p>}
 
       <p className="report-meta">
-        Model: {data.model} · kechikish {Math.round(data.latency_ms)} ms · narx{" "}
-        {data.cost_usd === null ? "noma'lum" : `$${data.cost_usd.toFixed(4)}`}
+        Model: {data.model} · {data.cached ? "saqlangan qoralama (qayta chaqirilmadi)" : "yangi qoralama"} · kechikish{" "}
+        {Math.round(data.latency_ms)} ms · narx{" "}
+        {data.cost_usd === null ? "noma'lum" : data.cost_usd === 0 ? "$0 (LLM chaqirilmadi)" : `$${data.cost_usd.toFixed(5)}`}
+        {data.input_tokens != null && data.output_tokens != null
+          ? ` · tokenlar: ${data.input_tokens} kirish / ${data.output_tokens} chiqish`
+          : ""}
       </p>
       <button type="button" className="secondary" onClick={onRefresh}>
         Qayta yaratish

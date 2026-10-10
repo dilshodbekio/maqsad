@@ -28,8 +28,9 @@ class Settings:
     llm_model: str
     llm_api_key: str
     llm_timeout_s: float
-    llm_price_in_per_mtok: Optional[float]
-    llm_price_out_per_mtok: Optional[float]
+    llm_price_in_per_mtok: Optional[float]  # USD per 1M input tokens (env LLM_PRICE_IN_PER_1M)
+    llm_price_out_per_mtok: Optional[float]  # USD per 1M output tokens (env LLM_PRICE_OUT_PER_1M)
+    llm_reasoning_effort: str  # sent as reasoning_effort; "" = not sent
 
     @property
     def llm_configured(self) -> bool:
@@ -50,6 +51,7 @@ class Settings:
             llm_model=env("LLM_MODEL", ""),
             llm_api_key=env("LLM_API_KEY", ""),
             llm_timeout_s=float(env("LLM_TIMEOUT_S", "30")),
-            llm_price_in_per_mtok=_float_or_none(env("LLM_PRICE_IN_PER_MTOK")),
-            llm_price_out_per_mtok=_float_or_none(env("LLM_PRICE_OUT_PER_MTOK")),
+            llm_price_in_per_mtok=_float_or_none(env("LLM_PRICE_IN_PER_1M") or env("LLM_PRICE_IN_PER_MTOK")),
+            llm_price_out_per_mtok=_float_or_none(env("LLM_PRICE_OUT_PER_1M") or env("LLM_PRICE_OUT_PER_MTOK")),
+            llm_reasoning_effort=env("LLM_REASONING_EFFORT", "minimal").strip().strip("\"'").strip(),
         )

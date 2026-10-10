@@ -22,4 +22,6 @@ Ildizdagi `CLAUDE.md`, `backend/CLAUDE.md` va `docs/api_contract.md` amal qiladi
 - Har so'rovda loading holati va o'zbekcha xato xabari; tizim hech qachon oq ekran bo'lib qolmaydi.
 - Mobil birinchi: 360px kenglikda ishlashi kerak (hakamlar telefonda sinaydi).
 - Tizim hech kimni "aybdor" demaydi: matnlarda "xavf", "birinchi navbatda tekshirish" iboralari ishlatiladi.
+- **`risk` ehtimollik emas** (model bahosi 0..1, faqat tartiblash uchun). UI'da u **"xavf bahosi"** deb ataladi va
+  son sifatida ko'rsatiladi (masalan `0.82`); **"%" belgisi, "ehtimollik", "foiz" so'zlari ishlatilmaydi**.
 - Git: commit/push qilma — Oybek o'zi qiladi (batafsil `backend/CLAUDE.md` dagi "Git" bo'limida).

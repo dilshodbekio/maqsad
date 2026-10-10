@@ -1,22 +1,23 @@
-"""Pydantic schemas — 1:1 with docs/api_contract.md (+ agreed changes in docs/api_contract_changes.md).
+"""Pydantic schemas — 1:1 with docs/api_contract.md (v1.1).
 
-Top-level contract fields are strict.
-
-Inner shapes (Loan, Transaction, Photo, Invoice, Evidence) are TEMPORARY (contract change #5):
-they are permissive (extra fields allowed, most fields optional) and live only in this file.
-When the ml generator's sample JSON arrives, its shape wins — change it here and nowhere else.
+Inner shapes (Loan, Transaction, Photo, Invoice, Evidence, LoanReason) match the REAL ml.api output exactly
+(get_loan / check_photo of ml money_trail_v1 + photo module). Unknown extra keys from ml are dropped
+(pydantic default); backend/tests/test_ml_integration.py fails if ml starts returning keys not declared here,
+so a shape change is noticed instead of silently lost.
 """
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any, List, Literal, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 Color = Literal["green", "yellow", "red"]
+# risk is a model SCORE in 0..1 (ranking), NOT a probability — UI shows it as "xavf bahosi", never as %
 Risk = Annotated[float, Field(ge=0.0, le=1.0)]
 LoanId = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_\-]+$")]
 LOAN_ID_PATTERN = r"^[A-Za-z0-9_\-]+$"
+FunctionStatus = Literal["real", "stub", "not_ready", "missing"]
 
 
 class Reason(BaseModel):
@@ -25,49 +26,82 @@ class Reason(BaseModel):
     weight: float
 
 
-# ---------- inner shapes (TEMPORARY, see module docstring) ----------
-
-class _Flexible(BaseModel):
-    model_config = ConfigDict(extra="allow")
+class LoanReason(Reason):
+    evidence_refs: List[str] = []  # each is an evidence[].ref of the same loan
 
 
-class Loan(_Flexible):
+# ---------- inner shapes of GET /loan/{id} (= ml.api.get_loan output) ----------
+
+class Loan(BaseModel):
     loan_id: str
+    borrower_id: Optional[str] = None
     borrower_name_masked: Optional[str] = None
     purpose: Optional[str] = None
     amount_uzs: Optional[int] = None
+    term_months: Optional[int] = None
     disbursed_at: Optional[str] = None
+    snapshot_date: Optional[str] = None
     region: Optional[str] = None
     branch_id: Optional[str] = None
     supplier_id: Optional[str] = None
+    invoice_amount_uzs: Optional[int] = None
 
 
-class Transaction(_Flexible):
+class Transaction(BaseModel):
     txn_id: str
     ts: str
     type: str  # disbursement | cash_withdrawal | supplier_payment | p2p_out | p2p_in | external_transfer | income
     amount_uzs: int
-    counterparty: Optional[str] = None
+    counterparty_id: Optional[str] = None
+    counterparty_kind: Optional[str] = None
 
 
-class Photo(_Flexible):
+class Duplicate(BaseModel):
+    loan_id: str
+    similarity: float
+
+
+class AssetMatch(BaseModel):
+    label: str
+    score: float
+
+
+class CheckPhotoResponse(BaseModel):
+    asset_match: Optional[AssetMatch] = None  # None until ml adds the asset-type (CLIP) step
+    duplicate_of: List[Duplicate]
+    geo_ok: Optional[bool] = None  # None = no geolocation given
+    time_ok: Optional[bool] = None  # None = no client time given
+    faces_blurred: bool
+    faces_count: Optional[int] = None
+    latency_ms: float
+
+
+class Photo(BaseModel):
     photo_id: str
-    url: Optional[str] = None
+    # portfolio photo (ml): path is repo-relative under ml/assets/; backend adds url = /api/asset/...
+    path: Optional[str] = None
+    purpose: Optional[str] = None
     captured_at: Optional[str] = None
-    source: Optional[str] = None
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    duplicate_of: List[Duplicate] = []
+    # added by backend
+    url: Optional[str] = None
+    source: Literal["portfolio", "borrower_upload"] = "portfolio"
+    client_captured_at: Optional[str] = None  # sandbox upload: client clock (server time is captured_at)
+    check: Optional[CheckPhotoResponse] = None  # sandbox upload: result of /check_photo
 
 
-class Invoice(_Flexible):
-    supplier_id: Optional[str] = None
+class Invoice(BaseModel):
     supplier_name: Optional[str] = None
-    oked_code: Optional[str] = None
+    supplier_oked: Optional[str] = None
     oked_matches_purpose: Optional[bool] = None
-    amount_uzs: Optional[int] = None
+    invoice_amount_uzs: Optional[int] = None
 
 
-class Evidence(_Flexible):
+class Evidence(BaseModel):
     ref: str
-    kind: str  # txn | photo | invoice | graph
+    kind: Literal["txn", "invoice", "graph"]
     summary_uz: Optional[str] = None
     data: Any = None
 
@@ -77,6 +111,8 @@ class Evidence(_Flexible):
 class Health(BaseModel):
     ml_mode: Literal["real", "stub"]
     model_version: str
+    warmup: Literal["pending", "running", "done", "failed"]
+    functions: Dict[str, FunctionStatus]
 
 
 class QueueItem(BaseModel):
@@ -97,7 +133,7 @@ class LoanDetail(BaseModel):
     invoice: Optional[Invoice] = None
     risk: Risk
     color: Color
-    reasons: List[Reason]
+    reasons: List[LoanReason]
     evidence: List[Evidence]
     model_version: str
 
@@ -114,16 +150,6 @@ class ScoreResponse(BaseModel):
     latency_ms: float
 
 
-class AssetMatch(BaseModel):
-    label: str
-    score: float
-
-
-class Duplicate(BaseModel):
-    loan_id: str
-    similarity: float
-
-
 class CheckPhotoFields(BaseModel):
     """Non-file fields of /check_photo (multipart form fields, primary; contract changes #2, #9)."""
     loan_id: LoanId
@@ -135,15 +161,6 @@ class CheckPhotoFields(BaseModel):
 class CheckPhotoJSON(CheckPhotoFields):
     """Fallback JSON body for /check_photo: image as base64 (optionally a data: URL)."""
     image_base64: str = Field(min_length=1)
-
-
-class CheckPhotoResponse(BaseModel):
-    asset_match: AssetMatch
-    duplicate_of: List[Duplicate]
-    geo_ok: Optional[bool] = None  # None = no geolocation given
-    time_ok: Optional[bool] = None  # None = no client time given
-    faces_blurred: bool
-    latency_ms: float
 
 
 class DraftReportRequest(BaseModel):

@@ -32,8 +32,9 @@ SYSTEM_PROMPT = (
     "o'ylab topmang. Hech kimni aybdor demang: 'xavf belgisi', 'birinchi navbatda tekshirish tavsiya etiladi' "
     "kabi iboralarni ishlating. Yakuniy qarorni xodim qabul qiladi. Matn o'zbek tilida (lotin). "
     "Faqat JSON qaytaring: {\"text_uz\": string, \"facts\": [{\"claim\": string, \"evidence_ref\": string}]}. "
-    "Har bir fakt bitta dalilga tayansin; evidence_ref aynan dalildagi 'ref' qiymati bo'lsin; "
-    "raqamlarni dalildagidek yozing."
+    "Har bir fakt bitta dalilga tayansin; evidence_ref FAQAT 'allowed_refs' ro'yxatidagi qiymatlardan biri "
+    "bo'lsin (boshqa qiymat tekshiruvdan o'tmaydi); raqamlarni dalildagidek yozing. "
+    "'risk' ehtimollik emas, foiz sifatida yozmang."
 )
 
 _NUM_RE = re.compile(r"\d+(?:[   .,]\d+)*")
@@ -45,7 +46,9 @@ def _numbers(text: str) -> set:
 
 
 def fact_check(facts: list, evidence: list) -> list:
-    by_ref = {e.get("ref"): e for e in evidence if e.get("ref")}
+    """evidence_ref must be one of evidence[].ref (nothing else, e.g. not a reasons[].evidence_refs value
+    that has no evidence item); every number in the claim must appear in that evidence item."""
+    by_ref = {e["ref"]: e for e in evidence if isinstance(e.get("ref"), str) and e["ref"]}
     checked = []
     for f in facts:
         claim = str(f.get("claim", "")).strip()
@@ -89,7 +92,11 @@ def draft_report(settings: Settings, loan_id: str, evidence: list, reasons: list
         raise LLMNotConfigured()
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": json.dumps({"reasons": reasons, "evidence": evidence}, ensure_ascii=False)},
+        {"role": "user", "content": json.dumps({
+            "allowed_refs": [e["ref"] for e in evidence if e.get("ref")],
+            "reasons": reasons,
+            "evidence": evidence,
+        }, ensure_ascii=False)},
     ]
     t = time.perf_counter()
     tin = tout = None

@@ -228,3 +228,4 @@ data/raw/
 data_runtime/
 frontend/dist/
 *.tsbuildinfo
+.venv/

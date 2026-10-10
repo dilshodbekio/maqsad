@@ -23,8 +23,10 @@ def make_client(tmp_path, monkeypatch):
         base = dict(data_dir=tmp_path / "data", frontend_dist=tmp_path / "no_dist", admin_token="",
                     llm_base_url="", llm_model="", llm_api_key="")
         base.update(overrides)
-        ml_stub.reset()
-        return TestClient(create_app(settings=replace(Settings.from_env(), **base), adapter=adapter))
+        ml_stub.reset_sandbox(None)
+        app = create_app(settings=replace(Settings.from_env(), **base), adapter=adapter)
+        assert app.state.ml.wait_warmup(30), "ml warm-up did not finish"
+        return TestClient(app)
 
     return _make
 

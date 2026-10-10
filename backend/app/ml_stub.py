@@ -6,8 +6,8 @@
   and the frontend shows a visible STUB banner.
 - check_photo does only what it can honestly compute without a model:
   exact-byte duplicate search inside the caller's sandbox, a coarse Uzbekistan bounding-box
-  geo check and a client-vs-server clock check. Asset type is "unknown" (no classifier),
-  faces are NOT blurred, so no image is returned for storage.
+  geo check and a client-vs-server clock check. asset_match is None (no classifier),
+  faces are NOT detected/blurred, so no image is returned for storage.
 """
 from __future__ import annotations
 
@@ -99,15 +99,20 @@ def check_photo(loan_id: str, image_bytes: bytes, lat=None, lon=None, captured_a
         time_ok = abs((datetime.now(timezone.utc) - client).total_seconds()) <= MAX_CLOCK_SKEW_S
 
     return {
-        "asset_match": {"label": "unknown", "score": 0.0},
+        "asset_match": None,
         "duplicate_of": [{"loan_id": lid, "similarity": 1.0} for lid in dups],
         "geo_ok": geo_ok,
         "time_ok": time_ok,
         "faces_blurred": False,
+        "faces_count": 0,
         "latency_ms": round((time.perf_counter() - t) * 1000, 3),
     }
 
 
-def reset() -> None:
+def reset_sandbox(sandbox_id: Optional[str] = None) -> None:
+    """Forget photos of one sandbox; None = all sandboxes."""
     with _lock:
-        _photo_index.clear()
+        if sandbox_id is None:
+            _photo_index.clear()
+        else:
+            _photo_index.pop(sandbox_id, None)

@@ -10,13 +10,13 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---- 2. ml requirements, if present (keeps the pip layer cached when only ml code changes) ----
-FROM python:3.11-slim AS mlreq
+FROM python:3.13-slim AS mlreq
 COPY ml/ /src/ml/
 RUN if [ -f /src/ml/requirements.txt ]; then cp /src/ml/requirements.txt /ml-requirements.txt; \
     else : > /ml-requirements.txt; fi
 
 # ---- 3. runtime ----
-FROM python:3.11-slim
+FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -24,6 +24,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=8000 \
     DATA_DIR=/data
 WORKDIR /app
+
+# libgomp1: OpenMP runtime needed by LightGBM wheels (not in -slim; without it `import lightgbm` raises OSError)
+RUN apt-get update  && apt-get install -y --no-install-recommends libgomp1  && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt /tmp/req/backend.txt
 COPY --from=mlreq /ml-requirements.txt /tmp/req/ml.txt

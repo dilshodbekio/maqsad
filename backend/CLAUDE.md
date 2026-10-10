@@ -9,7 +9,7 @@ Ish boshlashdan oldin o'qing: `CLAUDE.md`, `docs/api_contract.md`, `docs/brief.m
 - Branch: `app/<qisqa-nom>`, `main` ga faqat PR orqali. `main` doim ishlaydigan holatda.
 
 ## Stack
-- Python 3.11, FastAPI, Uvicorn, Pydantic v2. Saqlash: SQLite (`DATA_DIR` env, default `./data_runtime`).
+- Python 3.13, FastAPI, Uvicorn, Pydantic v2. Saqlash: SQLite (`DATA_DIR` env, default `./data_runtime`).
 - Bitta servis: FastAPI API'ni `/api/*` da, frontend build'ini (`frontend/dist`) `/` da static sifatida beradi.
 - Port: `PORT` env (default 8000). Deploy: Railway, ildizdagi `Dockerfile` orqali.
 - Backend kutubxonalari `backend/requirements.txt` da; ML kutubxonalari `ml/requirements.txt` da (Dockerfile ikkalasini o'rnatadi).

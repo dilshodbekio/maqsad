@@ -10,12 +10,17 @@ from backend.fixtures import make_fixtures
 from .conftest import png_bytes
 
 
-def _fake_ml(check_photo):
+def _fake_ml(check_photo, **overrides):
     m = types.ModuleType("fake_ml")
     m.MODEL_VERSION = "fake-1"
     m.get_queue, m.get_loan, m.score_loan = ml_stub.get_queue, ml_stub.get_loan, ml_stub.score_loan
     m.check_photo = check_photo
+    for name, fn in overrides.items():
+        setattr(m, name, fn)
     return m
+
+
+PROBE = "__maqsad_probe__"  # warm-up probes every function with this loan_id
 
 
 RESULT = {"asset_match": {"label": "tikuv_dastgohi", "score": 0.9}, "duplicate_of": [],
@@ -33,7 +38,8 @@ def test_real_ml_without_sandbox_and_blur(make_client):
     calls = []
 
     def check_photo(loan_id, image_bytes, lat=None, lon=None, captured_at=None):  # old signature
-        calls.append(loan_id)
+        if loan_id != PROBE:
+            calls.append(loan_id)
         return dict(RESULT)
 
     c = make_client(adapter=MLAdapter(_fake_ml(check_photo), "real"))
@@ -41,7 +47,10 @@ def test_real_ml_without_sandbox_and_blur(make_client):
     r = c.post("/api/check_photo", data={"loan_id": lid}, files={"image": ("a.png", png_bytes(), "image/png")})
     assert r.status_code == 200, r.text
     assert calls == [lid]
-    assert c.get("/api/health").json() == {"ml_mode": "real", "model_version": "fake-1"}
+    h = c.get("/api/health").json()
+    assert (h["ml_mode"], h["model_version"], h["warmup"]) == ("real", "fake-1", "done")
+    assert h["functions"] == {"get_queue": "real", "get_loan": "real", "score_loan": "real",
+                              "check_photo": "real", "reset_sandbox": "missing"}
     photo = c.get(f"/api/loan/{lid}").json()["photos"][0]
     assert photo["url"] is None  # no blurred_image -> nothing stored
     assert list(c.app.state.db.photo_dir.iterdir()) == []

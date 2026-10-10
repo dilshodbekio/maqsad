@@ -19,6 +19,7 @@ def _float_or_none(value: Optional[str]) -> Optional[float]:
 class Settings:
     data_dir: Path
     frontend_dist: Path
+    ml_assets_dir: Path
     admin_token: str
     rate_limit_per_min: int
     rate_limit_ip_per_min: int
@@ -40,6 +41,7 @@ class Settings:
         return cls(
             data_dir=Path(env("DATA_DIR", "./data_runtime")).resolve(),
             frontend_dist=Path(env("FRONTEND_DIST", str(REPO_ROOT / "frontend" / "dist"))).resolve(),
+            ml_assets_dir=Path(env("ML_ASSETS_DIR", str(REPO_ROOT / "ml" / "assets"))).resolve(),
             admin_token=env("ADMIN_TOKEN", ""),
             rate_limit_per_min=int(env("RATE_LIMIT_PER_MIN", "20")),
             rate_limit_ip_per_min=int(env("RATE_LIMIT_IP_PER_MIN", "120")),

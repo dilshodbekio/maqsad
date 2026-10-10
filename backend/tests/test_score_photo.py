@@ -34,7 +34,8 @@ def test_check_photo_multipart(client, loan_id):
     r = _upload(client, loan_id, lat="41.31", lon="69.28", captured_at="2026-10-10T10:00:00Z")
     assert r.status_code == 200, r.text
     d = r.json()
-    assert set(d) == {"asset_match", "duplicate_of", "geo_ok", "time_ok", "faces_blurred", "latency_ms"}
+    assert set(d) == {"asset_match", "duplicate_of", "geo_ok", "time_ok", "faces_blurred", "faces_count", "latency_ms"}
+    assert d["asset_match"] is None  # no classifier yet: optional, not faked
     assert d["geo_ok"] is True
     assert d["duplicate_of"] == []
     # stored as a sandbox photo; stub returns no blurred image -> nothing on disk, no url

@@ -175,6 +175,10 @@ class Database:
         p = self.photo_dir / r["image_file"]
         return p if p.is_file() else None
 
+    def photo_sandboxes(self) -> list:
+        with self.conn() as c:
+            return [r[0] for r in c.execute("SELECT DISTINCT sandbox_id FROM photos")]
+
     def reset_sandbox_data(self) -> None:
         """Admin reset: removes sandbox photos. The audit log is append-only and is kept."""
         with self._write_lock, self.conn() as c:

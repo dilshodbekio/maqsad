@@ -1,29 +1,60 @@
 """The ONLY place the backend talks to ML.
 
-`from ml.api import score_loan, check_photo, get_queue, get_loan` works -> ML_MODE = "real".
-ImportError -> backend/app/ml_stub.py -> ML_MODE = "stub" (unless REQUIRE_REAL_ML=1: then startup fails).
+Loading:
+- `import ml.api` works -> mode "real". ANY failing import (ImportError; OSError such as a missing
+  libgomp for LightGBM; SyntaxError from code needing a newer Python) -> backend/app/ml_stub.py,
+  mode "stub" (visible STUB banner).
+  With REQUIRE_REAL_ML=1 a failing import stops the service instead.
+- Warm-up runs in a background thread (so /api/health answers immediately): the first get_queue()
+  builds the ml portfolio. If it fails -> the whole adapter switches to the stub
+  (or, with REQUIRE_REAL_ML=1, the process exits). Then every other function is probed with a
+  non-existent loan_id to find functions that still raise NotImplementedError.
 
-Optional, not yet approved by ml (docs/api_contract_changes.md #3, #4) — both paths work:
-- `sandbox_id` is passed to check_photo only if its signature accepts it.
-- `blurred_image` (bytes) is taken from check_photo's result if present; otherwise nothing is stored.
+Per-function status (shown by /api/health): "real" | "stub" | "not_ready" (NotImplementedError -> 503)
+| "missing" (not defined in ml.api -> 503).
+
+Optional ml features (both paths work): `sandbox_id` is passed to check_photo only if its signature
+accepts it; `blurred_image` is taken from check_photo's result if present, otherwise nothing is stored.
 """
 from __future__ import annotations
 
 import inspect
 import logging
 import os
+import threading
 from types import ModuleType
 from typing import Any, Callable, Optional, Tuple
 
 log = logging.getLogger("maqsad.ml")
 
+FUNCTIONS = ("get_queue", "get_loan", "score_loan", "check_photo", "reset_sandbox")
+PROBE_LOAN_ID = "__maqsad_probe__"
+PROBES = {  # called after a successful get_queue(); any error except NotImplementedError = implemented
+    "get_loan": (PROBE_LOAN_ID,),
+    "score_loan": (PROBE_LOAN_ID,),
+    "check_photo": (PROBE_LOAN_ID, b""),
+    "reset_sandbox": (PROBE_LOAN_ID,),
+}
+
 
 class MLNotFound(Exception):
-    """Unknown loan_id (ml raised KeyError/LookupError)."""
+    """Unknown loan_id (ml raised KeyError/LookupError, e.g. LoanNotFoundError)."""
 
 
 class MLBadInput(Exception):
-    """ml rejected the input (ValueError), e.g. an undecodable image."""
+    """ml rejected the input (ValueError)."""
+
+
+class MLInvalidImage(Exception):
+    """check_photo rejected the image (InvalidImageError, a ValueError)."""
+
+    @property
+    def too_large(self) -> bool:
+        return "larger than" in str(self)
+
+
+class MLNotReady(Exception):
+    """The ml function is not implemented yet (NotImplementedError) or missing."""
 
 
 class MLFailure(Exception):
@@ -31,7 +62,7 @@ class MLFailure(Exception):
 
 
 def _to_builtin(x: Any) -> Any:
-    """numpy/pandas scalars and timestamps -> plain JSON-friendly Python."""
+    """numpy/pandas scalars and timestamps -> plain JSON-friendly Python (bytes are kept)."""
     if isinstance(x, dict):
         return {k: _to_builtin(v) for k, v in x.items()}
     if isinstance(x, (list, tuple)):
@@ -58,23 +89,108 @@ def _accepts_kw(fn: Callable, name: str) -> bool:
     return any(p.name == name or p.kind is inspect.Parameter.VAR_KEYWORD for p in params)
 
 
+def _exit_process(message: str) -> None:
+    log.critical("%s — exiting (REQUIRE_REAL_ML=1)", message)
+    os._exit(3)
+
+
 class MLAdapter:
-    def __init__(self, impl: ModuleType, mode: str):
-        self.impl = impl
-        self.mode = mode
-        self._check_photo_takes_sandbox = _accepts_kw(impl.check_photo, "sandbox_id")
+    def __init__(self, impl: ModuleType, mode: str, require_real: bool = False,
+                 on_fatal: Callable[[str], None] = _exit_process):
+        self.require_real = require_real
+        self._on_fatal = on_fatal
+        self._lock = threading.Lock()
+        self._warmup_done = threading.Event()
+        self.warmup_error: Optional[str] = None
+        self._set_impl(impl, mode)
+        if mode == "stub":
+            self.warmup_state = "done"
+            self._warmup_done.set()
+        else:
+            self.warmup_state = "pending"
+
+    def _set_impl(self, impl: ModuleType, mode: str) -> None:
+        self.impl, self.mode = impl, mode
+        self.status = {
+            f: "stub" if mode == "stub" else ("real" if callable(getattr(impl, f, None)) else "missing")
+            for f in FUNCTIONS
+        }
+        cp = getattr(impl, "check_photo", None)
+        self._check_photo_takes_sandbox = callable(cp) and _accepts_kw(cp, "sandbox_id")
 
     @property
     def model_version(self) -> str:
         return str(getattr(self.impl, "MODEL_VERSION", None) or "unknown")
 
-    def _call(self, name: str, *args, **kwargs):
+    # ---------- warm-up ----------
+
+    def start_warmup(self) -> None:
+        with self._lock:
+            if self.warmup_state != "pending":
+                return
+            self.warmup_state = "running"
+        threading.Thread(target=self._warmup, name="ml-warmup", daemon=True).start()
+
+    def warmup(self) -> None:
+        """Synchronous warm-up (tests, scripts)."""
+        with self._lock:
+            if self.warmup_state != "pending":
+                return
+            self.warmup_state = "running"
+        self._warmup()
+
+    def wait_warmup(self, timeout: Optional[float] = None) -> bool:
+        return self._warmup_done.wait(timeout)
+
+    def _warmup(self) -> None:
         try:
-            return _to_builtin(getattr(self.impl, name)(*args, **kwargs))
+            n = len(self.impl.get_queue())
+            log.info("ML warm-up: get_queue() ok (%d loans)", n)
+        except Exception as e:  # noqa: BLE001 - any failure here means the real ML cannot serve the queue
+            self.warmup_error = f"{type(e).__name__}: {e}"
+            self.warmup_state = "failed"
+            if self.require_real:
+                self._warmup_done.set()
+                self._on_fatal(f"ml.get_queue() failed during warm-up: {self.warmup_error}")
+                return
+            log.warning("ML warm-up failed (%s) -> switching to STUB", self.warmup_error)
+            from . import ml_stub
+            self._set_impl(ml_stub, "stub")
+            self._warmup_done.set()
+            return
+        for name, args in PROBES.items():
+            if self.status[name] != "real":
+                continue
+            try:
+                getattr(self.impl, name)(*args)
+            except NotImplementedError:
+                self.status[name] = "not_ready"
+                log.warning("ml.%s is not implemented yet -> 503 until it is", name)
+            except Exception:  # noqa: BLE001 - expected (unknown loan / empty image): function exists
+                pass
+        self.warmup_state = "done"
+        self._warmup_done.set()
+
+    # ---------- calls ----------
+
+    def _fn(self, name: str) -> Callable:
+        if self.status[name] in ("missing", "not_ready"):
+            raise MLNotReady(name)
+        return getattr(self.impl, name)
+
+    def _call(self, name: str, *args, **kwargs):
+        fn = self._fn(name)
+        try:
+            return _to_builtin(fn(*args, **kwargs))
+        except NotImplementedError as e:
+            self.status[name] = "not_ready"
+            raise MLNotReady(name) from e
         except LookupError as e:
             raise MLNotFound(str(e)) from e
         except ValueError as e:
             log.warning("ml.%s rejected input: %s", name, e)
+            if name == "check_photo":
+                raise MLInvalidImage(str(e)) from e
             raise MLBadInput(str(e)) from e
         except Exception as e:  # noqa: BLE001 - map everything else to 502
             log.exception("ml.%s failed", name)
@@ -95,27 +211,19 @@ class MLAdapter:
         kwargs = dict(lat=lat, lon=lon, captured_at=captured_at)
         if self._check_photo_takes_sandbox:
             kwargs["sandbox_id"] = sandbox_id
-        try:
-            raw = self.impl.check_photo(loan_id, image_bytes, **kwargs)
-        except LookupError as e:
-            raise MLNotFound(str(e)) from e
-        except ValueError as e:
-            log.warning("ml.check_photo rejected input: %s", e)
-            raise MLBadInput(str(e)) from e
-        except Exception as e:  # noqa: BLE001
-            log.exception("ml.check_photo failed")
-            raise MLFailure(f"{type(e).__name__}: {e}") from e
-        raw = dict(raw)
+        raw = dict(self._call("check_photo", loan_id, image_bytes, **kwargs))
         blurred = raw.pop("blurred_image", None)
         if blurred is not None and not isinstance(blurred, (bytes, bytearray)):
             log.warning("ml.check_photo blurred_image is %s, not bytes; ignoring", type(blurred).__name__)
             blurred = None
-        return _to_builtin(raw), (bytes(blurred) if blurred is not None else None)
+        return raw, (bytes(blurred) if blurred is not None else None)
 
-    def reset(self) -> None:
-        fn = getattr(self.impl, "reset", None)
-        if callable(fn):
-            fn()
+    def reset_sandbox(self, sandbox_id: Optional[str]) -> None:
+        """Best effort: a missing / not-ready reset_sandbox is logged, not raised."""
+        try:
+            self._call("reset_sandbox", sandbox_id)
+        except (MLNotReady, MLFailure, MLNotFound, MLBadInput) as e:
+            log.warning("ml.reset_sandbox(%r) skipped: %s", sandbox_id, e)
 
 
 def load_adapter() -> MLAdapter:
@@ -123,13 +231,12 @@ def load_adapter() -> MLAdapter:
     try:
         if os.environ.get("ML_FORCE_STUB", "0") == "1":
             raise ImportError("ML_FORCE_STUB=1")
-        from ml.api import check_photo, get_loan, get_queue, score_loan  # noqa: F401
         import ml.api as impl
-        log.info("ML mode: real (ml.api imported)")
-        return MLAdapter(impl, "real")
-    except ImportError as e:
+        log.info("ML mode: real (ml.api imported, MODEL_VERSION=%s)", getattr(impl, "MODEL_VERSION", "?"))
+        return MLAdapter(impl, "real", require_real=require_real)
+    except Exception as e:  # noqa: BLE001 - ImportError, OSError (libgomp.so.1), SyntaxError, ...
         if require_real:
-            raise RuntimeError(f"REQUIRE_REAL_ML=1 but ml.api could not be imported: {e}") from e
-        log.warning("ML mode: STUB (ml.api not importable: %s)", e)
+            raise RuntimeError(f"REQUIRE_REAL_ML=1 but ml.api could not be imported: {e!r}") from e
+        log.warning("ML mode: STUB (ml.api not importable: %r)", e)
         from . import ml_stub
         return MLAdapter(ml_stub, "stub")

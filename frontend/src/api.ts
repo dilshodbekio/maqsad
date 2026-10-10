@@ -1,9 +1,13 @@
 // All requests are relative (/api/...); the same FastAPI service serves the API and this build.
-// Contract: docs/api_contract.md + docs/api_contract_changes.md.
+// Contract: docs/api_contract.md (v1.1).
+
+export type FunctionStatus = "real" | "stub" | "not_ready" | "missing";
 
 export type Health = {
   ml_mode: "real" | "stub";
   model_version: string;
+  warmup: "pending" | "running" | "done" | "failed";
+  functions: Record<string, FunctionStatus>;
 };
 
 export class ApiError extends Error {

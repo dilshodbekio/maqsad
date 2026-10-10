@@ -1,5 +1,5 @@
-"""Maqsad API: FastAPI app serving /api/* (docs/api_contract.md + docs/api_contract_changes.md)
-and the frontend build (frontend/dist) at /.
+"""Maqsad API: FastAPI app serving /api/* (docs/api_contract.md v1.1) and the frontend build
+(frontend/dist) at /.
 
 Run:  uvicorn backend.app.main:create_app --factory --port 8000   (from the repo root)
 """
@@ -13,6 +13,7 @@ import logging
 import uuid
 from http import HTTPStatus
 from pathlib import Path as FsPath
+from pathlib import PurePosixPath
 from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, FastAPI, Header, HTTPException, Path, Query, Request
@@ -25,7 +26,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from . import llm
 from .config import Settings
 from .db import Database, canonical, sha256_hex, utc_now
-from .ml_adapter import MLAdapter, MLBadInput, MLFailure, MLNotFound, load_adapter
+from .ml_adapter import (MLAdapter, MLBadInput, MLFailure, MLInvalidImage, MLNotFound, MLNotReady,
+                         load_adapter)
 from .ratelimit import RateLimiter
 from .schemas import (
     LOAN_ID_PATTERN, AuditEntry, CheckPhotoFields, CheckPhotoJSON, CheckPhotoResponse, DecisionRequest,
@@ -44,6 +46,9 @@ MSG_BAD_TYPE = "Faqat JPEG, PNG yoki WebP rasm qabul qilinadi."
 MSG_EMPTY = "Rasm fayli bo'sh."
 MSG_NO_IMAGE = "Rasm yuborilmadi: 'image' maydoniga JPEG, PNG yoki WebP fayl biriktiring."
 MSG_REPORT_NOT_READY = "Dalolatnoma qoralamasi hozircha tayyor emas"
+MSG_NOT_READY = "Bu funksiya hali ulanmagan"
+MSG_BAD_IMAGE = "Rasmni o'qib bo'lmadi: fayl buzilgan yoki rasm emas."
+ASSET_SUFFIXES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
 HTTP_MSG_UZ = {
     400: "So'rov noto'g'ri.",
     403: "Ruxsat yo'q.",
@@ -113,6 +118,7 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     settings = settings or Settings.from_env()
     adapter = adapter or load_adapter()  # REQUIRE_REAL_ML=1 + no ml.api -> raises, service does not start
+    adapter.start_warmup()  # background thread: /api/health answers while ml builds its portfolio
     db = Database(settings.data_dir)
     limiter = RateLimiter()
 
@@ -167,6 +173,16 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
     async def on_ml_not_found(_: Request, exc: MLNotFound):
         return JSONResponse({"detail": f"Kredit topilmadi: {str(exc).strip(chr(39))}"}, status_code=404)
 
+    @app.exception_handler(MLNotReady)
+    async def on_ml_not_ready(_: Request, exc: MLNotReady):
+        return JSONResponse({"detail": f"{MSG_NOT_READY} ({exc})."}, status_code=503)
+
+    @app.exception_handler(MLInvalidImage)
+    async def on_ml_invalid_image(_: Request, exc: MLInvalidImage):
+        if exc.too_large:
+            return JSONResponse({"detail": _too_large_msg(settings)}, status_code=413)
+        return JSONResponse({"detail": MSG_BAD_IMAGE}, status_code=400)
+
     @app.exception_handler(MLBadInput)
     async def on_ml_bad_input(_: Request, exc: MLBadInput):
         return JSONResponse({"detail": f"Model kiritilgan ma'lumotni qabul qilmadi: {exc}"}, status_code=422)
@@ -193,7 +209,8 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
 
     @api.get("/health", response_model=Health)
     def health():
-        return {"ml_mode": adapter.mode, "model_version": adapter.model_version}
+        return {"ml_mode": adapter.mode, "model_version": adapter.model_version,
+                "warmup": adapter.warmup_state, "functions": dict(adapter.status)}
 
     @api.get("/queue", response_model=List[QueueItem])
     def queue():
@@ -203,6 +220,8 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
     @api.get("/loan/{loan_id}", response_model=LoanDetail)
     def loan(loan_id: LoanIdPath, request: Request):
         data = dict(adapter.get_loan(loan_id))
+        portfolio = [{**ph, "url": _asset_url(ph.get("path")), "source": "portfolio"}
+                     for ph in data.get("photos") or []]
         own = [{
             "photo_id": p["photo_id"],
             "url": f"/api/photo/{p['photo_id']}" if p["image_file"] else None,
@@ -213,7 +232,7 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
             "lon": p["lon"],
             "check": json.loads(p["result_json"]),
         } for p in db.photo_list(request.state.sandbox_id, loan_id)]
-        data["photos"] = list(data.get("photos") or []) + own
+        data["photos"] = portfolio + own
         return _validated(LoanDetail, data)
 
     @api.post("/score_loan", response_model=ScoreResponse)
@@ -330,11 +349,26 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         if not settings.admin_token or not x_admin_token or not hmac.compare_digest(
                 x_admin_token.encode(), settings.admin_token.encode()):
             raise HTTPException(403, "Ruxsat yo'q: X-Admin-Token noto'g'ri yoki ADMIN_TOKEN sozlanmagan.")
+        for sid in db.photo_sandboxes():  # every sandbox that uploaded through this backend
+            adapter.reset_sandbox(sid)
+        adapter.reset_sandbox(None)  # ml: None = all sandboxes (agreed contract v1.1)
         db.reset_sandbox_data()
-        adapter.reset()
         limiter.reset()
         log.warning("admin reset done")
         return {"ok": True}
+
+    @api.get("/asset/{asset_path:path}", include_in_schema=False)
+    def asset(asset_path: str):
+        """Portfolio photos from ml/assets/ only (photos[].url). Nothing outside that folder is served."""
+        root = settings.ml_assets_dir.resolve()
+        try:
+            target = (root / asset_path).resolve()
+        except (OSError, ValueError):
+            raise HTTPException(404, "Fayl topilmadi.") from None
+        media_type = ASSET_SUFFIXES.get(target.suffix.lower())
+        if root not in target.parents or media_type is None or not target.is_file():
+            raise HTTPException(404, "Fayl topilmadi.")
+        return FileResponse(target, media_type=media_type, headers={"Cache-Control": "public, max-age=86400"})
 
     app.include_router(api)
 
@@ -359,6 +393,16 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
     return app
+
+
+def _asset_url(path: Optional[str]) -> Optional[str]:
+    """'ml/assets/photos/x.jpg' (repo-relative, from ml) -> '/api/asset/photos/x.jpg'; anything else -> None."""
+    if not path:
+        return None
+    parts = PurePosixPath(path.replace("\\", "/")).parts
+    if len(parts) < 3 or parts[:2] != ("ml", "assets") or ".." in parts:
+        return None
+    return "/api/asset/" + "/".join(parts[2:])
 
 
 def _too_large_msg(settings: Settings) -> str:

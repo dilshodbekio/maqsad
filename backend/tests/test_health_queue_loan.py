@@ -1,7 +1,10 @@
 def test_health_stub(client):
     r = client.get("/api/health")
     assert r.status_code == 200
-    assert r.json() == {"ml_mode": "stub", "model_version": "stub"}
+    assert r.json() == {
+        "ml_mode": "stub", "model_version": "stub", "warmup": "done",
+        "functions": {f: "stub" for f in ("get_queue", "get_loan", "score_loan", "check_photo", "reset_sandbox")},
+    }
     assert r.headers["X-ML-Mode"] == "stub"
     assert "sandbox_id" in r.cookies
 
@@ -42,8 +45,11 @@ def test_loan_detail(client, loan_id):
         assert key in d
     assert d["model_version"] == "stub"
     assert d["loan"]["loan_id"] == loan_id
-    assert all({"code", "text_uz", "weight"} <= set(x) for x in d["reasons"])
-    assert all({"ref", "kind"} <= set(e) for e in d["evidence"])
+    assert all({"code", "text_uz", "weight", "evidence_refs"} <= set(x) for x in d["reasons"])
+    refs = {e["ref"] for e in d["evidence"]}
+    assert all(set(x["evidence_refs"]) <= refs for x in d["reasons"])
+    assert all(e["kind"] in ("txn", "invoice", "graph") for e in d["evidence"])
+    assert all({"counterparty_id", "counterparty_kind"} <= set(t) for t in d["transactions"])
 
 
 def test_loan_unknown_is_404(client):

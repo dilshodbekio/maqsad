@@ -9,7 +9,8 @@
   Color thresholds 0.33 / 0.66 are a stub-only assumption; real thresholds come from ml.
 - OKED codes are NACE Rev.2-style codes chosen for illustration; the purpose <-> OKED mapping
   is a stub assumption. Amount ranges are synthetic assumptions, not bank statistics.
-- Inner shapes follow docs/api_contract_changes.md #5 (temporary until the ml generator's JSON).
+- Shapes mirror the real ml.api.get_loan output (docs/api_contract.md v1.1): counterparty_id/_kind,
+  invoice.supplier_oked / invoice_amount_uzs, reasons[].evidence_refs, evidence refs = txn_id | invoice:* | graph:*.
 
 Usage:  python backend/fixtures/make_fixtures.py [--seed 42] [--n 40]
 Output: backend/fixtures/loans.json
@@ -110,54 +111,67 @@ def make_loan(i: int, profile: str, purpose: str, suppliers: dict, rng: random.R
 
     txns = []
 
-    def txn(day: float, ttype: str, amt: float, counterparty: str):
+    def txn(day: float, ttype: str, amt: float, counterparty_id=None, counterparty_kind="none"):
         txns.append({
             "txn_id": f"{loan_id}-T{len(txns) + 1:02d}",
             "ts": (t0 + timedelta(days=day, minutes=rng.randint(5, 300))).isoformat(timespec="seconds"),
             "type": ttype,
             "amount_uzs": int(round(amt, -3)),
-            "counterparty": counterparty,
+            "counterparty_id": counterparty_id,
+            "counterparty_kind": counterparty_kind,
         })
 
-    txn(0, "disbursement", amount, "MKBANK-kredit")
+    def person():
+        return f"P{rng.randint(10000, 99999)}", "person"
+
+    def business():
+        return f"BZ{rng.randint(1000, 9999)}", "business"
+
+    sup_cp = (sup["supplier_id"], "supplier")
+    txn(0, "disbursement", amount)
     if profile == "honest":
-        txn(rng.uniform(0.5, 6), "supplier_payment", amount * rng.uniform(0.75, 0.97), sup["supplier_id"])
+        txn(rng.uniform(0.5, 6), "supplier_payment", amount * rng.uniform(0.75, 0.97), *sup_cp)
         if rng.random() < 0.6:
-            txn(rng.uniform(4, 25), "cash_withdrawal", amount * rng.uniform(0.02, 0.12), "kassa")
+            txn(rng.uniform(4, 25), "cash_withdrawal", amount * rng.uniform(0.02, 0.12))
         for _ in range(rng.randint(1, 3)):
-            txn(rng.uniform(20, 60), "income", amount * rng.uniform(0.03, 0.1), f"P2P-{rng.randint(1000, 9999)}")
+            txn(rng.uniform(20, 60), "income", amount * rng.uniform(0.03, 0.1), *business())
     elif profile == "honest_suspicious":
-        txn(rng.uniform(0.5, 5), "supplier_payment", amount * rng.uniform(0.45, 0.7), sup["supplier_id"])
-        txn(rng.uniform(2, 8), "cash_withdrawal", amount * rng.uniform(0.2, 0.4), "kassa")
+        txn(rng.uniform(0.5, 5), "supplier_payment", amount * rng.uniform(0.45, 0.7), *sup_cp)
+        txn(rng.uniform(2, 8), "cash_withdrawal", amount * rng.uniform(0.2, 0.4))
         if rng.random() < 0.5:  # e.g. farmer legally sells part of livestock
-            txn(rng.uniform(30, 60), "income", amount * rng.uniform(0.2, 0.35), f"P2P-{rng.randint(1000, 9999)}")
+            txn(rng.uniform(30, 60), "p2p_in", amount * rng.uniform(0.2, 0.35), *person())
     elif profile == "T1_cash_out":
-        txn(rng.uniform(0, 1.5), "cash_withdrawal", amount * rng.uniform(0.55, 0.95), "kassa")
+        txn(rng.uniform(0, 1.5), "cash_withdrawal", amount * rng.uniform(0.55, 0.95))
         if rng.random() < 0.6:
-            txn(rng.uniform(1, 4), "p2p_out", amount * rng.uniform(0.03, 0.15), f"P2P-{rng.randint(1000, 9999)}")
+            txn(rng.uniform(1, 4), "p2p_out", amount * rng.uniform(0.03, 0.15), *person())
     elif profile == "T2_supplier_ring":
-        txn(rng.uniform(0, 2), "supplier_payment", amount * rng.uniform(0.8, 1.0), sup["supplier_id"])
+        txn(rng.uniform(0, 2), "supplier_payment", amount * rng.uniform(0.8, 1.0), *sup_cp)
     elif profile == "T3_asset_resale":
-        txn(rng.uniform(1, 5), "supplier_payment", amount * rng.uniform(0.75, 0.95), sup["supplier_id"])
+        txn(rng.uniform(1, 5), "supplier_payment", amount * rng.uniform(0.75, 0.95), *sup_cp)
         resale_day = rng.uniform(15, 40)
         resale = amount * rng.uniform(0.45, 0.8)
-        txn(resale_day, "income", resale, f"P2P-{rng.randint(1000, 9999)}")
-        txn(resale_day + rng.uniform(0, 2), "cash_withdrawal", resale * rng.uniform(0.7, 0.95), "kassa")
+        txn(resale_day, "p2p_in", resale, *person())
+        txn(resale_day + rng.uniform(0, 2), "cash_withdrawal", resale * rng.uniform(0.7, 0.95))
     elif profile == "T4_fake_invoice":
-        txn(rng.uniform(0.5, 4), "supplier_payment", amount * rng.uniform(0.8, 0.98), sup["supplier_id"])
+        txn(rng.uniform(0.5, 4), "supplier_payment", amount * rng.uniform(0.8, 0.98), *sup_cp)
         if rng.random() < 0.5:
-            txn(rng.uniform(3, 15), "external_transfer", amount * rng.uniform(0.02, 0.1), "EXT-BANK")
+            txn(rng.uniform(3, 15), "external_transfer", amount * rng.uniform(0.02, 0.1), "EXT-BANK", "external")
     txns.sort(key=lambda t: t["ts"])
 
+    paid = sum(t["amount_uzs"] for t in txns if t["type"] == "supplier_payment")
     loan = {
         "loan_id": loan_id,
+        "borrower_id": f"BR{i:05d}",
         "borrower_name_masked": f"{rng.choice(INITIALS)}*** {rng.choice(INITIALS)}***",
         "purpose": purpose,
         "amount_uzs": amount,
-        "disbursed_at": t0.date().isoformat(),
+        "term_months": rng.choice([12, 18, 24, 36]),
+        "disbursed_at": t0.isoformat(timespec="seconds"),
+        "snapshot_date": "2026-09-30T00:00:00",
         "region": rng.choice(REGIONS),
         "branch_id": f"B{rng.randint(1, 12):02d}",
         "supplier_id": sup["supplier_id"],
+        "invoice_amount_uzs": paid or None,
     }
     return loan, txns, sup
 
@@ -176,42 +190,53 @@ def stub_rule_score(loan: dict, txns: list, sup: dict, in_degree: int) -> tuple:
     cash_30d = share({"cash_withdrawal"}, 30)
     supplier_share = share({"supplier_payment"}, 365)
     payments_after = [t for t in txns if t["type"] == "supplier_payment"]
-    big_income = [t for t in txns if t["type"] == "income" and t["amount_uzs"] >= 0.4 * amount
+    big_income = [t for t in txns if t["type"] in ("income", "p2p_in") and t["amount_uzs"] >= 0.4 * amount
                   and payments_after and t["ts"] > payments_after[0]["ts"]]
     oked_ok = sup["oked_code"] in PURPOSE_OKED[loan["purpose"]]
 
+    def refs_of(types, max_days=365):
+        return [t["txn_id"] for t in txns if t["type"] in types
+                and (datetime.fromisoformat(t["ts"]) - t0).total_seconds() <= max_days * 86400]
+
+    invoice_ref, graph_ref = f"invoice:{loan['loan_id']}", f"graph:{sup['supplier_id']}"
     reasons = []
     if cash_2d >= 0.2:
         reasons.append(("CASH_FAST", 0.9 * cash_2d,
-                        f"Kredit tushgandan keyin 2 kun ichida summaning {round(cash_2d * 100)}% i naqd yechilgan"))
+                        f"Kredit tushgandan keyin 2 kun ichida summaning {round(cash_2d * 100)}% i naqd yechilgan",
+                        refs_of({"disbursement", "cash_withdrawal"}, 2)))
     elif cash_30d >= 0.02:
         reasons.append(("CASH_30D", 0.5 * cash_30d,
-                        f"30 kun ichida summaning {round(cash_30d * 100)}% i naqd yechilgan"))
+                        f"30 kun ichida summaning {round(cash_30d * 100)}% i naqd yechilgan",
+                        refs_of({"cash_withdrawal"}, 30)))
     if supplier_share < 0.5:
         reasons.append(("LOW_SUPPLIER_PAYMENT", 0.4 * (1 - supplier_share),
-                        f"Ta'minotchiga summaning faqat {round(supplier_share * 100)}% i to'langan"))
+                        f"Ta'minotchiga summaning faqat {round(supplier_share * 100)}% i to'langan",
+                        refs_of({"disbursement", "supplier_payment"})))
     if payments_after and not oked_ok:
         w = 0.15 if sup["oked_code"] == GENERIC_OKED else 0.45
         reasons.append(("OKED_MISMATCH", w,
-                        f"Ta'minotchi faoliyat turi (OKED {sup['oked_code']}) kredit maqsadiga mos emas"))
+                        f"Ta'minotchi faoliyat turi (OKED {sup['oked_code']}) kredit maqsadiga mos emas",
+                        [invoice_ref]))
     if payments_after and in_degree >= 4 and sup["cash_out_share"] >= 0.5:
         reasons.append(("SUPPLIER_RING", 0.5,
                         f"Ta'minotchiga {in_degree} ta qarz oluvchi pul o'tkazgan, u pulning "
-                        f"{round(sup['cash_out_share'] * 100)}% ini naqdlashtirgan"))
+                        f"{round(sup['cash_out_share'] * 100)}% ini naqdlashtirgan", [graph_ref]))
     if payments_after and sup["employee_link"]:
-        reasons.append(("EMPLOYEE_LINK", 0.25, "Ta'minotchi bank xodimi bilan bog'liq"))
+        reasons.append(("EMPLOYEE_LINK", 0.25, "Ta'minotchi bank xodimi bilan bog'liq", [graph_ref]))
     if big_income:
         p = round(big_income[0]["amount_uzs"] / amount * 100)
         reasons.append(("ASSET_RESALE", 0.6,
-                        f"Ta'minotchiga to'lovdan keyin kredit summasining {p}% iga teng bir martalik kirim bo'lgan"))
+                        f"Ta'minotchiga to'lovdan keyin kredit summasining {p}% iga teng bir martalik kirim bo'lgan",
+                        [big_income[0]["txn_id"]]))
 
-    total = sum(w for _, w, _ in reasons)
+    total = sum(r[1] for r in reasons)
     risk = round(1 - math.exp(-1.4 * total), 3)
     color = "red" if risk >= HIGH else "yellow" if risk >= LOW else "green"
     reasons = sorted(reasons, key=lambda r: -r[1])
-    out = [{"code": c, "text_uz": t, "weight": round(w, 3)} for c, w, t in reasons]
+    out = [{"code": c, "text_uz": t, "weight": round(w, 3), "evidence_refs": refs} for c, w, t, refs in reasons]
     if not out:
-        out = [{"code": "NO_FLAGS", "text_uz": "Stub qoidalari bo'yicha sezilarli xavf belgisi topilmadi", "weight": 0.0}]
+        out = [{"code": "NO_FLAGS", "text_uz": "Stub qoidalari bo'yicha sezilarli xavf belgisi topilmadi",
+                "weight": 0.0, "evidence_refs": []}]
     return risk, color, out
 
 
@@ -246,37 +271,36 @@ def build(seed: int, n: int) -> dict:
     for loan, txns, sup in raw:
         deg = in_degree.get(sup["supplier_id"], 0)
         risk, color, reasons = stub_rule_score(loan, txns, sup, deg)
-        paid = sum(t["amount_uzs"] for t in txns if t["type"] == "supplier_payment")
+        paid = loan["invoice_amount_uzs"]
         invoice = None
         if paid:
             invoice = {
-                "supplier_id": sup["supplier_id"],
                 "supplier_name": sup["supplier_name"],
-                "oked_code": sup["oked_code"],
+                "supplier_oked": sup["oked_code"],
                 "oked_matches_purpose": sup["oked_code"] in PURPOSE_OKED[loan["purpose"]],
-                "amount_uzs": paid,
+                "invoice_amount_uzs": paid,
             }
         evidence = [{
-            "ref": f"txn:{t['txn_id']}",
+            "ref": t["txn_id"],
             "kind": "txn",
-            "summary_uz": f"{t['ts'][:10]}: {TXN_LABEL_UZ[t['type']]} {fmt_uzs(t['amount_uzs'])} so'm ({t['counterparty']})",
+            "summary_uz": f"{t['ts'][:10]}: {fmt_uzs(t['amount_uzs'])} so'm {TXN_LABEL_UZ[t['type']]}",
             "data": t,
         } for t in txns]
         if invoice:
             evidence.append({
                 "ref": f"invoice:{loan['loan_id']}",
                 "kind": "invoice",
-                "summary_uz": f"Faktura: {invoice['supplier_name']}, OKED {invoice['oked_code']}, "
-                              f"{fmt_uzs(paid)} so'm",
+                "summary_uz": f"Hisob-faktura {fmt_uzs(paid)} so'm, ta'minotchi {invoice['supplier_name']} "
+                              f"(OKED {invoice['supplier_oked']})",
                 "data": invoice,
             })
             evidence.append({
                 "ref": f"graph:{sup['supplier_id']}",
                 "kind": "graph",
-                "summary_uz": f"Ta'minotchi {sup['supplier_id']}: {deg} ta qarz oluvchi, "
-                              f"naqdlashtirish ulushi {round(sup['cash_out_share'] * 100)}%",
-                "data": {"supplier_id": sup["supplier_id"], "in_degree": deg,
-                         "cash_out_share": sup["cash_out_share"], "employee_link": sup["employee_link"]},
+                "summary_uz": f"Ta'minotchi {sup['supplier_name']}: {deg} ta kredit bo'yicha to'lov olgan; "
+                              f"olgan mablag'ning {round(sup['cash_out_share'] * 100)}% i naqd yechilgan",
+                "data": {"supplier_name": sup["supplier_name"], "in_degree": deg,
+                         "cash_share": sup["cash_out_share"], "employee_link": sup["employee_link"]},
             })
         loans.append({
             "loan": loan,

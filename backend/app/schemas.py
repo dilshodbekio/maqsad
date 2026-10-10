@@ -1,4 +1,4 @@
-"""Pydantic schemas — 1:1 with docs/api_contract.md (v1.3).
+"""Pydantic schemas — 1:1 with docs/api_contract.md (v1.4).
 
 Inner shapes (Loan, Transaction, Photo, Invoice, Evidence, LoanReason) match the REAL ml.api output exactly
 (get_loan / check_photo of ml money_trail_v1 + photo module). Unknown extra keys from ml are dropped
@@ -251,6 +251,11 @@ class AuditEntry(BaseModel):
     ai_recommendation: Optional[str] = None
     model_version: Optional[str] = None
     inputs_hash: str
+
+
+class SessionInfo(BaseModel):
+    """GET /session (v1.4): demo officer id derived from the sandbox cookie (production: from the bank's SSO)."""
+    officer_id: str
 
 
 class ResetResponse(BaseModel):

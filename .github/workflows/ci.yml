@@ -74,6 +74,16 @@ jobs:
 
           curl -fsS "localhost:8000/api/loan/$LOAN" | jq -e '.model_version != "stub"'
 
+          # loan page (contract v1.4): officer id per sandbox, decision -> audit visible only in that sandbox
+          OFFICER=$(curl -fsS -c jar.txt localhost:8000/api/session | jq -r .officer_id)
+          echo "$OFFICER" | grep -Eq '^Xodim-[0-9A-F]{4}$'
+          jq -n --arg l "$LOAN" --arg o "$OFFICER" '{loan_id: $l, officer_id: $o, action: "visit", comment: "ci"}' \
+            | curl -fsS -b jar.txt -H 'Content-Type: application/json' -d @- localhost:8000/api/decision \
+            | jq -e '.audit_id > 0'
+          curl -fsS -b jar.txt "localhost:8000/api/audit?loan_id=$LOAN" \
+            | jq -e --arg o "$OFFICER" 'length == 1 and .[0].actor == $o and .[0].action == "visit"'
+          curl -fsS "localhost:8000/api/audit?loan_id=$LOAN" | jq -e 'length == 0'
+
           IMG=$(ls ml/assets/photos/*.jpg | head -n 1)
           curl -fsS -F "loan_id=$LOAN" -F "image=@$IMG;type=image/jpeg" localhost:8000/api/check_photo \
             | jq -e 'has("duplicate_of") and has("faces_blurred")'

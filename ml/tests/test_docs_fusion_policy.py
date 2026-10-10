@@ -59,7 +59,7 @@ def test_api_contract_does_not_say_asset_mismatch_is_inactive_or_asset_match_nul
     assert fusion.POLICY["PHOTO_ASSET_MISMATCH"]["active"] is True
     assert "inactive until" not in t and "stays inactive" not in t, "api_contract.md still says PHOTO_ASSET_MISMATCH is inactive"
     assert "is `null` until the CLIP step" not in t, "api_contract.md still says asset_match is null until CLIP exists"
-    assert "not wired yet" not in t
+    assert "CLIP) is not wired yet" not in t        # (the generic "function not wired yet" HTTP 503 row is unrelated)
 
 
 def test_api_contract_asset_match_shape_lists_all_four_fields():

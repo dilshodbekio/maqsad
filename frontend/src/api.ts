@@ -1,0 +1,250 @@
+// All requests are relative (/api/...); the same FastAPI service serves the API and this build.
+// Contract: docs/api_contract.md (v1.4).
+
+export type FunctionStatus = "real" | "stub" | "not_ready" | "missing";
+
+export type Health = {
+  ml_mode: "real" | "stub";
+  model_version: string;
+  warmup: "pending" | "running" | "done" | "failed";
+  functions: Record<string, FunctionStatus>;
+};
+
+export type Color = "red" | "yellow" | "green";
+
+export type Escalation = {
+  code: string;
+  min_color: Color;
+  text_uz: string;
+  evidence_refs: string[];
+  raises_color: boolean;
+};
+
+export type QueueItem = {
+  loan_id: string;
+  borrower_name_masked: string;
+  purpose: string;
+  amount_uzs: number;
+  region: string;
+  // model score 0..1 for ranking, NOT a probability: shown as "xavf bahosi", never as %
+  risk: number;
+  color: Color;
+  top_reason: string;
+  base_color: Color;
+  priority: number;
+  escalations: Escalation[];
+};
+
+export type QueuePage = {
+  items: QueueItem[];
+  total: number;
+  counts: Record<Color, number>;
+};
+
+export type QueueFilters = {
+  color?: Color;
+  region?: string;
+  purpose?: string;
+};
+
+export type QueueFacets = {
+  regions: string[];
+  purposes: string[];
+};
+
+export type ColorLegend = {
+  red: number;
+  yellow: number;
+  n_red: number;
+  n_yellow: number;
+  n_loans: number;
+  rule: string;
+  n_escalated_to_red: number;
+  n_escalated_to_yellow: number;
+  n_red_total: number;
+  n_yellow_total: number;
+  note: string;
+};
+
+// ---------- GET /api/loan/{id} (= ml.api.get_loan + backend photo urls) ----------
+
+export type Loan = {
+  loan_id: string;
+  borrower_id?: string | null;
+  borrower_name_masked?: string | null;
+  purpose?: string | null;
+  amount_uzs?: number | null;
+  term_months?: number | null;
+  disbursed_at?: string | null;
+  snapshot_date?: string | null;
+  region?: string | null;
+  branch_id?: string | null;
+  supplier_id?: string | null;
+  invoice_amount_uzs?: number | null;
+};
+
+export type TxnType =
+  | "disbursement"
+  | "cash_withdrawal"
+  | "supplier_payment"
+  | "p2p_out"
+  | "p2p_in"
+  | "external_transfer"
+  | "income";
+
+export type Transaction = {
+  txn_id: string;
+  ts: string;
+  type: TxnType | string;
+  amount_uzs: number;
+  counterparty_id?: string | null;
+  counterparty_kind?: string | null;
+};
+
+export type Duplicate = { loan_id: string; similarity: number };
+
+export type CheckPhotoResult = {
+  asset_match: { label: string; score: number } | null;
+  duplicate_of: Duplicate[];
+  geo_ok: boolean | null;
+  time_ok: boolean | null;
+  faces_blurred: boolean;
+  faces_count?: number | null;
+  latency_ms: number;
+};
+
+export type Photo = {
+  photo_id: string;
+  path?: string | null;
+  purpose?: string | null;
+  captured_at?: string | null;
+  lat?: number | null;
+  lon?: number | null;
+  duplicate_of: Duplicate[];
+  url?: string | null;
+  source: "portfolio" | "borrower_upload";
+  client_captured_at?: string | null;
+  check?: CheckPhotoResult | null;
+};
+
+export type Invoice = {
+  supplier_name?: string | null;
+  supplier_oked?: string | null;
+  oked_matches_purpose?: boolean | null;
+  invoice_amount_uzs?: number | null;
+};
+
+export type EvidenceKind = "txn" | "invoice" | "graph" | "photo";
+
+export type Evidence = {
+  ref: string;
+  kind: EvidenceKind;
+  summary_uz?: string | null;
+  data?: unknown;
+};
+
+export type LoanReason = {
+  code: string;
+  text_uz: string;
+  weight: number | null; // null for evidence-fusion policy reasons
+  evidence_refs: string[];
+  source?: "fusion_policy" | null;
+};
+
+export type LoanDetail = {
+  loan: Loan;
+  transactions: Transaction[];
+  photos: Photo[];
+  invoice?: Invoice | null;
+  risk: number;
+  color: Color;
+  base_color: Color;
+  priority: number;
+  escalations: Escalation[];
+  reasons: LoanReason[];
+  evidence: Evidence[];
+  model_version: string;
+};
+
+export type Fact = { claim: string; evidence_ref: string; unverified: boolean };
+
+export type DraftReport = {
+  text_uz: string;
+  facts: Fact[];
+  model: string;
+  latency_ms: number;
+  cost_usd: number | null;
+};
+
+export type DecisionAction = "approve" | "reject" | "visit";
+
+export type AuditEntry = {
+  ts: string;
+  actor: string;
+  action: string;
+  ai_recommendation: string | null;
+  model_version: string | null;
+  inputs_hash: string;
+};
+
+export type Session = { officer_id: string };
+
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(path, { ...init, headers: { Accept: "application/json", ...init?.headers } });
+  } catch {
+    throw new ApiError("Server bilan aloqa yo'q. Internetni tekshirib, qayta urinib ko'ring.", 0);
+  }
+  let body: unknown = null;
+  try {
+    body = await res.json();
+  } catch {
+    // non-JSON body (e.g. proxy error page)
+  }
+  if (!res.ok) {
+    const detail = (body as { detail?: unknown } | null)?.detail;
+    throw new ApiError(typeof detail === "string" ? detail : `Server xatosi (${res.status}).`, res.status);
+  }
+  return body as T;
+}
+
+const getJson = <T>(path: string) => request<T>(path);
+
+const postJson = <T>(path: string, payload: unknown) =>
+  request<T>(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+function query(params: Record<string, string | number | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== "") q.set(k, String(v));
+  }
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export const QUEUE_PAGE_SIZE = 50;
+
+export const api = {
+  health: () => getJson<Health>("/api/health"),
+  queue: (filters: QueueFilters, offset = 0, limit = QUEUE_PAGE_SIZE) =>
+    getJson<QueuePage>(`/api/queue${query({ ...filters, offset, limit })}`),
+  queueFacets: () => getJson<QueueFacets>("/api/queue/facets"),
+  queueLegend: () => getJson<ColorLegend>("/api/queue/legend"),
+  loan: (loanId: string) => getJson<LoanDetail>(`/api/loan/${encodeURIComponent(loanId)}`),
+  session: () => getJson<Session>("/api/session"),
+  audit: (loanId: string) => getJson<AuditEntry[]>(`/api/audit${query({ loan_id: loanId })}`),
+  draftReport: (loanId: string) => postJson<DraftReport>("/api/draft_report", { loan_id: loanId }),
+  decision: (body: { loan_id: string; officer_id: string; action: DecisionAction; comment: string }) =>
+    postJson<{ audit_id: number }>("/api/decision", body),
+};

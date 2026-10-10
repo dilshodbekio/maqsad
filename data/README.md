@@ -66,6 +66,8 @@ Assumption: all numbers measured on this synthetic data say nothing about real a
 | numpy 2.5.3 | generator | BSD-3-Clause |
 | pandas 3.0.6 | generator, features | BSD-3-Clause |
 | pyarrow 26.0.0 | parquet I/O | Apache-2.0 |
-| scikit-learn 1.9.1 | leakage check (ROC-AUC) | BSD-3-Clause |
+| scikit-learn 1.9.1 | leakage check, grouped CV, metrics | BSD-3-Clause |
 | Images (photo set, asset-type probe) | TBD | TBD (openly licensed only; each file to be listed here) |
-| Models (LightGBM, CLIP, ...) | TBD | TBD |
+| LightGBM 4.7.0 | money-trail model (`ml/money_trail/`) | MIT |
+| pytest 9.1.1 | tests | MIT |
+| Models (CLIP, ...) | TBD | TBD |

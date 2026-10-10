@@ -266,7 +266,7 @@ def render(dup, faces, lat, idx) -> str:
       "of any detector; the 'faces left' numbers above only show that *detectable* faces are gone.")
     w("- **Small library:** hard negatives come from ~10 images per purpose and half; with a real portfolio of "
       "thousands of photos the false-positive rate at this threshold must be re-measured.")
-    w("- The photo result does not change the money-trail risk; combining them is a later step.")
+    w("- The photo result does not change the money-trail risk; it can only raise the queue colour via the fusion policy (section 5).")
     w(END)
     return "\n".join(L) + "\n"
 

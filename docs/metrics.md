@@ -270,9 +270,41 @@ Detection is count based (no box annotations), so a miss and a false alarm on th
 - **Larger rotation / mirroring** were not tested (only 5 degrees).
 - **Faces:** a decorated bull head was detected as a face once (`faces_test_04`); a dark, out-of-focus face in the background (`faces_test_08`) is not counted and was not detected, so it is not blurred. Side and tiny faces are the weak spot of any detector; the 'faces left' numbers above only show that *detectable* faces are gone.
 - **Small library:** hard negatives come from ~10 images per purpose and half; with a real portfolio of thousands of photos the false-positive rate at this threshold must be re-measured.
-- The photo result does not change the money-trail risk; combining them is a later step.
+- The photo result does not change the money-trail risk; it can only raise the queue colour via the fusion policy (section 5).
 
-## 5. Known failure cases
+## 5. Scenario scoring and evidence fusion
+
+### Scenario scoring (judges build their own loan)
+
+`ml.api.score_scenario` scores a loan + transactions typed in by the user with the same frozen model v2, the same features and the same reason templates as a portfolio loan. The scenario is added as one extra loan to a *copy* of the demo portfolio's context (the cached portfolio is never modified); `percentile` is its rank among the demo portfolio's risks. Every score is computed live: changing one transaction changes the score.
+
+Example (`fast_cash_out` preset, only the day of the 42 000 000 so'm cash withdrawal changed):
+
+| Cash withdrawal on day | risk | colour | percentile in the demo portfolio | cash_share_d1 | first top reason |
+|---|---|---|---|---|---|
+| 1 | 0.9927 | red | 99.3 | 0.84 | Kredit tushgandan keyingi 24 soat ichida mablag'ning 84 foizi naqd yechilgan |
+| 30 | 0.5978 | yellow | 88.8 | 0.00 | Hisob-fakturadagi summaning 90 foizi ta'minotchiga to'lanmagan |
+
+Latency of `score_scenario` (3 runs x 60 calls over the 4 presets, inputs varied; Intel64 Family 6 Model 154 Stepping 3, GenuineIntel, Python 3.13.15), range across runs: p50 140 - 142 ms, p95 160 - 165 ms, slowest call 196 ms (limit in the tests: 500 ms). Produced by `python -m ml.eval.eval_scenario`.
+
+Rules and assumptions: `snapshot_day` must be 2..364 (the model was trained on loans up to one year old); unknown keys, a single amount above 10 x the loan, total inflows above 20 x the loan, and outflows above the available balance are rejected (`ScenarioError`, never capped); without `invoice_amount_uzs` there is no invoice (training convention `-1`) and no invoice-gap reason; for a NEW supplier no reason about the supplier's own cash-out is shown (the scenario has no supplier ledger; the features still enter the model with 0); for an existing supplier the real demo ledger gives the supplier-graph features. The context is restricted to the supplier's loans, which gives exactly the same features as a full copy of the portfolio (`pytest -m slow`).
+
+### Fusion policy (photo -> queue)
+
+**There is no labelled data for photo signals, so fusion is a documented, configurable policy (`ml/fusion.py`, one dict), not a learned model; no accuracy is claimed for it.** Each triggered signal escalates a loan to a minimum colour. Escalation only raises priority: it never lowers the money-trail colour, and the money-trail `risk` is never changed. `priority` = colour rank + risk (the queue sort key); `escalations[]` and policy reasons (Uzbek, factual, with evidence refs to the photo) are added to the queue items and to `get_loan`.
+
+| Code | Minimum colour | Active | Triggered when |
+|---|---|---|---|
+| `PHOTO_DUPLICATE` | red | yes | the photo duplicates another loan's photo (in the portfolio index, or in the same sandbox) |
+| `PHOTO_FAR` | yellow | yes | geo_ok == False: the photo was taken more than 5 km from the borrower (assumed limit) |
+| `PHOTO_TIME` | yellow | yes | time_ok == False: captured before disbursement or in the future |
+| `PHOTO_ASSET_MISMATCH` | yellow | no (later) | asset_match below a threshold (switched on when the CLIP step is added) |
+
+**Colour budget (default queue of the demo portfolio):** 500 red by risk + 13 escalated to red by the photo policy = 513 red; 501 yellow (500 by risk, 5 green loans raised to yellow, the rest moved to red). The thresholds stay 10% / 10% by risk (500 red + 500 yellow); the photo policy adds 13 loans to red and 5 green loans to yellow, so the 20% inspection budget is exceeded by these escalations (`ml.api.get_color_thresholds()`). Reason order: policy reasons that raised the colour, then money-trail reasons, then the other policy reasons; the queue's `top_reason` is the first of them.
+
+The demo portfolio's own photos are evaluated with the same policy (duplicates in the index, distance, capture time); a sandbox's uploaded photos escalate loans only in that sandbox's view (`get_queue(sandbox_id)`, `get_loan(loan_id, sandbox_id)`) and `reset_sandbox` removes them. The 5 km distance limit and the photo rates of the generator are assumptions.
+
+## 6. Known failure cases
 
 - **Weakest fraud groups (holdout):** T3 resale not yet happened 4.8% in budget (n=21); T4 stealth 8.8% in budget (n=34); T4 45.4% in budget (n=130); T3 56.9% in budget (n=130).
 - **Honest look-alikes that get flagged most:** honest/oked_mismatch 37.2% (n=382); honest/livestock_seller 22.5% (n=271).
@@ -280,9 +312,11 @@ Detection is count based (no box annotations), so a miss and a false alarm on th
 - **'No income' and young loans:** v2 no longer penalises loans younger than 90 days, but the 90-day limit is an assumption about how our synthetic generator times income; real borrowers (seasonal income, grace periods) must be re-measured.
 - **Everything is synthetic:** fraud typologies, rates and the honest-but-suspicious profiles are assumptions; the generator's own structure (e.g. ring bursts, photo-reuse rates the same for all typologies) is what the model learns. See `ml/generator/README.md` (Known limitations: counterparty ID collisions, ring size up to ~12 vs. 71 in a real case).
 - **Photo module:** see the failure cases in section 4 (hash crop robustness, screen photos, side faces).
-- The photo result does not change the money-trail risk; combining them is a later step.
+- **Fusion is a policy, not a measured model:** its thresholds (e.g. 5 km) and escalation colours are choices, not fitted values; its effect on recall / precision cannot be measured without labelled photo data.
+- **Scenarios:** a hand-built scenario can describe behaviour the generator never produces; the score then shows what the model does outside the synthetic world, not that the behaviour is fraud. Assumptions are listed in section 5.
+- The photo result does not change the money-trail `risk` value; it only raises the colour / priority (policy in section 5).
 
-## 6. Reproduce
+## 7. Reproduce
 
 ```
 .venv/Scripts/python -m pip install -r ml/requirements.txt
@@ -293,6 +327,7 @@ Detection is count based (no box annotations), so a miss and a false alarm on th
 .venv/Scripts/python -m ml.eval.eval_photo --write-config        # photo duplicate variant + threshold
 .venv/Scripts/python -m ml.photo.index                           # photo index on the demo split
 .venv/Scripts/python -m ml.eval.eval_photo
+.venv/Scripts/python -m ml.eval.eval_scenario                    # scenario latency + example
 .venv/Scripts/python -m ml.eval.build_metrics                    # regenerate this file from the stored results
 .venv/Scripts/python -m pytest ml/tests -q
 ```

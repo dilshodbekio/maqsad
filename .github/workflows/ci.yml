@@ -95,6 +95,11 @@ jobs:
                      and has("percentile") and (.model_version != "stub")'
           test "$(curl -s -o scn_err.json -w '%{http_code}' -H 'Content-Type: application/json'             -d '{"purpose":"x","snapshot_day":1}' localhost:8000/api/score_scenario)" = 400
           jq -e '.detail | type == "string"' scn_err.json
+          # draft queue (contract v1.8): admin pre-warm needs the token, an unknown job id is 404
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8000/api/admin/prewarm)" = 403
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/api/admin/prewarm)" = 403
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-Admin-Token: wrong' localhost:8000/api/admin/prewarm)" = 403
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/api/draft_report/job/00000000000000000000000000000000)" = 404
           # /api/asset serves only photos from ml's photo index
           test "$(curl -s -o /dev/null -w '%{http_code}' 'localhost:8000/api/asset/photos/manifest.csv')" = 404
           curl -fsS localhost:8000/ | grep -q '<div id="root">'

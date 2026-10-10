@@ -184,26 +184,44 @@ class Database:
         p = self.photo_dir / r["image_file"]
         return p if p.is_file() else None
 
-    def reset_sandbox_data(self) -> None:
-        """Admin reset: removes sandbox photos. The audit log is append-only and is kept."""
+    def reset_sandbox_data(self, *, clear_shared_cache: bool = False) -> None:
+        """Admin reset: removes sandbox photos and sandbox drafts (shared drafts only if asked).
+        The audit log is append-only and is kept."""
+        self.draft_cache_clear(shared=clear_shared_cache)
         with self._write_lock, self.conn() as c:
             c.execute("DELETE FROM photos")
-            c.execute("DELETE FROM draft_cache")
         shutil.rmtree(self.photo_dir, ignore_errors=True)
         self.photo_dir.mkdir(parents=True, exist_ok=True)
 
-    # ---------- draft report cache (one draft per sandbox + loan; valid while the inputs are unchanged) ----------
+    # ---------- draft report cache ----------
+    # scope = "shared" (the loan has no sandbox-specific evidence: one draft for everybody) or a sandbox id.
+    # Valid only while inputs_hash (evidence, reasons, model, prompt version) is unchanged. Lives in the SQLite file
+    # under DATA_DIR, so it survives restarts and redeploys.
 
-    def draft_cache_get(self, sandbox_id: str, loan_id: str, inputs_hash: str) -> Optional[dict]:
+    SHARED_SCOPE = "shared"
+
+    def draft_cache_get(self, scope: str, loan_id: str, inputs_hash: str) -> Optional[dict]:
         with self.conn() as c:
-            r = c.execute("SELECT response_json FROM draft_cache WHERE sandbox_id = ? AND loan_id = ? "
-                          "AND inputs_hash = ?", (sandbox_id, loan_id, inputs_hash)).fetchone()
-        return json.loads(r["response_json"]) if r else None
+            r = c.execute("SELECT response_json, ts FROM draft_cache WHERE sandbox_id = ? AND loan_id = ? "
+                          "AND inputs_hash = ?", (scope, loan_id, inputs_hash)).fetchone()
+        if not r:
+            return None
+        out = json.loads(r["response_json"])
+        out.setdefault("generated_at", r["ts"])
+        return out
 
-    def draft_cache_put(self, sandbox_id: str, loan_id: str, inputs_hash: str, response: dict) -> None:
+    def draft_cache_put(self, scope: str, loan_id: str, inputs_hash: str, response: dict) -> None:
         with self._write_lock, self.conn() as c:
             c.execute("INSERT OR REPLACE INTO draft_cache VALUES (?, ?, ?, ?, ?)",
-                      (sandbox_id, loan_id, inputs_hash, json.dumps(response, ensure_ascii=False), utc_now()))
+                      (scope, loan_id, inputs_hash, json.dumps(response, ensure_ascii=False), utc_now()))
+
+    def draft_cache_clear(self, *, shared: bool = False) -> None:
+        """Sandbox drafts always; the shared (pre-warmed) ones only when asked."""
+        with self._write_lock, self.conn() as c:
+            if shared:
+                c.execute("DELETE FROM draft_cache")
+            else:
+                c.execute("DELETE FROM draft_cache WHERE sandbox_id != ?", (self.SHARED_SCOPE,))
 
     # ---------- LLM call log ----------
 

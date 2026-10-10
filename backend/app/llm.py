@@ -29,6 +29,14 @@ class LLMError(Exception):
     pass
 
 
+class LLMRateLimited(LLMError):
+    """HTTP 429 from the LLM API: the draft queue keeps the job and retries after `retry_after_s`."""
+
+    def __init__(self, message: str, retry_after_s: float):
+        super().__init__(message)
+        self.retry_after_s = retry_after_s
+
+
 SYSTEM_PROMPT = (
     "Siz bank kredit monitoringi xodimi uchun tekshiruv dalolatnomasining QORALAMASINI yozasiz. "
     "Faqat berilgan dalillar (evidence) va sabablar (reasons) dagi faktlardan foydalaning, hech narsa "
@@ -75,7 +83,30 @@ def _cost(settings: Settings, tin: Optional[int], tout: Optional[int]) -> Option
     return round(tin / 1e6 * settings.llm_price_in_per_mtok + tout / 1e6 * settings.llm_price_out_per_mtok, 6)
 
 
-_RETRY_STATUS = {429, 500, 502, 503, 504}  # transient (Gemini: 503 "high demand")
+_RETRY_STATUS = {500, 502, 503, 504}  # transient (Gemini: 503 "high demand"); 429 goes back to the draft queue
+DEFAULT_RETRY_AFTER_S = 15.0
+_RETRY_IN_RE = re.compile(r"retry in ((?:[0-9]+h)?(?:[0-9]+m)?(?:[0-9]+(?:\.[0-9]+)?s)?)", re.I)
+_DURATION_RE = re.compile(r"(?:([0-9]+)h)?(?:([0-9]+)m)?(?:([0-9]+(?:\.[0-9]+)?)s)?$")
+
+
+def _seconds(text: str) -> Optional[float]:
+    """'2.1s' / '6549s' / '1h49m9.55s' -> seconds."""
+    m = _DURATION_RE.match(text or "")
+    if not m or not any(m.groups()):
+        return None
+    h, mi, sec = m.groups()
+    return int(h or 0) * 3600 + int(mi or 0) * 60 + float(sec or 0)
+
+
+def _retry_after(r) -> float:
+    """Retry-After header, else Gemini's 'Please retry in 2.1s' / '1h49m9.5s' text, else a default."""
+    try:
+        return max(0.0, float(r.headers.get("retry-after", "")))
+    except (TypeError, ValueError):
+        pass
+    m = _RETRY_IN_RE.search(r.text or "")
+    parsed = _seconds(m.group(1)) if m else None
+    return parsed if parsed is not None else DEFAULT_RETRY_AFTER_S
 _RETRY_DELAYS_S = (1.0, 3.0)
 
 
@@ -110,6 +141,8 @@ def _chat(settings: Settings, messages: list) -> tuple:
             log.warning("LLM HTTP %s (attempt %s), retrying: %s", r.status_code, attempt + 1, scrub(r.text))
             time.sleep(_RETRY_DELAYS_S[attempt])
             continue
+        if r.status_code == 429:
+            raise LLMRateLimited(f"HTTP 429 from LLM API: {scrub(r.text)}", _retry_after(r))
         if r.is_error:
             # short response body (key scrubbed) so the 4xx/5xx cause is visible in the log
             raise LLMError(f"HTTP {r.status_code} from LLM API: {scrub(r.text)}")
@@ -139,6 +172,9 @@ def draft_report(settings: Settings, loan_id: str, evidence: list, reasons: list
         facts = parsed.get("facts") or []
         if not isinstance(facts, list):
             raise ValueError("facts is not a list")
+    except LLMRateLimited as e:
+        log.warning("LLM rate limited loan=%s model=%s (retry in %ss)", loan_id, settings.llm_model, e.retry_after_s)
+        raise
     except Exception as e:  # noqa: BLE001
         latency = round((time.perf_counter() - t) * 1000, 1)
         log.warning("LLM call failed loan=%s model=%s latency_ms=%s: %s", loan_id, settings.llm_model, latency, e)

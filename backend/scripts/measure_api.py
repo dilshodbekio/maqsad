@@ -3,7 +3,7 @@
     python backend/scripts/measure_api.py [--base URL] [--n 20] [--only queue,loan,photo,draft_cached,draft_fresh] [--out FILE.json]
 
 Every number printed comes from real requests. Percentiles: nearest-rank on the sorted samples.
-Pacing keeps the app's rate limit (20 requests/min per sandbox) and the free-tier LLM quota out of the picture;
+Pacing keeps the app's rate limit (20 requests/min per sandbox) out of the picture; the LLM calls are paced by the server's queue;
 requests that still fail are counted and reported, never dropped silently.
 """
 from __future__ import annotations
@@ -54,6 +54,35 @@ def timed(fn, pace_s: float, n: int):
     return samples, errors, extra
 
 
+class _Resp:
+    """Final answer of a draft request (status 200 = a DraftReport, also after a 202 job finished)."""
+
+    def __init__(self, status_code, body, text=""):
+        self.status_code, self._body, self.text, self.headers = status_code, body, text, {"content-type": "application/json"}
+
+    def json(self):
+        return self._body
+
+
+def post_draft(c, loan_id: str, regenerate: bool = False, timeout_s: float = 300.0):
+    """POST /api/draft_report; on 202 poll the job every 2 s. The wall time of the caller therefore includes the queue wait."""
+    r = c.post("/api/draft_report", json={"loan_id": loan_id, "regenerate": regenerate})
+    if r.status_code != 202:
+        return r
+    job, end = r.json()["job_id"], time.monotonic() + timeout_s
+    while time.monotonic() < end:
+        time.sleep(2.0)
+        j = c.get(f"/api/draft_report/job/{job}")
+        if j.status_code != 200:
+            return j
+        j = j.json()
+        if j["status"] == "done":
+            return _Resp(200, j["result"])
+        if j["status"] == "error":
+            return _Resp(502, None, j.get("error") or "job error")
+    return _Resp(504, None, "poll timeout")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="https://maqsad-production-d704.up.railway.app")
@@ -91,7 +120,7 @@ def main() -> int:
         results["endpoints"].append(r)
     if "draft_cached" in want or "draft_fresh" in want:
         lid = ids[1]
-        probe = c.post("/api/draft_report", json={"loan_id": lid})
+        probe = post_draft(c, lid)
         if probe.status_code == 200:
             d = probe.json()
             results["draft_sample"] = {k: d.get(k) for k in ("model", "latency_ms", "cost_usd", "cached", "input_tokens", "output_tokens")}
@@ -99,13 +128,13 @@ def main() -> int:
         else:
             results["draft_probe_error"] = f"HTTP {probe.status_code}: {probe.text[:160]}"
         if "draft_cached" in want and probe.status_code == 200:
-            s, e, extra = timed(lambda i: c.post("/api/draft_report", json={"loan_id": lid}), 0.5, a.n)
+            s, e, extra = timed(lambda i: post_draft(c, lid), 0.5, a.n)
             r = summarize("POST /api/draft_report (cache hit)", s, e)
             r["cached_flags"] = sorted({bool(x.get("cached")) for x in extra if x})
             results["endpoints"].append(r)
         if "draft_fresh" in want:
-            s, e, extra = timed(lambda i: c.post("/api/draft_report", json={"loan_id": ids[i % len(ids)], "regenerate": True}),
-                                13.0, a.n)  # 13 s spacing: stays under a 5 requests/minute LLM quota
+            s, e, extra = timed(lambda i: post_draft(httpx.Client(base_url=a.base, timeout=90), ids[i % len(ids)], True),
+                                0.0, a.n)  # a new sandbox per request (regenerate is limited to 1/min per sandbox); the server queue paces the LLM
             r = summarize("POST /api/draft_report (regenerate=true, no cache)", s, e)
             srv = sorted(x["latency_ms"] for x in extra if x)
             if srv:

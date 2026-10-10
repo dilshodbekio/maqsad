@@ -1,0 +1,102 @@
+{
+ "single_thread": {
+  "warm_up": {
+   "cpu_s": 14.96875,
+   "wall_s": 15.770494600001257,
+   "portfolio_s": 6.02,
+   "face_detector_s": 0.03,
+   "clip_s": 9.68,
+   "total_s": 15.73,
+   "clip_loaded": true
+  },
+  "score_loan": {
+   "cpu_ms": 2.96875,
+   "wall_ms": 3.2586620002985,
+   "n": 100
+  },
+  "score_scenario": {
+   "cpu_ms": 95.703125,
+   "wall_ms": 98.37779500085162,
+   "n": 40
+  },
+  "check_photo": {
+   "cpu_ms": 501.5625,
+   "wall_ms": 520.0705916669297,
+   "n": 60
+  },
+  "check_photo_parts": {
+   "decode_and_hash": {
+    "cpu_ms": 31.25,
+    "wall_ms": 32.48370000073919,
+    "n": 40
+   },
+   "face_detect_and_blur": {
+    "cpu_ms": 243.359375,
+    "wall_ms": 245.5636799990316,
+    "n": 40
+   },
+   "clip_asset_check": {
+    "cpu_ms": 200.0,
+    "wall_ms": 201.25741499941796,
+    "n": 40
+   }
+  },
+  "rss_mb": 1178.98828125,
+  "machine": {
+   "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+   "logical_cores": 12,
+   "python": "3.13.15",
+   "threads": "1 thread (OpenCV, torch, OpenMP)"
+  }
+ },
+ "all_cores": {
+  "warm_up": {
+   "cpu_s": 44.421875,
+   "wall_s": 13.345315699989442,
+   "portfolio_s": 3.01,
+   "face_detector_s": 0.05,
+   "clip_s": 10.19,
+   "total_s": 13.25,
+   "clip_loaded": true
+  },
+  "score_loan": {
+   "cpu_ms": 61.5625,
+   "wall_ms": 6.877552999649197,
+   "n": 100
+  },
+  "score_scenario": {
+   "cpu_ms": 986.71875,
+   "wall_ms": 151.885150000453,
+   "n": 40
+  },
+  "check_photo": {
+   "cpu_ms": 3016.9270833333335,
+   "wall_ms": 402.5725066661835,
+   "n": 60
+  },
+  "check_photo_parts": {
+   "decode_and_hash": {
+    "cpu_ms": 46.484375,
+    "wall_ms": 34.99255749920849,
+    "n": 40
+   },
+   "face_detect_and_blur": {
+    "cpu_ms": 1648.828125,
+    "wall_ms": 218.90595000004396,
+    "n": 40
+   },
+   "clip_asset_check": {
+    "cpu_ms": 1221.484375,
+    "wall_ms": 180.13559499959229,
+    "n": 40
+   }
+  },
+  "rss_mb": 1209.09765625,
+  "machine": {
+   "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+   "logical_cores": 12,
+   "python": "3.13.15",
+   "threads": "all cores"
+  }
+ }
+}

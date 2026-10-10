@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from ml.errors import InvalidImageError, LoanNotFoundError, ScenarioError  # noqa: F401  (re-exported for the backend)
+from ml.errors import InvalidImageError, InvalidRequestError, LoanNotFoundError, ScenarioError  # noqa: F401  (re-exported for the backend)
 from ml.money_trail.model import MODEL_VERSION
 from ml.money_trail.service import get_portfolio
 
@@ -107,7 +107,7 @@ def check_photo(
     + photos from THIS sandbox only. Sandbox photos are never added to the portfolio
     index and are dropped by reset_sandbox(). None = production/portfolio mode (nothing is remembered).
 
-    Returns: {asset_match: {label, score} | None   (None until the CLIP step is added),
+    Returns: {asset_match: {label, score, matches_purpose, label_uz} | None   (None only if the CLIP stack is unavailable),
               duplicate_of: [{loan_id, similarity}],
               geo_ok: bool | None, time_ok: bool | None,
               faces_blurred: bool (True = faces were found and blurred), faces_count: int,
@@ -118,6 +118,28 @@ def check_photo(
     """
     from ml.photo.checker import check_photo as _check
     return _check(loan_id, image_bytes, lat, lon, captured_at, sandbox_id)
+
+
+def warm_up() -> dict:
+    """Load everything a first request would otherwise pay for: the demo portfolio (features, scores, queue), the face
+    detector and CLIP (asset check). Call it once at service start. Returns the seconds each part took."""
+    import time
+    t0 = time.perf_counter()
+    get_portfolio()
+    t1 = time.perf_counter()
+    from ml.photo.checker import _detector
+    _detector()
+    t2 = time.perf_counter()
+    clip, clip_error = False, None
+    try:
+        from ml.photo.asset import get_asset_model
+        get_asset_model()
+        clip = True
+    except (ImportError, OSError, RuntimeError) as e:        # cached + logged once; check_photo then runs without asset_match
+        clip_error = str(e)
+    t3 = time.perf_counter()
+    return dict(portfolio_s=round(t1 - t0, 2), face_detector_s=round(t2 - t1, 2), clip_s=round(t3 - t2, 2),
+                total_s=round(t3 - t0, 2), clip_loaded=clip, clip_error=clip_error)
 
 
 def reset_sandbox(sandbox_id: Optional[str]) -> None:

@@ -9,6 +9,7 @@ import numpy as np
 from . import config
 
 SCORE_THRESHOLD = 0.6
+MIN_SIDE = 16                  # images thinner than this are not searched for faces
 DETECT_SIDE = 960              # YuNet runs on a copy whose longest side is at most this (speed)
 MAX_PASSES = 3                 # blur -> re-detect -> blur again until no detectable face is left
 
@@ -28,14 +29,23 @@ class FaceDetector:
 
     def detect(self, rgb: np.ndarray) -> list[tuple[int, int, int, int]]:
         h, w = rgb.shape[:2]
+        if min(h, w) < MIN_SIDE:                      # too small / too thin for any detector
+            return []
         if self._yunet is not None:
             s = min(1.0, DETECT_SIDE / max(h, w))
+            if min(h, w) * s < MIN_SIDE:               # a very wide / tall image would become too thin after scaling
+                s = 1.0 if min(h, w) >= MIN_SIDE else s
             small = cv2.resize(rgb, None, fx=s, fy=s, interpolation=cv2.INTER_AREA) if s < 1 else rgb
             bgr = cv2.cvtColor(small, cv2.COLOR_RGB2BGR)
-            with self._lock:
-                self._yunet.setInputSize((bgr.shape[1], bgr.shape[0]))
-                _, faces = self._yunet.detect(bgr)
-            return [] if faces is None else [tuple(int(v / s) for v in f[:4]) for f in faces]
+            try:
+                with self._lock:
+                    self._yunet.setInputSize((bgr.shape[1], bgr.shape[0]))
+                    _, faces = self._yunet.detect(bgr)
+            except cv2.error:                          # degenerate geometry the network cannot take: no faces found
+                return []
+            if faces is None:
+                return []
+            return [tuple(int(v / s) for v in f[:4]) for f in faces if np.isfinite(f[:4]).all()]
         gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
         found = self._haar.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
         return [tuple(int(v) for v in f) for f in found]

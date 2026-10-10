@@ -54,7 +54,7 @@ def view(sandbox_id, loan_id):
 def test_policy_table():
     assert fusion.POLICY["PHOTO_DUPLICATE"]["min_color"] == "red"
     assert fusion.POLICY["PHOTO_FAR"]["min_color"] == "yellow" and fusion.POLICY["PHOTO_TIME"]["min_color"] == "yellow"
-    assert fusion.POLICY["PHOTO_ASSET_MISMATCH"]["min_color"] == "yellow" and fusion.POLICY["PHOTO_ASSET_MISMATCH"]["active"] is False
+    assert fusion.POLICY["PHOTO_ASSET_MISMATCH"]["min_color"] == "yellow" and fusion.POLICY["PHOTO_ASSET_MISMATCH"]["active"] is True
     assert all(v["min_color"] in RANK for v in fusion.POLICY.values())
 
 

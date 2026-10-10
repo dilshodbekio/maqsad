@@ -15,6 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
+from ml.generator.config import PURPOSES
 from ml.photo import config, hashing, imageio
 from ml.photo.transforms import TRANSFORMS
 
@@ -26,7 +27,7 @@ GRID = [i / 128 for i in range(0, 65)]            # max normalised distance cand
 def library() -> list[dict]:
     import csv
     rows = list(csv.DictReader(open(config.ASSETS / "manifest.csv", encoding="utf-8")))
-    return [r for r in rows if r["purpose"] != "faces_test"]
+    return [r for r in rows if r["purpose"] in PURPOSES]       # the 5 asset purposes (not faces_test, not the CLIP "other" negatives)
 
 
 def _hashes(items, rng):
@@ -247,7 +248,7 @@ def render(dup, faces, lat, idx) -> str:
     w("| Item | Value |")
     w("|---|---|")
     w(f"| `check_photo` p50 / p95 ({lat['n']} calls, warm, {lat['size'][1]}x{lat['size'][0]} px, {lat['kb']:.0f} KB JPEG; "
-      "decode, hashing, duplicate search, face detection + blur, re-encode) | "
+      "decode, hashing, duplicate search, face detection + blur, CLIP asset check, re-encode) | "
       f"{lat['p50']:.0f} ms / {lat['p95']:.0f} ms |")
     w(f"| same, wall clock | {lat['wall_p50']:.0f} ms / {lat['wall_p95']:.0f} ms |")
     w("| Cost per check | 0 (local, no external API) |")

@@ -18,13 +18,14 @@ import pandas as pd
 
 from ml import fusion
 from ml.errors import LoanNotFoundError
+from ml.sandbox import validate_sandbox_id
 from ml.generator.build import build
 from ml.generator.config import MATCHING_OKED, SPLITS
 
 from .features import build_features
 from .colors import color_of, rank_thresholds
 from .model import MODEL_VERSION, MoneyTrailModel, load_model
-from .reasons import NO_REASON_UZ, TEMPLATES, build_evidence, build_reasons
+from .reasons import NO_REASON_UZ, TEMPLATES, build_evidence, build_reasons, is_skipped
 
 DEMO_SPLIT = "demo"
 LOAN_FIELDS = ["loan_id", "borrower_id", "borrower_name_masked", "purpose", "amount_uzs", "term_months",
@@ -110,7 +111,7 @@ class Portfolio:
             ctx = {"supplier_oked": oked[i]}
             if C[i, j] <= 1e-9:
                 text = NO_REASON_UZ
-            elif feats[j] == "income_rate_per_month" and X[i, j] < 0:      # not a shown fact: take the full path
+            elif is_skipped(feats[j], float(X[i, j])):                     # not a shown fact: take the full path
                 rs = build_reasons(feats, X[i], C[i], ctx, with_refs=False)
                 text = rs[0]["text_uz"] if rs else NO_REASON_UZ
             else:
@@ -152,7 +153,8 @@ class Portfolio:
             time_ok = bool(row["disbursed_at"] <= row["photo_captured_at"] <= row["snapshot_date"])
             for p in idx.photos_of(lid):
                 sig = fusion.photo_signals(ref=f"photo:{p['photo_id']}", photo_label=p["path"], duplicates=p["duplicate_of"],
-                                           geo_ok=km <= photo_config.GEO_MAX_KM, distance_km=km, time_ok=time_ok, uploaded=False)
+                                           geo_ok=km <= photo_config.GEO_MAX_KM, distance_km=km, time_ok=time_ok,
+                                           asset_match=p.get("asset_match"), uploaded=False, purpose=str(row["purpose"]))
                 if sig:
                     out.setdefault(lid, []).extend(sig)
         return out
@@ -170,7 +172,7 @@ class Portfolio:
         """Queue sorted by priority (colour rank, then risk). With a sandbox_id the escalations from that sandbox's
         uploaded photos are included; other sandboxes and the default view are unaffected."""
         items = copy.deepcopy(self._queue)          # callers may edit what they get; the cache must stay intact
-        if sandbox_id is None:
+        if validate_sandbox_id(sandbox_id) is None:
             return items
         from ml.photo.checker import sandbox_signals
         extra = sandbox_signals(sandbox_id)
@@ -205,6 +207,7 @@ class Portfolio:
                 for p in get_index().photos_of(loan_id)]
 
     def loan(self, loan_id: str, sandbox_id=None) -> dict:
+        validate_sandbox_id(sandbox_id)
         self._check(loan_id)
         ctx = self._context(loan_id)
         risk = float(self.risk[loan_id])

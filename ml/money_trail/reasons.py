@@ -41,6 +41,7 @@ def _som(v) -> str:
 # feature code -> template(value, context) -> Uzbek (Latin) sentence with the actual value
 TEMPLATES = {
     "first_cash_days": lambda v, c: ("Kredit tushgandan beri naqd yechish qayd etilmagan" if v >= NEVER else
+                                     "Birinchi naqd yechish kredit tushgan kunning o'zida bo'lgan" if v < 0.5 else
                                      f"Birinchi naqd yechish kredit tushgandan {_d(v)} kun o'tib bo'lgan"),
     "cash_share_d1": lambda v, c: f"Kredit tushgandan keyingi 24 soat ichida mablag'ning {_pct(v, 'i')} naqd yechilgan",
     "cash_share_d7": lambda v, c: f"Kredit tushgandan keyin 7 kun ichida mablag'ning {_pct(v, 'i')} naqd yechilgan",
@@ -51,6 +52,7 @@ TEMPLATES = {
                                    f"Ta'minotchiga kredit summasining atigi {_pct(v, 'i')} o'tkazilgan" if v < LOW_PAY_SHARE else
                                    f"Ta'minotchiga kredit summasining {_pct(v, 'i')} o'tkazilgan"),
     "first_sup_pay_days": lambda v, c: ("Ta'minotchiga hali to'lov o'tkazilmagan" if v >= NEVER else
+                                        "Ta'minotchiga birinchi to'lov kredit tushgan kunning o'zida qilingan" if v < 0.5 else
                                         f"Ta'minotchiga birinchi to'lov kredit tushgandan {_d(v)} kun o'tib qilingan"),
     "invoice_gap": lambda v, c: ("Hisob-faktura mavjud emas" if v < 0 else
                                  f"Hisob-fakturadagi summaning {_pct(v, 'i')} ta'minotchiga to'lanmagan"),
@@ -82,6 +84,7 @@ TEMPLATES = {
                                           f"Ta'minotchi hisobi {_d(v)} kun faol bo'lgan"),
     "sup_age_at_first_payment_days": lambda v, c: (
         "Ta'minotchiga hali to'lov tushmagan" if v < 0 else
+        "Ta'minotchi birinchi to'lov kunida ro'yxatdan o'tgan" if v < 0.5 else
         f"Ta'minotchi birinchi to'lovdan atigi {_d(v)} kun oldin ro'yxatdan o'tgan" if v < LOW_SUPPLIER_AGE_DAYS else
         f"Ta'minotchi birinchi to'lovdan {_d(v)} kun oldin ro'yxatdan o'tgan"),
     "sup_employee_link": lambda v, c: "Ta'minotchi bank xodimi bilan bog'langan",
@@ -89,6 +92,24 @@ TEMPLATES = {
     "oked_mismatch": lambda v, c: (f"Ta'minotchining faoliyat turi (OKED {c['supplier_oked']}) "
                                    "kredit maqsadiga mos kelmaydi"),
 }
+
+# A reason is only shown if it states something non-zero: "mablag'ning 0 foizi naqd yechilgan" is not a fact worth showing.
+# code -> largest value that still renders as zero (shares: < 0.5 foiz, counts and days: < 0.5)
+ZERO_HIDDEN = {**{c: 0.005 for c in ("cash_share_d1", "cash_share_d7", "cash_share_d30", "cash_share_all", "leave_share_30",
+                                      "post_inbound_exit", "big_inbound_share", "sup_cash_share", "sup_exit_share", "invoice_gap")},
+               **{c: 0.5 for c in ("p2p_out_count", "p2p_in_count", "income_after_big_count", "income_gap_days")}}
+
+
+def is_skipped(code: str, value: float) -> bool:
+    """True if a feature must not be shown as a reason: 'income not due yet' (-1), or a value that renders as zero.
+    (Only features that push the risk UP are candidates at all; see build_reasons.)"""
+    if code == "income_rate_per_month":
+        return value < 0
+    if code == "sup_active_span_days":
+        return 0 <= value < 0.5                      # a negative value is the 'no activity yet' sentinel and is shown
+    limit = ZERO_HIDDEN.get(code)
+    return limit is not None and abs(value) < limit
+
 
 # features that state (nearly) the same fact: only the strongest of a group is shown as a reason
 DUPLICATE_GROUPS = [
@@ -157,14 +178,16 @@ def build_reasons(model_features: list[str], x: np.ndarray, contrib: np.ndarray,
         code = model_features[i]
         if code in exclude:
             continue                                  # a fact the caller did not provide (e.g. a scenario without invoice)
-        if code == "income_rate_per_month" and x[i] < 0:
-            continue                                  # 'income not due yet' is not a fact worth showing
+        if is_skipped(code, float(x[i])):
+            continue                                  # 'income not due yet' / a value that renders as zero
         group = _GROUP_OF.get(code)
         if group is not None and group in used:
             continue                                  # same fact already shown by a stronger feature
         used.add(group)
-        item = dict(code=code, text_uz=TEMPLATES[code](float(x[i]), c),
-                    weight=round(float(contrib[i]) / total, 3))
+        weight = round(float(contrib[i]) / total, 3)
+        if weight <= 0:
+            continue                                  # a share that rounds to 0.0 is not a reason
+        item = dict(code=code, text_uz=TEMPLATES[code](float(x[i]), c), weight=weight)
         if with_refs:
             item["evidence_refs"] = _refs(code, c)[:MAX_REFS]
         out.append(item)

@@ -1,4 +1,4 @@
-# API contract (Dilshodbek ↔ Oybek) — v1.4
+# API contract (Dilshodbek ↔ Oybek) — v1.5
 
 Source: `docs/brief.md` §5. Any change requires agreement from both sides (via PR).
 During development the backend may fall back to a visible STUB; **in the demo only the real model runs**.
@@ -7,6 +7,12 @@ Code: HTTP schemas in `backend/app/schemas.py` (1:1 with this file), Python inte
 **Demo portfolio.** `ml/` serves the **demo** portfolio (generator split `demo`, seed 7), generated in memory on the first call
 (~6 s including imports). The backend warms it at start-up by calling `get_queue()` once in a background thread, so
 `/api/health` answers immediately (`warmup: "running"` → `"done"`).
+**ML warm-up (v1.5): the recommended start-up call is `ml.api.warm_up()`**, not `get_queue()` alone: it loads the demo portfolio, the face
+detector **and CLIP** (~16-25 s in total on the development machine, ~1.4 GB memory) and returns
+`{portfolio_s, face_detector_s, clip_s, total_s, clip_loaded, clip_error}`. If only `get_queue()` is called, CLIP is not preloaded and the
+first photo upload pays for loading it (~10-15 s). If CLIP cannot be loaded (`clip_loaded: false`, reason in `clip_error`), the service keeps
+working: `check_photo` returns `asset_match: null` and no asset escalation is raised (never retried, nothing is downloaded at request time).
+Build-time weight download and the `MAQSAD_*` environment variables: `ml/README.md`.
 
 ## HTTP (all endpoints under `/api`)
 
@@ -42,7 +48,7 @@ POST /api/score_loan        {loan_id}
 
 POST /api/check_photo       multipart: image (file) + loan_id, lat?, lon?, captured_at?
                             (fallback JSON: {loan_id, image_base64, lat?, lon?, captured_at?})
-  → {asset_match: {label, score} | null, duplicate_of: [{loan_id, similarity}],
+  → {asset_match: {label, score, matches_purpose, label_uz} | null, duplicate_of: [{loan_id, similarity}],
      geo_ok: bool|null, time_ok: bool|null, faces_blurred: bool, faces_count?: int, latency_ms}
 
 POST /api/draft_report      {loan_id}
@@ -76,11 +82,11 @@ GET  /api/scenario_presets  → [{id, title_uz, description_uz, scenario}]
 |---|---|
 | `loan` | `{loan_id, borrower_id, borrower_name_masked, purpose, amount_uzs, term_months, disbursed_at, snapshot_date, region, branch_id, supplier_id, invoice_amount_uzs}` |
 | `transactions[]` | `{txn_id, ts, type, amount_uzs, counterparty_id, counterparty_kind}`; `type` ∈ `disbursement, cash_withdrawal, supplier_payment, p2p_out, p2p_in, external_transfer, income` |
-| `photos[]` | ml: `{photo_id, path, purpose, captured_at, lat, lon, duplicate_of[], source: "portfolio"}` (only for loans that have a photo; `path` repo-relative, under `ml/assets/`); backend adds `url`. Borrower uploads of the caller's sandbox: `{photo_id, url, captured_at (server time), client_captured_at, lat, lon, source: "borrower_upload", check}` |
+| `photos[]` | ml: `{photo_id, path, purpose, captured_at, lat, lon, duplicate_of[], source: "portfolio"}` (no `asset_match` here: the asset result of a portfolio photo is in-sample, the probe was trained on these images; it only shows up as `evidence[].data.asset_match` when it escalates) (only for loans that have a photo; `path` repo-relative, under `ml/assets/`); backend adds `url`. Borrower uploads of the caller's sandbox: `{photo_id, url, captured_at (server time), client_captured_at, lat, lon, source: "borrower_upload", check}` |
 | `invoice?` | `{supplier_name, supplier_oked, oked_matches_purpose, invoice_amount_uzs}` |
 | `reasons[]` | top 3 money-trail reasons `{code, text_uz, weight, evidence_refs[]}` (`weight` = share of the loan's risk-raising push, 0..1) + policy reasons `{code, text_uz, weight: null, evidence_refs[], source: "fusion_policy"}`; plain Uzbek, never accusatory; every `evidence_refs` value is an `evidence[].ref`. `score_loan` reasons have no `evidence_refs` |
 | `escalations[]` | `{code, min_color, text_uz, evidence_refs[], raises_color}` (see "Evidence fusion") |
-| `evidence[]` | `{ref, kind, summary_uz, data}`: `txn` (`ref` = txn id; `data` = `{txn_id, ts, type, amount_uzs, counterparty_id}`), `invoice` (`invoice:<loan_id>`; `data` = invoice), `graph` (`graph:<supplier_id>`; `data` = `{supplier_name, in_degree, cash_share, exit_share, active_span_days, employee_link}`), `photo` (`photo:<photo_id>` or `photo:sandbox:<loan_id>:<n>`; `data` = `{photo, uploaded, duplicate_of, geo_ok, distance_km, time_ok}`). `ref` is what `/draft_report` cites as `evidence_ref` |
+| `evidence[]` | `{ref, kind, summary_uz, data}`: `txn` (`ref` = txn id; `data` = `{txn_id, ts, type, amount_uzs, counterparty_id}`), `invoice` (`invoice:<loan_id>`; `data` = invoice), `graph` (`graph:<supplier_id>`; `data` = `{supplier_name, in_degree, cash_share, exit_share, active_span_days, employee_link}`), `photo` (`photo:<photo_id>` or `photo:sandbox:<loan_id>:<n>`; `data` = `{photo, uploaded, duplicate_of, geo_ok, distance_km, time_ok, asset_match}`). `ref` is what `/draft_report` cites as `evidence_ref` |
 
 ### Colour rule (by queue rank)
 
@@ -101,18 +107,22 @@ priority and never changes `risk`:
 | `PHOTO_DUPLICATE` | red | the loan's photo duplicates another loan's photo (portfolio index, or the same sandbox) |
 | `PHOTO_FAR` | yellow | `geo_ok == false` |
 | `PHOTO_TIME` | yellow | `time_ok == false` |
-| `PHOTO_ASSET_MISMATCH` | yellow | asset match below a threshold (inactive until the CLIP step exists) |
+| `PHOTO_ASSET_MISMATCH` | yellow | `asset_match.matches_purpose == false`: the photo does not show the asset the loan was for (CLIP + linear probe; v1.5: active) |
 
 - `priority` = colour rank (green 0, yellow 1, red 2) + `risk`: the queue sort key.
 - One escalation per code; if several photos trigger the same code, their texts are joined and all evidence refs are kept.
 - Reason order (`get_loan().reasons`, and `top_reason` == `reasons[0].text_uz`, or "Sezilarli xavf belgisi aniqlanmadi"):
   policy reasons that **raised** the colour, then money-trail reasons, then policy reasons that did not raise it.
+- Asset rule (one rule for `label`, `matches_purpose` and the reason text): `matches_purpose = (label == the loan's purpose) and
+  probability >= tau` (tau chosen in cross-validation, `ml/artifacts/asset_probe_v1.json`). A different thing found → "Rasmda kredit
+  maqsadiga mos aktiv aniqlanmadi (aniqlangan: <label_uz>)"; the right class with low confidence → "Rasmdagi aktiv ishonchli aniqlanmadi
+  (eng ehtimoliy: <label_uz>, ishonch past)"; the text never says "no matching asset" when `label` equals the purpose.
 - Sandbox view: uploads made with `check_photo(..., sandbox_id=...)` escalate only that sandbox's `get_queue` / `get_loan`;
   other sandboxes and the default view are unaffected; `reset_sandbox` removes the effect.
 
 ### Errors
 Every error → `{detail: "<Uzbek message>"}`:
-`400` bad file/input (incl. `InvalidImageError`, `ScenarioError`) · `404` unknown `loan_id` · `413` file too large (> 8 MB) ·
+`400` bad file/input (incl. `InvalidImageError`, `InvalidRequestError`, `ScenarioError`) · `404` unknown `loan_id` · `413` file too large (> 8 MB) ·
 `422` validation · `429` rate limit · `502` ML/LLM failure ·
 `503` function not connected yet (`NotImplementedError`: "Bu funksiya hali ulanmagan") or LLM not configured.
 
@@ -125,6 +135,7 @@ Every error → `{detail: "<Uzbek message>"}`:
 | `POST /api/score_loan` | `ml.api.score_loan(loan_id)` | ml |
 | `POST /api/check_photo` | `ml.api.check_photo(loan_id, image_bytes, lat, lon, captured_at, sandbox_id)` → also returns internal `blurred_image: bytes` (stored by backend, never sent over HTTP) | ml |
 | `POST /api/admin/reset` | `ml.api.reset_sandbox(None)` (`None` = every sandbox) | ml |
+| service start-up (warm-up thread) | `ml.api.warm_up()` → `{portfolio_s, face_detector_s, clip_s, total_s, clip_loaded, clip_error}` (v1.5; replaces `get_queue()` alone) | ml |
 | `GET /api/queue/legend` | `ml.api.get_color_thresholds()` | ml |
 | `POST /api/score_scenario` (not exposed yet) | `ml.api.score_scenario(scenario)` | ml |
 | `GET /api/scenario_presets` (not exposed yet) | `ml.api.get_scenario_presets()` | ml |
@@ -138,6 +149,7 @@ Every error → `{detail: "<Uzbek message>"}`:
 | `ml.api.LoanNotFoundError` (KeyError) | unknown or invalid `loan_id` (any type) | 404 |
 | `ml.api.InvalidImageError` (ValueError) | empty / not an image / corrupted image | 400 |
 | `ml.api.InvalidImageError` "image larger than …" | > 10 MB (the backend already rejects > 8 MB) | 413 |
+| `ml.api.InvalidRequestError` (ValueError) | malformed `sandbox_id` (not a string, empty, > 64 characters, or characters outside `[A-Za-z0-9_.:-]`); message in Uzbek | 400 |
 | `ml.api.ScenarioError` (ValueError) | invalid scenario, message in Uzbek | 400 |
 | `NotImplementedError` | function not wired yet | 503 |
 | anything else | ml failure | 502 |
@@ -152,7 +164,12 @@ Warm-up: if `get_queue()` fails at start, the backend serves the STUB (or, with 
 - The original image is never written anywhere: faces are blurred, EXIF is dropped by re-encoding; only the blurred JPEG
   (`blurred_image`, internal) and a perceptual hash are kept.
 - `faces_count` = faces found; `faces_blurred` = `faces_count > 0`.
-- `asset_match` is `null` until the CLIP step is added. `geo_ok` / `time_ok` are `null` when the input is missing.
+- `asset_match` = `{label, score, matches_purpose, label_uz}` from OpenCLIP ViT-B-32 (CPU) + a linear probe: `label` is the most likely of the 5
+  loan purposes or `other`, `score` its probability, `matches_purpose` per the asset rule above, `label_uz` an Uzbek name of what was found (for
+  non-assets one of a few everyday categories, e.g. "avtomobil"). It is `null` only if the CLIP stack / weights are unavailable (the failure is
+  cached and logged once, nothing is downloaded at request time, no `PHOTO_ASSET_MISMATCH` is raised). The asset check is a flag for the officer,
+  not proof (measured limits: `docs/metrics.md`). `geo_ok` / `time_ok` are `null` when the input is missing.
+- `sandbox_id` is validated (`InvalidRequestError` → 400, see the exceptions table); the backend's sandbox ids are well-formed by construction.
 - The photo result does **not** change `risk`; it can only raise colour / priority through the evidence-fusion policy.
 
 ### Scenario scoring (ml; HTTP endpoint not exposed yet)
@@ -182,6 +199,13 @@ the cached portfolio is never modified.
   (the 29 computed values). The colour is the money-trail colour by the demo portfolio's thresholds.
 - `get_scenario_presets()` → 4 editable starting points with Uzbek titles: `honest_purchase`, `fast_cash_out`, `supplier_ring`,
   `asset_resale` (inputs only; scores are always computed live).
+
+### ML deployment (CLIP weights and environment)
+
+Details and the Dockerfile snippet: [`ml/README.md`](../ml/README.md). Short version: pre-download the CLIP weights **at build time**
+(`python -m ml.photo.asset --download`); at runtime the service never downloads. Environment: `MAQSAD_CLIP_CACHE` (weights directory, same at
+build and runtime), `HF_HUB_OFFLINE=1`, `MAQSAD_ASSET_CHECK=off` (switch the asset check off), `MAQSAD_TORCH_THREADS` / `OMP_NUM_THREADS` /
+`MKL_NUM_THREADS` (thread pinning; `1` matches the cost model in `docs/cost.md`).
 
 ## v1.1 o'zgarishlar (v1.0 → v1.1)
 
@@ -229,6 +253,17 @@ the cached portfolio is never modified.
    barcha sandbox'lar uchun bitta (global).
 3. `/api/queue`, `/api/loan` shakli o'zgarmadi.
 
+## v1.5 o'zgarishlar (CLIP aktiv tekshiruvi, ml)
+
+1. `check_photo().asset_match` = `{label, score, matches_purpose, label_uz}` (avval `null` edi); `PHOTO_ASSET_MISMATCH` faol. Qoida:
+   `matches_purpose = (label == kredit maqsadi) and p >= tau`; sabab matni shu qoidaga mos (yuqorida).
+2. `ml.api.warm_up()` qo'shildi: portfel + yuz detektori + CLIP; `get_queue()` o'rniga shuni chaqirish tavsiya etiladi. CLIP yuklanmasa
+   (`clip_loaded: false`) servis ishlayveradi: `asset_match: null`, eskalatsiya yo'q, so'rov vaqtida hech narsa yuklab olinmaydi.
+3. `ml.api.InvalidRequestError` (noto'g'ri `sandbox_id`) → 400.
+4. `evidence[kind=photo].data.asset_match` qo'shildi. `photos[]` shakli o'zgarmadi (portfel rasmlarining `asset_match`i in-sample bo'lgani uchun HTTP shaklida yo'q).
+5. CLIP vaznlari build vaqtida oldindan yuklanadi, `MAQSAD_*` o'zgaruvchilari va Dockerfile: `ml/README.md`.
+6. HTTP qatlami (v1.4) o'zgarishsiz: `/api` prefiksi, `{items, total, counts}`, `{detail}` xato shakli, health, admin, session.
+
 ## Open points
-- Photo asset match (CLIP) is not wired yet; `PHOTO_ASSET_MISMATCH` stays inactive until it is.
-- Backend: expose `/api/score_scenario`, `/api/scenario_presets`.
+- Backend: expose `/api/score_scenario`, `/api/scenario_presets`; call `ml.api.warm_up()` at start-up and show `clip_loaded` / `clip_error` in `/api/health`.
+- CLIP weights licence for production needs a legal review (see "Known failure cases" in `docs/metrics.md`).

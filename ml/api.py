@@ -3,7 +3,7 @@
 Contract: docs/api_contract.md. Signatures are stable; implementations are filled in
 module by module. Until a function is implemented it raises NotImplementedError —
 it never returns fake data. Wired: get_queue / get_loan / score_loan (money-trail model).
-check_photo / reset_sandbox: photo module (no CLIP asset match yet).
+check_photo / reset_sandbox: photo module (incl. the CLIP asset check).
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from ml.money_trail.service import get_portfolio
 
 
 def get_queue(sandbox_id: Optional[str] = None) -> list[dict]:
-    """Risk queue, sorted by risk descending.
+    """Risk queue, sorted by priority descending (colour rank + risk).
 
     Each item: {loan_id, borrower_name_masked, purpose, amount_uzs, region,
                 risk: float 0..1 (money-trail only, never changed by photos),
@@ -26,8 +26,8 @@ def get_queue(sandbox_id: Optional[str] = None) -> list[dict]:
     Sorted by priority, descending. `sandbox_id` (optional): the view of that demo sandbox, including the
     escalations caused by photos uploaded there; other sandboxes and the default view are unaffected.
 
-    The first call generates the demo portfolio (test-split config, seed 1337) in memory and scores it
-    (~3 s); later calls are served from memory.
+    The first call generates the demo portfolio (demo split, seed 7) in memory and scores it
+    (~6-7 s with imports); later calls are served from memory. Prefer `warm_up()` at service start.
     """
     return get_portfolio().queue(sandbox_id)
 

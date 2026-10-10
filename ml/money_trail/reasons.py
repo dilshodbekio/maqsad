@@ -18,15 +18,14 @@ NO_REASON_UZ = "Sezilarli xavf belgisi aniqlanmadi"
 
 # "atigi" (only) is used only below these values; above them the value is stated neutrally
 LOW_PAY_SHARE, LOW_SUPPLIER_AGE_DAYS, LOW_ACTIVE_SPAN_DAYS = 0.25, 60, 100
-SHARE_CAP = 1.5          # sup_cash_share / sup_exit_share are capped at 1.5 in the features
 
 
 def _pct(v, suffix="") -> str:
-    """'78 foiz' + Uzbek suffix ('i', 'ini', 'iga'). Values above 100% are shown as they are; the cap becomes
-    '150 foiz va undan ko'p'."""
+    """'78 foiz' + Uzbek suffix ('i', 'ini', 'iga'). A share above 100% (e.g. cash taken out that also includes later inflows)
+    is not shown as a percentage: '100 foizdan ko'p' + suffix ('...ko'pi', '...ko'pini', '...ko'piga')."""
     v = max(float(v), 0.0)
-    if v >= SHARE_CAP:
-        return f"{SHARE_CAP * 100:.0f} foiz va undan ko'p{suffix}"
+    if v > 1.0:
+        return f"100 foizdan ko'p{suffix}"
     return f"{v * 100:.0f} foiz{suffix}"
 
 
@@ -214,8 +213,10 @@ def build_evidence(refs: list[str], c: dict) -> list[dict]:
             g = c["graph"]
             out.append(dict(ref=ref, kind="graph", data=g, summary_uz=(
                 f"Ta'minotchi {g['supplier_name']}: {g['in_degree']} ta kreditning hisob-fakturasida ko'rsatilgan; olgan "
-                f"mablag'ning {_pct(g['cash_share'], 'ini')} naqd yechgan; hisobi "
-                + ("hali faol emas; " if g["active_span_days"] < 0 else f"{_d(g['active_span_days'])} kun faol; ") +
+                + ("mablag'dan naqd yechmagan; hisobi " if g["cash_share"] < 0.005 else
+                   f"mablag'ning {_pct(g['cash_share'], 'ini')} naqd yechgan; hisobi ")
+                + ("hali faol emas; " if g["active_span_days"] < 0 else "faqat bir kun faol bo'lgan; " if g["active_span_days"] < 1 else
+                   f"{_d(g['active_span_days'])} kun faol; ") +
                 f"bank xodimi bilan bog'lanish: {'bor' if g['employee_link'] else "yo'q"}")))
         elif ref in t.index:
             r = t.loc[ref]

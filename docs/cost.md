@@ -1,31 +1,31 @@
 # Cost per check
 
-All CPU times were **measured** by `python -m ml.eval.measure_cost` on the machine below (process CPU seconds, warm, 100 calls per component); prices are public prices with their source and date. Numbers are for the prototype code on synthetic data. The cost basis is the **single-thread** measurement (OpenCV, torch and OpenMP pinned to one thread = one vCPU): with all cores the process CPU time is inflated by spinning worker threads (see section 1b) and does not mean work done.
+All CPU times were **measured** by `python -m ml.eval.measure_cost` on the machine below (process CPU seconds, warm, the number of calls per row is in the table); prices are public prices with their source and date. Numbers are for the prototype code on synthetic data. The cost basis is the **single-thread** measurement (OpenCV, torch and OpenMP pinned to one thread = one vCPU): with all cores the process CPU time is inflated by spinning worker threads (see section 1b) and does not mean work done.
 
 Machine: Intel64 Family 6 Model 154 Stepping 3, GenuineIntel, 12 logical cores, Python 3.13.15. Resident memory after warm-up: 1179 MB.
 
 ## 1. Measured CPU time (single thread = one vCPU; the cost basis)
 
-| Component | CPU time per call | Wall time per call |
-|---|---|---|
-| Money-trail score (`score_loan`: model inference + reasons) | 3 ms | 3 ms |
-| Scenario score (`score_scenario`) | 96 ms | 98 ms |
-| `check_photo` total (decode, hash, duplicates, face detect + blur, CLIP asset check, re-encode; 1600 px) | 502 ms | 520 ms |
-| &nbsp;&nbsp;of which decode + perceptual hashes | 31 ms | 32 ms |
-| &nbsp;&nbsp;of which face detection + blur | 243 ms | 246 ms |
-| &nbsp;&nbsp;of which CLIP asset check (embedding + probe) | 200 ms | 201 ms |
-| Warm-up once at start (`ml.api.warm_up()`: demo portfolio + features + scores + queue, face detector, CLIP) | 15 s | 16 s |
+| Component | CPU time per call | Wall time per call | calls |
+|---|---|---|---|
+| Money-trail score (`score_loan`: model inference + reasons) | 3 ms | 3 ms | 100 |
+| Scenario score (`score_scenario`) | 102 ms | 105 ms | 40 |
+| `check_photo` total (decode, hash, duplicates, face detect + blur, CLIP asset check, re-encode; 1600 px) | 361 ms | 374 ms | 60 |
+| &nbsp;&nbsp;of which decode + perceptual hashes | 35 ms | 35 ms | 40 |
+| &nbsp;&nbsp;of which face detection + blur | 86 ms | 88 ms | 40 |
+| &nbsp;&nbsp;of which CLIP asset check (embedding + probe) | 203 ms | 208 ms | 40 |
+| Warm-up once at start (`ml.api.warm_up()`: demo portfolio + features + scores + queue, face detector, CLIP) | 16 s | 20 s |
 
 ### 1b. The same on all cores of this machine (latency, not cost)
 
 | Component | CPU time (all threads) | Wall time |
 |---|---|---|
-| Money-trail score (`score_loan`: model inference + reasons) | 62 ms | 7 ms |
-| Scenario score (`score_scenario`) | 987 ms | 152 ms |
-| `check_photo` total (decode, hash, duplicates, face detect + blur, CLIP asset check, re-encode; 1600 px) | 3017 ms | 403 ms |
-| Warm-up once | 44 s | 13 s |
+| Money-trail score (`score_loan`: model inference + reasons) | 52 ms | 6 ms |
+| Scenario score (`score_scenario`) | 962 ms | 147 ms |
+| `check_photo` total (decode, hash, duplicates, face detect + blur, CLIP asset check, re-encode; 1600 px) | 2255 ms | 280 ms |
+| Warm-up once | 45 s | 14 s |
 
-Warm-up breakdown (wall): portfolio 6.02 s, face detector 0.03 s, CLIP 9.68 s. Warm-up is paid once per process, not per check.
+Warm-up breakdown (wall): portfolio 6.09 s, face detector 0.11 s, CLIP 13.92 s. Warm-up is paid once per process, not per check.
 
 ## 2. Server prices used (public, read 2026-10-10)
 
@@ -36,15 +36,15 @@ Warm-up breakdown (wall): portfolio 6.02 s, face detector 0.03 s, CLIP 9.68 s. W
 
 | Check | Railway (CPU only), USD per 1 000 | Dedicated server at 100% core utilisation, EUR per 1 000 |
 |---|---|---|
-| Money-trail score | 0.00002 | 0.00001 |
-| Scenario score | 0.00074 | 0.00031 |
-| Photo check (incl. CLIP) | 0.00387 | 0.00165 |
+| Money-trail score | 0.00003 | 0.00001 |
+| Scenario score | 0.00079 | 0.00034 |
+| Photo check (incl. CLIP) | 0.00278 | 0.00119 |
 
 Formulas: Railway = CPU seconds x 1 000 x $0.000463 / 60. Dedicated = CPU seconds x 1 000 / 3 600 x (68.19 EUR / 720 h / 8 cores) = CPU seconds x 1 000 x 3.288e-06 EUR per core-second.
 
 ## 4. Always-on cost (not per check)
 
-- Railway memory for the resident model + portfolio: 1.15 GB x $10 = **$11.51 per month** (memory is billed while the service runs, whatever the number of checks).
+- Railway memory for the resident model + portfolio: 1.15 GB x $10 = **$11.52 per month** (memory is billed while the service runs, whatever the number of checks).
 - Dedicated server: **68.19 EUR per month** flat (see the caveat above).
 
 ## 5. LLM report (`/draft_report`)

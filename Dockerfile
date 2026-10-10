@@ -39,6 +39,13 @@ COPY backend/ backend/
 COPY ml/ ml/
 COPY --from=frontend /app/frontend/dist frontend/dist
 
+# CLIP weights for the photo asset check (ml/README.md): downloaded ONCE here at build time, never while the service runs.
+# Without them check_photo still works but returns asset_match: null.
+ENV MAQSAD_CLIP_CACHE=/opt/maqsad/clip
+RUN python -m ml.photo.asset --download
+# runtime: no hub access, one thread per process (matches the cost model in docs/cost.md)
+ENV HF_HUB_OFFLINE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 MAQSAD_TORCH_THREADS=1
+
 # Runs as root on purpose: Railway volumes (mounted at DATA_DIR) are root-owned.
 RUN mkdir -p /data
 EXPOSE 8000

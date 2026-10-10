@@ -19,3 +19,5 @@ docs/
 *.parquet
 Dockerfile
 .dockerignore
+ml/.cache
+ml/assets/faces_test

@@ -3,6 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "ml" / "assets" / "photos"
+FACES = ROOT / "ml" / "assets" / "faces_test"          # images of real people: local only, git-ignored, never committed or served
 ARTIFACTS = ROOT / "ml" / "artifacts"
 INDEX_PATH = ARTIFACTS / "photo_index_v1.json"
 DUP_PATH = ARTIFACTS / "photo_dup_v1.json"          # duplicate-matching variant + threshold (from ml/eval/eval_photo.py)

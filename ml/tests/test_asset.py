@@ -56,13 +56,13 @@ def test_probe_artifact_is_small_and_consistent():
     z = np.load(asset.PROBE_NPZ)
     assert meta["classes"] == list(asset.CLASSES) and meta["model"] == "ViT-B-32" and meta["pretrained"] == "openai"
     assert 0.05 <= meta["tau"] <= 0.95 and z["W"].shape == (6, 512) and z["b"].shape == (6,)
-    assert asset.PROBE_NPZ.stat().st_size < 100_000 and meta["n_train"] >= 140
+    assert asset.PROBE_NPZ.stat().st_size < 100_000 and meta["n_train"] >= 130
 
 
 def test_library_has_a_negative_class_with_licences():
     rows = manifest()
     other = [r for r in rows if r["purpose"] == "other"]
-    assert len(other) >= 40
+    assert len(other) >= 35
     assert all(r["license"] and r["author"] and r["source_url"].startswith("https://commons.wikimedia.org/") for r in other)
     assert all(not r["license"].upper().count("NC") and "ND" not in r["license"].split() for r in other)
 

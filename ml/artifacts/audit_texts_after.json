@@ -1,0 +1,33 @@
+{
+ "tag": "after",
+ "n_strings": 36103,
+ "n_unique": 14086,
+ "counts": {},
+ "examples": {},
+ "contradictions": [],
+ "sample_reasons": [
+  "Hisobga kredit summasining 42 foiziga teng bitta yirik kirim tushgan",
+  "Ta'minotchi hisobi atigi 6.8 kun faol bo'lgan",
+  "Yirik kirimdan keyingi 5 kunda uning 76 foizi hisobdan chiqarilgan",
+  "Eng yirik kirim kredit tushgandan 6.0 kun o'tib kelgan",
+  "Oxirgi tushumdan (yoki tushum kutilgan sanadan) beri 23 kun o'tgan",
+  "Hisob-fakturadagi summaning 92 foizi ta'minotchiga to'lanmagan",
+  "Ta'minotchi hisobi 121 kun faol bo'lgan",
+  "Yirik kirimdan keyingi 5 kunda uning 70 foizi hisobdan chiqarilgan",
+  "Ta'minotchi birinchi to'lovdan 668 kun oldin ro'yxatdan o'tgan",
+  "Ta'minotchi birinchi to'lovdan 952 kun oldin ro'yxatdan o'tgan"
+ ],
+ "sources": {
+  "queue.top_reason": 5000,
+  "queue.escalation": 28,
+  "loan.reason": 14982,
+  "loan.evidence": 15830,
+  "scenario.reason": 100,
+  "preset.title": 4,
+  "preset.description": 4,
+  "scenario.error": 25,
+  "photo.label_uz": 20,
+  "photo.escalation": 25,
+  "photo.reason": 85
+ }
+}

@@ -4,7 +4,7 @@
     .venv/Scripts/python -m ml.photo.fetch_assets build --work <dir> --keep keep.json
 
 Only CC0 / CC-BY / CC-BY-SA / public-domain files are accepted (no NC, no ND). Every kept file is re-saved as a
-JPEG of at most 512 px (EXIF dropped) into ml/assets/photos/ with manifest.csv
+JPEG of at most 512 px (EXIF dropped) into ml/assets/photos/ with manifest.csv (NOTE: the "faces_test" purpose shows real people and is NOT committed: keep those files in ml/assets/faces_test/, git-ignored)
 (file, purpose, title, author, license, source_url). Candidates are curated by eye (relevance, faces) before `build`.
 """
 from __future__ import annotations

@@ -65,7 +65,8 @@ def test_get_queue_failure_switches_to_full_stub(make_client):
     c = make_client(adapter=MLAdapter(_fake_ml(get_queue=_not_implemented), "real"))
     h = c.get("/api/health").json()
     assert h["ml_mode"] == "stub" and h["model_version"] == "stub" and h["warmup"] == "failed"
-    assert set(h["functions"].values()) == {"stub"}
+    assert {v for f, v in h["functions"].items() if "scenario" not in f} == {"stub"}
+    assert h["functions"]["score_scenario"] == "missing"  # the stub has no scenario model
     q = c.get("/api/queue")
     assert q.status_code == 200 and q.json()["total"] == 40  # stub fixtures, STUB banner in UI
 

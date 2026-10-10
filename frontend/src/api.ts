@@ -194,6 +194,35 @@ export type AuditEntry = {
 
 export type Session = { officer_id: string };
 
+// ---------- scenario (contract v1.6): hypothetical, never stored ----------
+
+export type ScenarioSupplier =
+  | { mode: "existing"; supplier_id: string }
+  | { mode: "new"; oked: string; registered_days_before: number };
+
+export type ScenarioTx = { day: number; type: string; amount_uzs: number; counterparty_kind?: string | null };
+
+export type Scenario = {
+  purpose: string;
+  amount_uzs: number;
+  invoice_amount_uzs?: number | null;
+  region?: string | null;
+  snapshot_day: number;
+  supplier: ScenarioSupplier;
+  transactions: ScenarioTx[];
+};
+
+export type ScenarioPreset = { id: string; title_uz: string; description_uz: string; scenario: Scenario };
+
+export type ScenarioScore = {
+  risk: number; // model score 0..1, "xavf bahosi"
+  color: Color;
+  reasons: { code: string; text_uz: string; weight: number }[];
+  model_version: string;
+  latency_ms: number;
+  percentile: number; // 0..100, rank among the demo portfolio's loans
+};
+
 export class ApiError extends Error {
   constructor(message: string, readonly status: number) {
     super(message);
@@ -253,6 +282,8 @@ export const api = {
   loan: (loanId: string) => getJson<LoanDetail>(`/api/loan/${encodeURIComponent(loanId)}`),
   session: () => getJson<Session>("/api/session"),
   audit: (loanId: string) => getJson<AuditEntry[]>(`/api/audit${query({ loan_id: loanId })}`),
+  scenarioPresets: () => getJson<ScenarioPreset[]>("/api/scenario_presets"),
+  scoreScenario: (scenario: Scenario) => postJson<ScenarioScore>("/api/score_scenario", scenario),
   checkPhoto: (form: FormData) => postForm<CheckPhotoResult>("/api/check_photo", form),
   draftReport: (loanId: string) => postJson<DraftReport>("/api/draft_report", { loan_id: loanId }),
   decision: (body: { loan_id: string; officer_id: string; action: DecisionAction; comment: string }) =>

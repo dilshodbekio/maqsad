@@ -4,6 +4,7 @@ import { HealthStatus, type HealthState } from "./components/HealthStatus";
 import { StubBanner } from "./components/StubBanner";
 import { CapturePage } from "./pages/CapturePage";
 import { LoanPage } from "./pages/loan/LoanPage";
+import { ScenarioPage } from "./pages/ScenarioPage";
 import { QueuePage } from "./pages/QueuePage";
 import { onLinkClick, useLocation } from "./router";
 
@@ -59,6 +60,8 @@ export default function App() {
           <QueuePage search={loc.search} ready={ready} />
         ) : loc.path === "/capture" || loc.path === "/capture/" ? (
           <CapturePage search={loc.search} ready={ready} />
+        ) : loc.path === "/scenario" || loc.path === "/scenario/" ? (
+          <ScenarioPage ready={ready} />
         ) : (
           <section className="card">
             <h2>Sahifa topilmadi</h2>

@@ -76,6 +76,7 @@ class Params:
     t3_max_day: float = 150.0               # resale happens U(20, t3_max_day) days after disbursement
     # --- honest ---
     honest_employee_link: float = 0.025
+    honest_link_same_branch: float = 0.75   # linked employee works in a borrower's branch (rings: 0.80)
     honest_mismatch: float = 0.07           # share of honest loans with OKED mismatch
     seller_scale: float = 1.0               # scales honest livestock/poultry sellers (~5% of loans)
     cash_heavy_share: float = 0.05          # honest cash-heavy rural businesses
@@ -104,6 +105,7 @@ TEST = Params(
     ring_employee_link=0.33,
     t3_max_day=130.0,
     honest_mismatch=0.08,
+    honest_link_same_branch=0.70,
     seller_scale=1.3,
     cash_heavy_share=0.065,
     amount_scale=1.10,

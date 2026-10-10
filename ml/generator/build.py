@@ -55,9 +55,6 @@ def _plan_loans(p: Params, rng):
     region = rng.choice(len(REGIONS), size=N, p=rw / rw.sum())
     branch = region * BRANCHES_PER_REGION + rng.integers(0, BRANCHES_PER_REGION, N)
 
-    med = np.array([MEDIAN_AMOUNT[x] for x in purpose], dtype=float) * p.amount_scale
-    amount = np.maximum(5_000_000, np.round(med * rng.lognormal(0, 0.35, N), -5)).astype(np.int64)
-    invoice = np.round(amount * rng.uniform(0.90, 1.05, N), -5).astype(np.int64)
     disb = (_snap_s(p) - rng.uniform(2, 365, N) * DAY).astype(np.int64)
 
     stealth = np.zeros(N, dtype=bool)
@@ -77,8 +74,17 @@ def _plan_loans(p: Params, rng):
             profile[i] = "oked_mismatch"
         else:
             profile[i] = "normal"
-    return dict(kind=kind, purpose=purpose, region=region, branch=branch, amount=amount,
-                invoice=invoice, disb=disb, stealth=stealth, profile=profile)
+    return dict(kind=kind, purpose=purpose, region=region, branch=branch,
+                disb=disb, stealth=stealth, profile=profile)
+
+
+def _plan_amounts(p: Params, rng, pl):
+    """Loan amount + invoice from the FINAL purpose (call after _plan_rings, which may swap it)."""
+    N = p.n_loans
+    med = np.array([MEDIAN_AMOUNT[x] for x in pl["purpose"]], dtype=float) * p.amount_scale
+    amount = np.maximum(5_000_000, np.round(med * rng.lognormal(0, 0.35, N), -5)).astype(np.int64)
+    pl["amount"] = amount
+    pl["invoice"] = np.round(amount * rng.uniform(0.90, 1.05, N), -5).astype(np.int64)
 
 
 def _snap_s(p: Params) -> int:
@@ -102,7 +108,8 @@ def _plan_rings(p, rng, pl):
         region = pl["region"][members[0]]
         branch = pl["branch"][members[0]]
         window = rng.uniform(30, 150) * DAY
-        start = snap_s - rng.uniform(2, 365) * DAY - window
+        # the whole ring window stays inside [snap-365d, snap-2d], like every other loan
+        start = snap_s - rng.uniform(2 * DAY + window, 365 * DAY)
         for m in members:
             if rng.random() < 0.8:
                 pl["purpose"][m] = primary
@@ -139,13 +146,13 @@ def _plan_suppliers(p, rng, pl, rings):
     sup: list[dict] = []
     sup_of = np.full(N, -1, dtype=np.int64)
 
-    def pool_draw(members, n_sup, group, okeds, sigma, weights_uniform=False):
+    def pool_draw(members, n_sup, group, okeds, sigma):
         if len(members) == 0:
             return
         base = len(sup)
         for _ in range(n_sup):
             sup.append(_new_supplier(rng, group, okeds(rng)))
-        w = np.ones(n_sup) if weights_uniform else rng.lognormal(0, sigma, n_sup)
+        w = rng.lognormal(0, sigma, n_sup)
         sup_of[members] = base + rng.choice(n_sup, size=len(members), p=w / w.sum())
 
     # honest-looking suppliers with an OKED that matches the purpose (used by honest, T1, T3)
@@ -162,19 +169,20 @@ def _plan_suppliers(p, rng, pl, rings):
               lambda r: str(r.choice(GENERIC_OKED)), 0.8)
     pool_draw(unrel, max(3, round(len(unrel) / 3)), "unrelated",
               lambda r: str(r.choice(UNRELATED_OKED)), 0.8)
-    # T4: dedicated pool; OKED mismatches the purpose (unrelated 70% / generic 30%) except the stealth 25%
+    # T4: dedicated pool, same size ratio (loans/4) and lognormal(0, 1) weights as the honest pools,
+    # so supplier in-degree carries no T4 fingerprint. OKED mismatches the purpose
+    # (unrelated 70% / generic 30%) except the stealth 25%.
     t4_all = np.where(kind == "T4")[0]
     # T4 stealth: ~25% route the fake invoice through a firm whose OKED matches the purpose
     t4_st = t4_all[rng.random(len(t4_all)) < 0.25]
     pl["stealth"][t4_st] = True
     for k in PURPOSES:
         m = t4_st[purpose[t4_st] == k]
-        pool_draw(m, max(2, round(len(m) / 2.2)), "t4",
-                  lambda r, k=k: str(r.choice(MATCHING_OKED[k])), 0, weights_uniform=True)
+        pool_draw(m, max(1, round(len(m) / 4.0)), "t4",
+                  lambda r, k=k: str(r.choice(MATCHING_OKED[k])), 1.0)
     t4 = np.setdiff1d(t4_all, t4_st)
-    pool_draw(t4, max(3, round(len(t4) / 2.2)), "t4",
-              lambda r: str(r.choice(UNRELATED_OKED if r.random() < 0.7 else GENERIC_OKED)),
-              0, weights_uniform=True)
+    pool_draw(t4, max(3, round(len(t4) / 4.0)), "t4",
+              lambda r: str(r.choice(UNRELATED_OKED if r.random() < 0.7 else GENERIC_OKED)), 1.0)
     # T2: one supplier per ring
     for ring_id, ring in enumerate(rings):
         u = rng.random()
@@ -206,6 +214,7 @@ def build(p: Params) -> dict:
 
     pl = _plan_loans(p, rng)
     rings = _plan_rings(p, rng, pl)
+    _plan_amounts(p, rng, pl)
     sup, sup_of = _plan_suppliers(p, rng, pl, rings)
 
     # drop suppliers nobody uses, then reindex
@@ -223,13 +232,21 @@ def build(p: Params) -> dict:
     borrower_ids = _ids("B", N, p.id_offset, rng)
     sup_ids = _ids("S", S, p.id_offset, rng)
 
+    members_of = [[] for _ in range(S)]
+    for i, j in enumerate(sup_of):
+        members_of[j].append(i)
     for j, s in enumerate(sup):
         if s["ring"]:
             if rng.random() < p.ring_employee_link:
                 same = np.where(emp_branch == s["ring_branch"])[0]
                 s["employee"] = int(rng.choice(same if rng.random() < 0.8 else np.arange(len(emp_branch))))
         elif rng.random() < p.honest_employee_link:
-            s["employee"] = int(rng.integers(0, len(emp_branch)))
+            # like rings: the linked employee usually works in the branch of one of the supplier's borrowers
+            if rng.random() < p.honest_link_same_branch:
+                b = pl["branch"][int(rng.choice(members_of[j]))]
+                s["employee"] = int(rng.choice(np.where(emp_branch == b)[0]))
+            else:
+                s["employee"] = int(rng.integers(0, len(emp_branch)))
 
     # ---- supplier registration (relative to the supplier's first loan)
     first_disb = np.full(S, np.iinfo(np.int64).max)
@@ -266,10 +283,22 @@ def build(p: Params) -> dict:
             t3_event[i] = flows.t3_asset_resale(em, rng, p, L)
         else:
             flows.t4_fake_invoice(em, rng, p, L)
+    # Borrower ledgers first: every outflow is capped at the account balance. Supplier accounts are
+    # then built from the supplier payments that actually settled (inflow row + capped outflows).
+    borrower_rows, n_red_b, n_drop_b = flows.cap_outflows(em.rows)
+    sup_idx = {sid: j for j, sid in enumerate(sup_ids)}
+    receipts: dict[int, list] = {}
+    sem = Emitter(snap_s)
+    for r in borrower_rows:
+        if r[3] == "supplier_payment":
+            j = sup_idx[r[5]]
+            receipts.setdefault(j, []).append((r[2], r[4]))
+            sem.rows.append((None, f"ACC-{sup_ids[j]}", r[2], "income", r[4], r[1][len("ACC-"):], "person"))
     for j, s in enumerate(sup):
-        flows.supplier_outflows(em, rng, j, sup_ids[j], f"ACC-{sup_ids[j]}", s)
+        flows.supplier_outflows(sem, rng, receipts.get(j, []), f"ACC-{sup_ids[j]}", s)
+    supplier_rows, n_red_s, n_drop_s = flows.cap_outflows(sem.rows)
 
-    tx = pd.DataFrame(em.rows, columns=["loan_id", "account_id", "ts", "type", "amount_uzs",
+    tx = pd.DataFrame(borrower_rows + supplier_rows, columns=["loan_id", "account_id", "ts", "type", "amount_uzs",
                                         "counterparty_id", "counterparty_kind"])
     tx = tx.sort_values(["ts", "account_id"], kind="stable").reset_index(drop=True)
     tx.insert(0, "txn_id", [f"T{p.id_offset * 100 + i:09d}" for i in range(len(tx))])
@@ -294,7 +323,6 @@ def build(p: Params) -> dict:
     by_purpose = {k: np.where(pl["purpose"] == k)[0] for k in PURPOSES}
     ring_of = {m: r for r in rings for m in r["members"]}
     reused = rng.random(N) < np.where(fraud, p.photo_reuse_fraud, p.photo_reuse_honest)
-    src_lat, src_lon, src_cap = ph_lat.copy(), ph_lon.copy(), cap.copy()
     for i in np.where(reused)[0]:
         r = ring_of.get(i)
         if r is not None and len(r["members"]) > 1 and rng.random() < 0.6:
@@ -305,8 +333,7 @@ def build(p: Params) -> dict:
             j = int(rng.choice(pool))
             if j == i:
                 j = (j + 1) % N
-        photo_idx[i] = j
-        ph_lat[i], ph_lon[i], cap[i] = src_lat[j], src_lon[j], src_cap[j]
+        photo_idx[i] = j   # only the image (photo_id) is reused; time and place stay this loan's own
     photo_ids = _ids("P", N, p.id_offset, rng)
     photo_id = photo_ids[photo_idx]
 
@@ -376,6 +403,8 @@ def build(p: Params) -> dict:
         honest_profiles={k: int((pl["profile"] == k).sum()) for k in
                          ("normal", "livestock_seller", "cash_heavy", "oked_mismatch")},
         rings=len(rings), ring_sizes=[len(r["members"]) for r in rings],
+        balance_cap=dict(borrower_reduced=int(n_red_b), borrower_dropped=int(n_drop_b),
+                         supplier_reduced=int(n_red_s), supplier_dropped=int(n_drop_s)),
     )
     return dict(loans=loans, transactions=tx, suppliers=suppliers, employees=employees,
                 labels=labels, photo_manifest=manifest, meta=meta)

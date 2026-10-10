@@ -72,16 +72,43 @@ def _cost(settings: Settings, tin: Optional[int], tout: Optional[int]) -> Option
     return round(tin / 1e6 * settings.llm_price_in_per_mtok + tout / 1e6 * settings.llm_price_out_per_mtok, 6)
 
 
+_RETRY_STATUS = {429, 500, 502, 503, 504}  # transient (Gemini: 503 "high demand")
+_RETRY_DELAYS_S = (1.0, 3.0)
+
+
+def _clean(value: str) -> str:
+    """Env values pasted into a dashboard often keep whitespace/newlines or quotes; Gemini then answers 400
+    ('Please pass a valid API key' / 'unexpected model name format')."""
+    return (value or "").strip().strip("\"'").strip()
+
+
 def _chat(settings: Settings, messages: list) -> tuple:
     """Returns (content, input_tokens, output_tokens)."""
+    api_key, model, base_url = _clean(settings.llm_api_key), _clean(settings.llm_model), _clean(settings.llm_base_url)
+
+    def scrub(text: str) -> str:
+        text = " ".join(str(text).split())[:300]
+        return text.replace(api_key, "***") if api_key else text
+
     headers = {"Content-Type": "application/json"}
-    if settings.llm_api_key:
-        headers["Authorization"] = f"Bearer {settings.llm_api_key}"
-    body = {"model": settings.llm_model, "messages": messages, "temperature": 0.1,
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    body = {"model": model, "messages": messages, "temperature": 0.1,
             "response_format": {"type": "json_object"}}
-    r = httpx.post(f"{settings.llm_base_url}/chat/completions", json=body, headers=headers,
-                   timeout=settings.llm_timeout_s)
-    r.raise_for_status()
+    for attempt in range(len(_RETRY_DELAYS_S) + 1):
+        try:
+            r = httpx.post(f"{base_url.rstrip('/')}/chat/completions", json=body, headers=headers,
+                           timeout=settings.llm_timeout_s)
+        except httpx.HTTPError as e:  # transport errors may echo request headers -> scrub the key
+            raise LLMError(f"{type(e).__name__}: {scrub(e)}") from None
+        if r.status_code in _RETRY_STATUS and attempt < len(_RETRY_DELAYS_S):
+            log.warning("LLM HTTP %s (attempt %s), retrying: %s", r.status_code, attempt + 1, scrub(r.text))
+            time.sleep(_RETRY_DELAYS_S[attempt])
+            continue
+        if r.is_error:
+            # short response body (key scrubbed) so the 4xx/5xx cause is visible in the log
+            raise LLMError(f"HTTP {r.status_code} from LLM API: {scrub(r.text)}")
+        break
     data = r.json()
     usage = data.get("usage") or {}
     return data["choices"][0]["message"]["content"], usage.get("prompt_tokens"), usage.get("completion_tokens")

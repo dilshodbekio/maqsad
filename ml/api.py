@@ -2,22 +2,17 @@
 
 Contract: docs/api_contract.md. Signatures are stable; implementations are filled in
 module by module. Until a function is implemented it raises NotImplementedError —
-it never returns fake data (the backend shows its own STUB banner meanwhile).
+it never returns fake data. Wired: get_queue / get_loan / score_loan (money-trail model).
+Not wired yet: check_photo.
 """
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
 
-MODEL_VERSION = "not-ready"
-
-
-class LoanNotFoundError(KeyError):
-    """loan_id does not exist in the portfolio. Backend → HTTP 404."""
-
-
-class InvalidImageError(ValueError):
-    """Image is empty, corrupted, not an image, or too large. Backend → HTTP 400/413."""
+from ml.errors import InvalidImageError, LoanNotFoundError  # noqa: F401  (re-exported for the backend)
+from ml.money_trail.model import MODEL_VERSION
+from ml.money_trail.service import get_portfolio
 
 
 def get_queue() -> list[dict]:
@@ -25,28 +20,32 @@ def get_queue() -> list[dict]:
 
     Each item: {loan_id, borrower_name_masked, purpose, amount_uzs, region,
                 risk: float 0..1, color: "green"|"yellow"|"red", top_reason: str (Uzbek)}
+
+    The first call generates the demo portfolio (test-split config, seed 1337) in memory and scores it
+    (~3 s); later calls are served from memory.
     """
-    raise NotImplementedError("get_queue: money-trail model not wired yet")
+    return get_portfolio().queue()
 
 
 def get_loan(loan_id: str) -> dict:
     """Full loan view.
 
     Returns: {loan, transactions[], photos[], invoice | None,
-              risk, color, reasons: [{code, text_uz, weight}], evidence: [...], model_version}
-    Raises: LoanNotFoundError
+              risk, color, reasons: [{code, text_uz, weight, evidence_refs}],
+              evidence: [{ref, kind: "txn"|"invoice"|"graph", summary_uz, data}], model_version}
+    `photos` is [] until the photo module is wired. Raises: LoanNotFoundError
     """
-    raise NotImplementedError("get_loan: not wired yet")
+    return get_portfolio().loan(loan_id)
 
 
 def score_loan(loan_id: str) -> dict:
-    """Score one loan.
+    """Score one loan (live model inference on its cached features).
 
     Returns: {risk: float 0..1, color, reasons: [{code, text_uz, weight}],
               model_version, latency_ms}
     Raises: LoanNotFoundError
     """
-    raise NotImplementedError("score_loan: money-trail model not wired yet")
+    return get_portfolio().score(loan_id)
 
 
 def check_photo(

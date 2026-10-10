@@ -185,3 +185,5 @@ button.secondary { background: transparent; color: var(--brand); border: 1px sol
   min-height: 44px; padding: 0 16px; border-radius: 8px;
   background: var(--brand); color: #fff; font-weight: 600; text-decoration: none;
 }
+.top-links { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 520px) { .top-links { grid-template-columns: repeat(2, max-content); } }

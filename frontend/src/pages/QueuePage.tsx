@@ -138,9 +138,14 @@ export function QueuePage({ search, ready }: { search: string; ready: boolean })
 
   return (
     <>
-      <a className="capture-link" href="/capture" onClick={(e) => onLinkClick(e, "/capture")}>
-        <span aria-hidden="true">📷</span> Rasm tekshirish
-      </a>
+      <div className="top-links">
+        <a className="capture-link" href="/capture" onClick={(e) => onLinkClick(e, "/capture")}>
+          <span aria-hidden="true">📷</span> Rasm tekshirish
+        </a>
+        <a className="capture-link" href="/scenario" onClick={(e) => onLinkClick(e, "/scenario")}>
+          <span aria-hidden="true">🧪</span> Ssenariy sinash
+        </a>
+      </div>
       <section className="card">
         <div className="queue-head">
           <div>

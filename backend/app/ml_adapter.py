@@ -28,7 +28,8 @@ from typing import Any, Callable, Optional, Tuple
 
 log = logging.getLogger("maqsad.ml")
 
-FUNCTIONS = ("get_queue", "get_loan", "score_loan", "check_photo", "reset_sandbox", "get_color_thresholds")
+FUNCTIONS = ("get_queue", "get_loan", "score_loan", "check_photo", "reset_sandbox", "get_color_thresholds",
+             "score_scenario", "get_scenario_presets")
 PROBE_LOAN_ID = "__maqsad_probe__"
 PROBES = {  # called after a successful get_queue(); any error except NotImplementedError = implemented
     "get_loan": (PROBE_LOAN_ID,),
@@ -36,6 +37,8 @@ PROBES = {  # called after a successful get_queue(); any error except NotImpleme
     "check_photo": (PROBE_LOAN_ID, b""),
     "reset_sandbox": (PROBE_LOAN_ID,),
     "get_color_thresholds": (),  # read-only, cheap once the portfolio is built
+    "get_scenario_presets": (),  # read-only
+    "score_scenario": ({},),  # an empty scenario is rejected with ScenarioError: the function exists
 }
 
 
@@ -121,7 +124,7 @@ class MLAdapter:
     def _set_impl(self, impl: ModuleType, mode: str) -> None:
         self.impl, self.mode = impl, mode
         self.status = {
-            f: "stub" if mode == "stub" else ("real" if callable(getattr(impl, f, None)) else "missing")
+            f: ("stub" if mode == "stub" else "real") if callable(getattr(impl, f, None)) else "missing"
             for f in FUNCTIONS
         }
         self._takes_sandbox = {f: callable(getattr(impl, f, None)) and _accepts_kw(getattr(impl, f), "sandbox_id")
@@ -251,6 +254,12 @@ class MLAdapter:
 
     def get_color_thresholds(self) -> dict:
         return self._call("get_color_thresholds")
+
+    def score_scenario(self, scenario: dict) -> dict:
+        return self._call("score_scenario", scenario)
+
+    def get_scenario_presets(self) -> list:
+        return self._call("get_scenario_presets")
 
     def check_photo(self, loan_id: str, image_bytes: bytes, lat=None, lon=None, captured_at=None,
                     sandbox_id: Optional[str] = None) -> Tuple[dict, Optional[bytes]]:

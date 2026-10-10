@@ -3,8 +3,9 @@ def test_health_stub(client):
     assert r.status_code == 200
     assert r.json() == {
         "ml_mode": "stub", "model_version": "stub", "warmup": "done",
-        "functions": {f: "stub" for f in ("get_queue", "get_loan", "score_loan", "check_photo", "reset_sandbox",
-                                          "get_color_thresholds")},
+        "functions": {**{f: "stub" for f in ("get_queue", "get_loan", "score_loan", "check_photo", "reset_sandbox",
+                                             "get_color_thresholds")},
+                      "score_scenario": "missing", "get_scenario_presets": "missing"},  # the stub has no scenario model
         "clip_loaded": False,
     }
     assert r.headers["X-ML-Mode"] == "stub"

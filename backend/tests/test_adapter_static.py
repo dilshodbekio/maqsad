@@ -52,7 +52,8 @@ def test_real_ml_without_sandbox_and_blur(make_client):
     assert (h["ml_mode"], h["model_version"], h["warmup"]) == ("real", "fake-1", "done")
     assert h["functions"] == {"get_queue": "real", "get_loan": "real", "score_loan": "real",
                               "check_photo": "real", "reset_sandbox": "missing",
-                              "get_color_thresholds": "missing"}
+                              "get_color_thresholds": "missing", "score_scenario": "missing",
+                              "get_scenario_presets": "missing"}
     photo = c.get(f"/api/loan/{lid}").json()["photos"][0]
     assert photo["url"] is None  # no blurred_image -> nothing stored
     assert list(c.app.state.db.photo_dir.iterdir()) == []

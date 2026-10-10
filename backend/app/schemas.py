@@ -8,9 +8,9 @@ so a shape change is noticed instead of silently lost.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any, Dict, List, Literal, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 Color = Literal["green", "yellow", "red"]
 # risk is a model SCORE in 0..1 (ranking), NOT a probability — UI shows it as "xavf bahosi", never as %
@@ -269,3 +269,78 @@ class ResetResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+
+# ---------- scenario (contract v1.6): hypothetical loan, never written to the portfolio ----------
+
+PURPOSES = ("tikuv_dastgohi", "chorva", "issiqxona", "parranda", "asalarichilik")
+SCENARIO_TX_TYPES = ("cash_withdrawal", "supplier_payment", "p2p_out", "p2p_in", "external_transfer", "income")
+SCENARIO_MAX_TX = 60
+SCENARIO_MAX_AMOUNT = 10 ** 11
+SCENARIO_MAX_SINGLE_X, SCENARIO_MAX_INFLOW_X = 10, 20  # same limits as ml/money_trail/scenario.py
+SCENARIO_INFLOWS = {"p2p_in", "income"}
+
+
+class _Strict(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class ScenarioExistingSupplier(_Strict):
+    mode: Literal["existing"]
+    supplier_id: Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_\-]+$")]
+
+
+class ScenarioNewSupplier(_Strict):
+    mode: Literal["new"]
+    oked: Annotated[str, Field(pattern=r"^[0-9]{2}\.[0-9]{2}$")]
+    registered_days_before: Annotated[StrictInt, Field(ge=0, le=40_000)]
+
+
+class ScenarioTransaction(_Strict):
+    day: Annotated[StrictInt, Field(ge=0, le=364)]
+    type: Literal["cash_withdrawal", "supplier_payment", "p2p_out", "p2p_in", "external_transfer", "income"]
+    amount_uzs: Annotated[StrictInt, Field(ge=1, le=SCENARIO_MAX_AMOUNT)]
+    counterparty_kind: Optional[Literal["person", "business", "external", "supplier", "none"]] = None
+
+
+class ScenarioRequest(_Strict):
+    purpose: Literal["tikuv_dastgohi", "chorva", "issiqxona", "parranda", "asalarichilik"]
+    amount_uzs: Annotated[StrictInt, Field(ge=1, le=SCENARIO_MAX_AMOUNT)]
+    invoice_amount_uzs: Optional[Annotated[StrictInt, Field(ge=1, le=SCENARIO_MAX_AMOUNT)]] = None
+    region: Optional[Annotated[str, Field(min_length=1, max_length=64)]] = None
+    snapshot_day: Annotated[StrictInt, Field(ge=2, le=364)]
+    supplier: Annotated[Union[ScenarioExistingSupplier, ScenarioNewSupplier], Field(discriminator="mode")]
+    transactions: Annotated[List[ScenarioTransaction], Field(max_length=SCENARIO_MAX_TX)]
+
+    @model_validator(mode="after")
+    def _limits(self):
+        loan = self.amount_uzs
+        cap = SCENARIO_MAX_SINGLE_X * loan
+        if self.invoice_amount_uzs is not None and self.invoice_amount_uzs > cap:
+            raise ValueError("invoice_amount_uzs kredit summasidan 10 baravardan katta bo'lishi mumkin emas")
+        for i, t in enumerate(self.transactions, 1):
+            if t.day > self.snapshot_day:
+                raise ValueError(f"{i}-tranzaksiya kuni snapshot_day dan katta bo'lishi mumkin emas")
+            if t.amount_uzs > cap:
+                raise ValueError(f"{i}-tranzaksiya summasi kredit summasidan 10 baravardan katta")
+        inflow = sum(t.amount_uzs for t in self.transactions if t.type in SCENARIO_INFLOWS)
+        if inflow > SCENARIO_MAX_INFLOW_X * loan:
+            raise ValueError("kirimlar yig'indisi kredit summasidan 20 baravardan katta")
+        return self
+
+
+class ScenarioScore(BaseModel):
+    risk: Risk
+    color: Color
+    reasons: List[Reason]
+    model_version: str
+    latency_ms: float
+    percentile: float
+    features: Dict[str, Any]
+
+
+class ScenarioPreset(BaseModel):
+    id: str
+    title_uz: str
+    description_uz: str
+    scenario: Dict[str, Any]

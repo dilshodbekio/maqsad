@@ -32,7 +32,8 @@ from .ratelimit import RateLimiter
 from .schemas import (
     LOAN_ID_PATTERN, AuditEntry, CheckPhotoFields, CheckPhotoJSON, CheckPhotoResponse, Color, ColorLegend,
     DecisionRequest, DecisionResponse, DraftReport, DraftReportRequest, Health, LoanDetail, QueueFacets, QueueItem,
-    QueuePage, ResetResponse, ScoreRequest, ScoreResponse, SessionInfo,
+    QueuePage, ResetResponse, ScenarioPreset, ScenarioRequest, ScenarioScore, ScoreRequest, ScoreResponse,
+    SessionInfo,
 )
 
 log = logging.getLogger("maqsad.api")
@@ -277,6 +278,24 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
     def score(body: ScoreRequest):
         return _validated(ScoreResponse, adapter.score_loan(body.loan_id))
 
+    @api.get("/scenario_presets", response_model=List[ScenarioPreset])
+    def scenario_presets():
+        return _validated(List[ScenarioPreset], adapter.get_scenario_presets())
+
+    @api.post("/score_scenario", response_model=ScenarioScore)
+    async def score_scenario(request: Request):
+        """Hypothetical scenario scored live by ml; nothing is stored (no audit, no portfolio change)."""
+        try:
+            payload = await request.json()
+        except ValueError:
+            raise HTTPException(400, "So'rov JSON ko'rinishida bo'lishi kerak.") from None
+        try:
+            scenario = ScenarioRequest.model_validate(payload)
+        except ValidationError as e:
+            raise HTTPException(400, "Ssenariy noto'g'ri: " + scenario_error_text(e)) from None
+        result = await run_in_threadpool(adapter.score_scenario, scenario.model_dump(mode="json"))
+        return _validated(ScenarioScore, result)
+
     @api.post("/check_photo", response_model=CheckPhotoResponse, openapi_extra=CHECK_PHOTO_OPENAPI)
     async def check_photo(request: Request):
         rate_check(request, "check_photo")
@@ -435,6 +454,40 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
     return app
+
+
+def scenario_error_text(e: ValidationError) -> str:
+    """Pydantic errors of a scenario -> short Uzbek text (first 4 problems)."""
+    parts = []
+    for err in e.errors()[:4]:
+        loc = ".".join(str(x) for x in err.get("loc", ()))
+        t, ctx = err.get("type", ""), err.get("ctx") or {}
+        if t == "extra_forbidden":
+            what = "noma'lum kalit"
+        elif t == "missing":
+            what = "majburiy maydon yetishmaydi"
+        elif t == "model_type" or t == "dict_type":
+            what = "obyekt bo'lishi kerak"
+        elif t == "list_type":
+            what = "ro'yxat bo'lishi kerak"
+        elif t in ("int_type", "int_parsing", "int_from_float"):
+            what = "butun son bo'lishi kerak"
+        elif t in ("greater_than_equal", "less_than_equal"):
+            what = "qiymat ruxsat etilgan oralig'dan tashqarida"
+        elif t == "too_long":
+            what = f"{ctx.get('max_length', '')} tadan oshmasligi kerak"
+        elif t == "literal_error":
+            what = f"ruxsat etilgan qiymatlardan biri bo'lishi kerak ({ctx.get('expected', '')})"
+        elif t == "union_tag_invalid" or t == "union_tag_not_found":
+            what = "ta'minotchi 'mode' qiymati 'existing' yoki 'new' bo'lishi kerak"
+        elif t == "string_pattern_mismatch":
+            what = "format noto'g'ri"
+        elif t == "value_error":
+            what = str(err.get("msg", "")).removeprefix("Value error, ")
+        else:
+            what = "qiymat noto'g'ri"
+        parts.append(f"{loc or 'ssenariy'}: {what}")
+    return "; ".join(parts) + "."
 
 
 def _asset_url(path: Optional[str]) -> Optional[str]:

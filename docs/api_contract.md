@@ -68,7 +68,7 @@ POST /api/admin/reset       header X-Admin-Token  → {ok: true}
 GET  /api/photo/{photo_id}  → blurred JPEG of a borrower upload (owner sandbox only)
 GET  /api/asset/{path}      → portfolio photo from ml/assets/ (photos[].url)
 
--- agreed in ml, NOT yet exposed by the backend (next step) --
+-- scenario (v1.6): hypothetical loan, scored live, never stored --
 POST /api/score_scenario    {purpose, amount_uzs, invoice_amount_uzs?, region?, supplier, transactions[], snapshot_day}
   → {risk, color, reasons:[{code, text_uz, weight}], model_version, latency_ms, percentile, features{}}
 GET  /api/scenario_presets  → [{id, title_uz, description_uz, scenario}]
@@ -137,8 +137,8 @@ Every error → `{detail: "<Uzbek message>"}`:
 | `POST /api/admin/reset` | `ml.api.reset_sandbox(None)` (`None` = every sandbox) | ml |
 | service start-up (warm-up thread) | `ml.api.warm_up()` → `{portfolio_s, face_detector_s, clip_s, total_s, clip_loaded, clip_error}` (v1.5; replaces `get_queue()` alone) | ml |
 | `GET /api/queue/legend` | `ml.api.get_color_thresholds()` | ml |
-| `POST /api/score_scenario` (not exposed yet) | `ml.api.score_scenario(scenario)` | ml |
-| `GET /api/scenario_presets` (not exposed yet) | `ml.api.get_scenario_presets()` | ml |
+| `POST /api/score_scenario` | `ml.api.score_scenario(scenario)` | ml |
+| `GET /api/scenario_presets` | `ml.api.get_scenario_presets()` | ml |
 | `POST /api/draft_report` | backend (LLM) | backend |
 | `POST /api/decision`, `GET /api/audit` | backend (audit log) | backend |
 
@@ -172,7 +172,7 @@ Warm-up: if `get_queue()` fails at start, the backend serves the STUB (or, with 
 - `sandbox_id` is validated (`InvalidRequestError` → 400, see the exceptions table); the backend's sandbox ids are well-formed by construction.
 - The photo result does **not** change `risk`; it can only raise colour / priority through the evidence-fusion policy.
 
-### Scenario scoring (ml; HTTP endpoint not exposed yet)
+### Scenario scoring (ml; HTTP endpoints since v1.6)
 
 `score_scenario(scenario)` builds a loan and its transactions and returns a **live** score from the same model, features and
 reason templates as a portfolio loan. The scenario is evaluated as one extra loan inside a copy of the demo portfolio's context;
@@ -264,6 +264,18 @@ build and runtime), `HF_HUB_OFFLINE=1`, `MAQSAD_ASSET_CHECK=off` (switch the ass
 5. CLIP vaznlari build vaqtida oldindan yuklanadi, `MAQSAD_*` o'zgaruvchilari va Dockerfile: `ml/README.md`.
 6. HTTP qatlami (v1.4) o'zgarishsiz: `/api` prefiksi, `{items, total, counts}`, `{detail}` xato shakli, health, admin, session.
 
+## v1.6 o'zgarishlar (ssenariy sinash, backend + frontend)
+
+1. `GET /api/scenario_presets` va `POST /api/score_scenario` backend'da ochildi (`ml.api.get_scenario_presets` / `score_scenario`),
+   shakllar yuqoridagi "Scenario scoring" bo'limidagidek, ml tomonda o'zgarish yo'q. Ssenariy hech qayerga yozilmaydi (audit ham, portfel ham).
+2. Backend ml bilan bir xil kirish qoidalarini Pydantic'da (`extra=forbid`, qat'iy `int`) tekshiradi: noma'lum kalit yo'q,
+   `snapshot_day` 2..364, `invoice_amount_uzs` ixtiyoriy, bitta summa <= kredit x 10, kirimlar yig'indisi <= kredit x 20,
+   `day` <= `snapshot_day`, <= 60 tranzaksiya. Noto'g'ri kirish **400** (422 emas) va o'zbekcha `{detail}`; `ScenarioError` / `InvalidRequestError`
+   ham 400. Hudud nomi, mavjud `supplier_id` va balans tekshiruvi ml'da qoladi (400).
+3. `/api/health` `functions` ichiga `score_scenario`, `get_scenario_presets` qo'shildi. Stub rejimda (`ml_stub` da ssenariy modeli yo'q)
+   ikkalasi `"missing"` va 503 qaytaradi.
+4. Frontend: `/scenario` sahifasi, navbatda "Ssenariy sinash" havolasi. `.github/workflows/ci.yml` smoke testi yangilandi.
+
 ## Open points
-- Backend: expose `/api/score_scenario`, `/api/scenario_presets`; call `ml.api.warm_up()` at start-up and show `clip_loaded` / `clip_error` in `/api/health`.
+- Backend: call `ml.api.warm_up()` at start-up and show `clip_loaded` / `clip_error` in `/api/health`.
 - CLIP weights licence for production needs a legal review (see "Known failure cases" in `docs/metrics.md`).

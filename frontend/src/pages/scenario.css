@@ -1,0 +1,29 @@
+/* scenario page (hypothetical loan, phone first) */
+.scenario { display: grid; gap: 12px; }
+.scenario h3 { margin: 8px 0 0; font-size: 1rem; }
+.scn-note {
+  margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; font-weight: 600;
+  background: #fffaeb; border: 1px solid #e0b100; color: #6b4e00;
+}
+.scn-desc { margin: 8px 0 0; }
+.scn-form { display: grid; gap: 12px; }
+.scn-check { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.scn-check input { width: 22px; height: 22px; }
+.scn-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.scn-row {
+  display: grid; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 10px;
+  grid-template-columns: 1fr 1fr;
+}
+.scn-row .scn-row-n { grid-column: 1 / -1; }
+.scn-row label:first-of-type, .scn-row label:nth-of-type(3), .scn-row button { grid-column: 1 / -1; }
+.scn-score {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 12px; border: 1px solid var(--border); border-left-width: 5px; border-radius: 10px; font-size: 1.1rem;
+}
+.scn-color { font-weight: 700; }
+.scn-reasons { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+@media (min-width: 640px) {
+  .scn-row { grid-template-columns: 2fr 1fr 2fr auto; align-items: end; }
+  .scn-row .scn-row-n { grid-column: auto; }
+  .scn-row label:first-of-type, .scn-row label:nth-of-type(3), .scn-row button { grid-column: auto; }
+}

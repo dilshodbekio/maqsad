@@ -8,7 +8,9 @@ could not be confirmed on the provider's own page is marked as such. Every assum
 """
 from __future__ import annotations
 
+import argparse
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -50,7 +52,13 @@ def cpu_wall(fn, n=N, warm=5):
     return dict(cpu_ms=(time.process_time() - c0) / n * 1000, wall_ms=(time.perf_counter() - w0) / n * 1000, n=n)
 
 
-def measure() -> dict:
+def measure(single_thread: bool = False) -> dict:
+    """CPU time per component. single_thread=True pins OpenCV / torch / OpenMP to one thread (what a 1-vCPU container does):
+    with many threads the process CPU time is inflated by spinning worker threads and no longer means 'work done'."""
+    if single_thread:
+        cv2.setNumThreads(1)
+        import torch
+        torch.set_num_threads(1)
     t0c, t0w = time.process_time(), time.perf_counter()
     warm = api.warm_up()
     warm_cpu = time.process_time() - t0c
@@ -77,7 +85,8 @@ def measure() -> dict:
     out["check_photo_parts"] = parts
     import psutil
     out["rss_mb"] = psutil.Process().memory_info().rss / 2 ** 20
-    out["machine"] = dict(cpu=platform.processor(), logical_cores=__import__("os").cpu_count(), python=sys.version.split()[0])
+    out["machine"] = dict(cpu=platform.processor(), logical_cores=os.cpu_count(), python=sys.version.split()[0],
+                          threads="1 thread (OpenCV, torch, OpenMP)" if single_thread else "all cores")
     return out
 
 
@@ -85,7 +94,8 @@ def usd_per_1000_railway(cpu_s: float) -> float:
     return cpu_s * 1000 * PRICES["railway"]["cpu_usd_per_vcpu_minute"] / 60
 
 
-def render(m: dict) -> str:
+def render(multi: dict, m: dict) -> str:
+    """m = single-thread measurement (the cost basis), multi = all cores (latency on this machine)."""
     P = PRICES
     R, D = P["railway"], P["dedicated"]
     cs = {k: m[k]["cpu_ms"] / 1000 for k in ("score_loan", "score_scenario", "check_photo")}
@@ -93,13 +103,15 @@ def render(m: dict) -> str:
     w = L.append
     w("# Cost per check")
     w("")
-    w("All CPU times were **measured** by `python -m ml.eval.measure_cost` on the machine below (process CPU seconds over all threads, warm, "
-      f"{N} calls per component); prices are public prices with their source and date. Numbers are for the prototype code on synthetic data.")
+    w("All CPU times were **measured** by `python -m ml.eval.measure_cost` on the machine below (process CPU seconds, warm, "
+      f"{N} calls per component); prices are public prices with their source and date. Numbers are for the prototype code on synthetic data. "
+      "The cost basis is the **single-thread** measurement (OpenCV, torch and OpenMP pinned to one thread = one vCPU): with all cores the process "
+      "CPU time is inflated by spinning worker threads (see section 1b) and does not mean work done.")
     w("")
     mach = m["machine"]
     w(f"Machine: {mach['cpu']}, {mach['logical_cores']} logical cores, Python {mach['python']}. Resident memory after warm-up: {m['rss_mb']:.0f} MB.")
     w("")
-    w("## 1. Measured CPU time")
+    w("## 1. Measured CPU time (single thread = one vCPU; the cost basis)")
     w("")
     w("| Component | CPU time per call | Wall time per call |")
     w("|---|---|---|")
@@ -113,6 +125,14 @@ def render(m: dict) -> str:
         w(f"| &nbsp;&nbsp;{label} | {p['cpu_ms']:.0f} ms | {p['wall_ms']:.0f} ms |")
     wu = m["warm_up"]
     w(f"| Warm-up once at start (`ml.api.warm_up()`: demo portfolio + features + scores + queue, face detector, CLIP) | {wu['cpu_s']:.0f} s | {wu['wall_s']:.0f} s |")
+    w("")
+    w("### 1b. The same on all cores of this machine (latency, not cost)")
+    w("")
+    w("| Component | CPU time (all threads) | Wall time |")
+    w("|---|---|---|")
+    for k, label in labels:
+        w(f"| {label} | {multi[k]['cpu_ms']:.0f} ms | {multi[k]['wall_ms']:.0f} ms |")
+    w(f"| Warm-up once | {multi['warm_up']['cpu_s']:.0f} s | {multi['warm_up']['wall_s']:.0f} s |")
     w("")
     w("Warm-up breakdown (wall): portfolio " + f"{wu['portfolio_s']} s, face detector {wu['face_detector_s']} s, CLIP {wu['clip_s']} s. "
       "Warm-up is paid once per process, not per check.")
@@ -132,7 +152,7 @@ def render(m: dict) -> str:
     w("| Check | Railway (CPU only), USD per 1 000 | Dedicated server at 100% core utilisation, EUR per 1 000 |")
     w("|---|---|---|")
     for k, label in (("score_loan", "Money-trail score"), ("score_scenario", "Scenario score"), ("check_photo", "Photo check (incl. CLIP)")):
-        w(f"| {label} | {rail[k]:.4f} | {ded[k]:.4f} |")
+        w(f"| {label} | {rail[k]:.5f} | {ded[k]:.5f} |")
     w("")
     w(f"Formulas: Railway = CPU seconds x 1 000 x ${R['cpu_usd_per_vcpu_minute']} / 60. Dedicated = CPU seconds x 1 000 / 3 600 x "
       f"({D['price_eur_per_month']} EUR / 720 h / {D['cores']} cores) = CPU seconds x 1 000 x {core_hour_eur / 3600:.3e} EUR per core-second.")
@@ -168,10 +188,26 @@ def render(m: dict) -> str:
     return "\n".join(L) + "\n"
 
 
+def _run(single: bool) -> dict:
+    env = dict(os.environ, PYTHONPATH=str(ROOT))
+    if single:
+        env.update(OMP_NUM_THREADS="1", MKL_NUM_THREADS="1", MAQSAD_TORCH_THREADS="1")
+    out = subprocess.run([sys.executable, "-m", "ml.eval.measure_cost", "--worker"] + (["--single-thread"] if single else []),
+                         capture_output=True, text=True, cwd=ROOT, env=env)
+    return json.loads(out.stdout.strip().splitlines()[-1])
+
+
 def main():
-    m = measure()
-    RES.write_text(json.dumps(m, indent=1), encoding="utf-8", newline="\n")
-    DOC.write_text(render(m), encoding="utf-8", newline="\n")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--worker", action="store_true")
+    ap.add_argument("--single-thread", action="store_true")
+    a = ap.parse_args()
+    if a.worker:                                  # one measurement in a fresh process; prints one JSON line
+        print(json.dumps(measure(a.single_thread)))
+        return
+    single, multi = _run(True), _run(False)
+    RES.write_text(json.dumps(dict(single_thread=single, all_cores=multi), indent=1), encoding="utf-8", newline="\n")
+    DOC.write_text(render(multi, single), encoding="utf-8", newline="\n")
     print(DOC.read_text(encoding="utf-8"))
 
 

@@ -30,7 +30,7 @@ PURPOSE_UZ = {"tikuv_dastgohi": "tikuv dastgohi", "chorva": "chorva", "issiqxona
 EXPLAIN = [
     ("halol", "Halol kredit",
      "Qarz oluvchi kredit mablag'ini ta'minotchiga o'tkazadi, qolgan qismini kichik xarajatlar uchun ishlatadi va keyingi oylarda muntazam tushum oladi. "
-     "Halol kreditlar orasida ham 'shubhali ko'rinadigan' holatlar bor: qonuniy ravishda chorva sotgan fermer (bir martalik katta kirim va naqd yechish), "
+     "Halol kreditlar orasida ham 'shubhali ko'rinadigan' holatlar bor: qonuniy ravishda chorva yoki parranda sotgan fermer (bir martalik katta kirim va naqd yechish), "
      "naqd bilan ishlaydigan qishloq biznesi (ish haqi naqd to'lanadi) va umumiy savdo (OKED mos kelmaydigan) ta'minotchidan qonuniy xarid. "
      "Tizim ularni 'aybdor' demaydi, faqat 'avval shu kreditni tekshiring, sababi shu' deydi; yakuniy qarorni bank xodimi qabul qiladi."),
     ("T1", "T1: tez naqdlashtirish",
@@ -76,7 +76,7 @@ def main():
         chosen.append((i, turi, note))
 
     honest = ~lab.is_fraud & lab.index.isin(readable)
-    add(lab.index[honest & (lab.profile == "livestock_seller")], "halol", "qonuniy ravishda chorva sotgan fermer")
+    add(lab.index[honest & (lab.profile == "livestock_seller")], "halol", "qonuniy ravishda chorva yoki parranda sotgan fermer")
     add(lab.index[honest & (lab.profile == "cash_heavy")], "halol", "naqd bilan ishlaydigan qishloq biznesi")
     add(lab.index[honest & (lab.profile == "oked_mismatch") & lab.index.isin(generic)], "halol", "umumiy savdo (OKED mos kelmaydi) ta'minotchisidan qonuniy xarid")
     add(lab.index[honest & (lab.profile == "normal")], "halol", "oddiy halol kredit")

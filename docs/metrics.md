@@ -205,7 +205,7 @@ Reading the ablation: the age-aware encoding changes the honest false-positive r
 
 **All numbers are on a small library of openly licensed photos (CC / public domain) and are produced by `python -m ml.eval.eval_photo`. They say nothing about real borrower photos; real accuracy is measured in the pilot.**
 
-- Library: 100 asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) + 11 photos with people for the face-blur test; 4726 KB in the repo.
+- Library: 100 asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) + 11 photos with people for the face-blur test; 6165 KB in the repo.
 - Portfolio photo index (`ml/artifacts/photo_index_v1.json`): 90 images on 100 loans of the demo portfolio; 10 images are shared by 2-3 loans (the generator's photo-reuse groups). Photos are matched to the loan's purpose.
 
 | Purpose | library images | in index | loans with a photo |
@@ -258,8 +258,8 @@ Detection is count based (no box annotations), so a miss and a false alarm on th
 
 | Item | Value |
 |---|---|
-| `check_photo` p50 / p95 (500 calls, warm, 1600x1119 px, 164 KB JPEG; decode, hashing, duplicate search, face detection + blur, re-encode) | 296 ms / 316 ms |
-| same, wall clock | 297 ms / 317 ms |
+| `check_photo` p50 / p95 (500 calls, warm, 1600x1119 px, 164 KB JPEG; decode, hashing, duplicate search, face detection + blur, CLIP asset check, re-encode) | 406 ms / 460 ms |
+| same, wall clock | 407 ms / 461 ms |
 | Cost per check | 0 (local, no external API) |
 
 ### Known failure cases
@@ -271,6 +271,69 @@ Detection is count based (no box annotations), so a miss and a false alarm on th
 - **Faces:** a decorated bull head was detected as a face once (`faces_test_04`); a dark, out-of-focus face in the background (`faces_test_08`) is not counted and was not detected, so it is not blurred. Side and tiny faces are the weak spot of any detector; the 'faces left' numbers above only show that *detectable* faces are gone.
 - **Small library:** hard negatives come from ~10 images per purpose and half; with a real portfolio of thousands of photos the false-positive rate at this threshold must be re-measured.
 - The photo result does not change the money-trail risk; it can only raise the queue colour via the fusion policy (section 5).
+
+### Asset check: is the thing in the photo what the loan was for? (OpenCLIP ViT-B-32, CPU)
+
+Produced by `python -m ml.eval.eval_asset`. Library: 143 images, tikuv_dastgohi 20, chorva 20, issiqxona 20, parranda 20, asalarichilik 20, other 43 (`other` = random things: rooms, vehicles, phones / laptops, food, landscapes, documents, animals, people; all openly licensed, `ml/assets/photos/manifest.csv`). Zero-shot = cosine similarity to English prompts per class; probe = logistic regression on the CLIP image embeddings. **Stratified 5-fold cross-validation**; the threshold tau of the 'matches the loan purpose' decision (probability of the loan's purpose >= tau) is chosen inside every training fold (inner out-of-fold probabilities, best F1), never on the test fold. These are tiny, hand-picked Wikimedia images: the numbers say how the method behaves on this library, not on real borrower photos.
+
+**6-class accuracy (what is in the photo)**
+
+| Class | n | zero-shot | linear probe (CV) |
+|---|---|---|---|
+| tikuv_dastgohi | 20 | 100.0% | 100.0% |
+| chorva | 20 | 100.0% | 100.0% |
+| issiqxona | 20 | 95.0% | 100.0% |
+| parranda | 20 | 75.0% | 100.0% |
+| asalarichilik | 20 | 100.0% | 90.0% |
+| other | 43 | 74.4% | 100.0% |
+| **all** | 143 | **88.1%** | **98.6%** |
+
+**Binary task: the photo matches the loan purpose** (every image paired with each of the 5 purposes; positive = the image shows that purpose; 100 positive and 615 negative pairs, pooled over the CV test folds)
+
+| Method | tau per fold | precision | recall | F1 | TP / FP / FN |
+|---|---|---|---|---|---|
+| zero-shot | 0.74, 0.74, 0.74, 0.74, 0.78 | 94.7% | 90.0% | 92.3% | 90 / 5 / 10 |
+| linear probe | 0.33, 0.38, 0.41, 0.37, 0.31 | 94.2% | 97.0% | 95.6% | 97 / 6 / 3 |
+
+False matches on photos of random things (the situation of a judge photographing something else): out of 215 pairs (an `other` image x a purpose) the probe says 'matches' 1.9% of the time, zero-shot 1.9%; for assets of a different purpose (400 pairs) 0.5% (probe) and 0.2% (zero-shot).
+
+**The 10 images left out of the portfolio photo index** (probe trained on the other images, tau chosen on them): probe accuracy 100.0% (10/10), zero-shot 100.0% (10/10); binary task probe TP/FP/FN 10/0/0 (n_pos 10, n_neg 40), zero-shot 10/0/0. With 10 images these are counts, not rates to rely on.
+
+Deployed: the probe fitted on all 143 images, tau = 0.37 (from all-data out-of-fold probabilities); artifact `ml/artifacts/asset_probe_v1.npz` (+ `.json`). `check_photo().asset_match = {label, score, matches_purpose, label_uz}`; `matches_purpose == false` escalates the loan to at least yellow (`PHOTO_ASSET_MISMATCH`, section 5).
+
+**Robustness** (same transforms as the duplicate test; each transformed copy is classified by the probe / zero-shot of its CV fold; 'label kept' = same predicted class as the untransformed image):
+
+| Transform | probe accuracy | probe label kept | zero-shot accuracy | zero-shot label kept |
+|---|---|---|---|---|
+| JPEG q=30 | 98.6% | 100.0% | 84.6% | 95.1% |
+| resize 50% | 98.6% | 100.0% | 88.8% | 97.9% |
+| screenshot | 95.8% | 96.5% | 88.1% | 93.0% |
+| rotate 5 deg | 97.9% | 97.9% | 88.8% | 95.8% |
+| (no transform) | 98.6% | 100.0% | 88.1% | 100.0% |
+
+**Warm-up and memory** (fresh processes, 3 runs; CLIP weights already in the cache directory; the one-off 354 MB weights download is not included): loading CLIP (imports + model + prompts) 15.1 - 16.1 s, process memory after loading CLIP 1266 - 1269 MB; full `ml.api.warm_up()` (portfolio + face detector + CLIP) 24.1 - 24.3 s, memory 1422 - 1424 MB. Both are within the deploy limits we set (warm-up <= 30 s, memory <= 4 GB). `check_photo` latency with CLIP is in the photo latency table above; CPU time per component and cost per 1 000 checks: [`docs/cost.md`](cost.md).
+
+**Failure cases measured on this library** (19 of 143 images are wrong for the probe (CV) or for zero-shot):
+
+| Image | true | probe (CV) | zero-shot |
+|---|---|---|---|
+| `issiqxona_11.jpg` | issiqxona | issiqxona | parranda |
+| `parranda_06.jpg` | parranda | parranda | asalarichilik |
+| `parranda_09.jpg` | parranda | parranda | issiqxona |
+| `parranda_11.jpg` | parranda | parranda | asalarichilik |
+| `parranda_12.jpg` | parranda | parranda | chorva |
+| `parranda_14.jpg` | parranda | parranda | asalarichilik |
+| `asalarichilik_09.jpg` | asalarichilik | other | asalarichilik |
+| `asalarichilik_10.jpg` | asalarichilik | parranda | asalarichilik |
+| `other_01.jpg` | other | other | tikuv_dastgohi |
+| `other_02.jpg` | other | other | asalarichilik |
+| `other_14.jpg` | other | other | asalarichilik |
+| `other_15.jpg` | other | other | asalarichilik |
+| `other_19.jpg` | other | other | asalarichilik |
+| `other_21.jpg` | other | other | tikuv_dastgohi |
+| ... | | | (5 more in `ml/artifacts/eval_asset.json`) |
+
+Not measured but expected: a toy or a picture / painting of a cow or a sewing machine looks like the real thing to CLIP; a cluttered workshop with several objects; poultry vs wild birds; a screen showing a photo; the probe only knows 6 classes, so the name in `label_uz` for non-assets comes from a separate zero-shot list of 13 everyday categories and can be wrong. The check is a flag for the officer, not proof.
 
 ## 5. Scenario scoring and evidence fusion
 
@@ -298,7 +361,7 @@ Rules and assumptions: `snapshot_day` must be 2..364 (the model was trained on l
 | `PHOTO_DUPLICATE` | red | yes | the photo duplicates another loan's photo (in the portfolio index, or in the same sandbox) |
 | `PHOTO_FAR` | yellow | yes | geo_ok == False: the photo was taken more than 5 km from the borrower (assumed limit) |
 | `PHOTO_TIME` | yellow | yes | time_ok == False: captured before disbursement or in the future |
-| `PHOTO_ASSET_MISMATCH` | yellow | no (later) | asset_match below a threshold (switched on when the CLIP step is added) |
+| `PHOTO_ASSET_MISMATCH` | yellow | yes | asset_match.matches_purpose == False: the photo does not show the asset the loan was for (CLIP + linear probe, `ml/photo/asset.py`) |
 
 **Colour budget (default queue of the demo portfolio):** 500 red by risk + 13 escalated to red by the photo policy = 513 red; 501 yellow (500 by risk, 5 green loans raised to yellow, the rest moved to red). The thresholds stay 10% / 10% by risk (500 red + 500 yellow); the photo policy adds 13 loans to red and 5 green loans to yellow, so the 20% inspection budget is exceeded by these escalations (`ml.api.get_color_thresholds()`). Reason order: policy reasons that raised the colour, then money-trail reasons, then the other policy reasons; the queue's `top_reason` is the first of them.
 
@@ -327,7 +390,10 @@ The demo portfolio's own photos are evaluated with the same policy (duplicates i
 .venv/Scripts/python -m ml.eval.eval_photo --write-config        # photo duplicate variant + threshold
 .venv/Scripts/python -m ml.photo.index                           # photo index on the demo split
 .venv/Scripts/python -m ml.eval.eval_photo
+.venv/Scripts/python -m ml.eval.eval_asset                       # CLIP: zero-shot vs probe, CV, robustness, warm-up (writes the probe)
+.venv/Scripts/python -m ml.photo.index                           # rebuild the photo index (adds the asset check of the portfolio photos)
 .venv/Scripts/python -m ml.eval.eval_scenario                    # scenario latency + example
+.venv/Scripts/python -m ml.eval.measure_cost                     # CPU time per component -> docs/cost.md
 .venv/Scripts/python -m ml.eval.build_metrics                    # regenerate this file from the stored results
 .venv/Scripts/python -m pytest ml/tests -q
 ```

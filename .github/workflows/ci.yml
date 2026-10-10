@@ -53,9 +53,25 @@ jobs:
           echo "health: $H"
           echo "$H" | jq -e '.ml_mode == "real" and .warmup == "done" and ([.functions[]] | all(. == "real"))'
 
-          curl -fsS localhost:8000/api/queue -o queue.json
-          jq -e 'length > 0' queue.json
-          LOAN=$(jq -r '.[0].loan_id' queue.json)
+          # queue (contract v1.3): {items, total, counts}; no cookie -> fresh sandbox = default view
+          curl -fsS "localhost:8000/api/queue?limit=50" -o queue.json
+          jq -e '(.items | length) == 50 and .total > 0
+                 and (.counts.red + .counts.yellow + .counts.green) == .total' queue.json
+          LOAN=$(jq -r '.items[0].loan_id' queue.json)
+          curl -fsS "localhost:8000/api/queue?color=red&limit=5" \
+            | jq -e '(.items | length) > 0 and all(.items[]; .color == "red")'
+          test "$(curl -s -o /dev/null -w '%{http_code}' 'localhost:8000/api/queue?limit=201')" = 422
+
+          curl -fsS localhost:8000/api/queue/facets -o facets.json
+          jq -e '(.regions | length) > 0 and (.purposes | length) > 0' facets.json
+          REGION=$(jq -r '.regions[0]' facets.json)
+          curl -fsS -G localhost:8000/api/queue --data-urlencode "region=$REGION" \
+            | jq -e --arg r "$REGION" '.total > 0 and all(.items[]; .region == $r)'
+
+          curl -fsS localhost:8000/api/queue/legend -o legend.json
+          jq -e --slurpfile q queue.json '.n_loans == $q[0].total and .n_red_total == $q[0].counts.red
+                 and .n_yellow_total == $q[0].counts.yellow and .red >= .yellow' legend.json
+
           curl -fsS "localhost:8000/api/loan/$LOAN" | jq -e '.model_version != "stub"'
 
           IMG=$(ls ml/assets/photos/*.jpg | head -n 1)

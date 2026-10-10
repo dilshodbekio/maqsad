@@ -18,6 +18,9 @@ from .config import Settings
 log = logging.getLogger("maqsad.llm")
 
 
+PROMPT_VERSION = "2"  # part of the draft cache key: a prompt change invalidates cached drafts
+
+
 class LLMNotConfigured(Exception):
     pass
 
@@ -95,6 +98,8 @@ def _chat(settings: Settings, messages: list) -> tuple:
         headers["Authorization"] = f"Bearer {api_key}"
     body = {"model": model, "messages": messages, "temperature": 0.1,
             "response_format": {"type": "json_object"}}
+    if settings.llm_reasoning_effort:
+        body["reasoning_effort"] = settings.llm_reasoning_effort  # lowest thinking: faster and cheaper
     for attempt in range(len(_RETRY_DELAYS_S) + 1):
         try:
             r = httpx.post(f"{base_url.rstrip('/')}/chat/completions", json=body, headers=headers,
@@ -156,4 +161,6 @@ def draft_report(settings: Settings, loan_id: str, evidence: list, reasons: list
         "model": settings.llm_model,
         "latency_ms": latency,
         "cost_usd": cost,
+        "input_tokens": tin,
+        "output_tokens": tout,
     }

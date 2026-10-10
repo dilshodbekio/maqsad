@@ -10,6 +10,7 @@ import binascii
 import hmac
 import json
 import logging
+import time
 import uuid
 from http import HTTPStatus
 from pathlib import Path as FsPath
@@ -374,8 +375,21 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         data = adapter.get_loan(body.loan_id, request.state.sandbox_id)
         if not settings.llm_configured:
             raise HTTPException(503, f"{MSG_REPORT_NOT_READY}: LLM ulanmagan. Kredit sahifasi undan mustaqil ishlaydi.")
+        evidence, reasons = data.get("evidence") or [], data.get("reasons") or []
+        sid = request.state.sandbox_id
+        # the cache is valid only while the draft's inputs (evidence, reasons, model) are unchanged
+        key = sha256_hex(canonical({"evidence": evidence, "reasons": reasons, "model": settings.llm_model,
+                                    "prompt": llm.PROMPT_VERSION}))
+        if not body.regenerate:
+            t = time.perf_counter()
+            hit = db.draft_cache_get(sid, body.loan_id, key)
+            if hit is not None:
+                return {**hit, "cached": True, "cost_usd": 0.0, "input_tokens": None, "output_tokens": None,
+                        "latency_ms": round((time.perf_counter() - t) * 1000, 1)}
         try:
-            return llm.draft_report(settings, body.loan_id, data.get("evidence") or [], data.get("reasons") or [], db)
+            result = llm.draft_report(settings, body.loan_id, evidence, reasons, db)
+            db.draft_cache_put(sid, body.loan_id, key, result)
+            return {**result, "cached": False}
         except llm.LLMError as e:
             raise HTTPException(502, f"{MSG_REPORT_NOT_READY}: LLM xatosi. Keyinroq qayta urinib ko'ring.") from e
 

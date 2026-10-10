@@ -32,7 +32,7 @@ def test_draft_report_fact_check(make_client, monkeypatch, loan_id):
     r = c.post("/api/draft_report", json={"loan_id": loan_id})
     assert r.status_code == 200, r.text
     d = r.json()
-    assert set(d) == {"text_uz", "facts", "model", "latency_ms", "cost_usd"}
+    assert set(d) == {"text_uz", "facts", "model", "latency_ms", "cost_usd", "cached", "input_tokens", "output_tokens"}
     assert [f["unverified"] for f in d["facts"]] == [False, True, True]
     assert d["model"] == "test-model"
     assert d["cost_usd"] is None  # price not configured -> not guessed
@@ -124,3 +124,70 @@ def test_admin_reset_clears_photos(make_client, loan_id):
     r = c.post("/api/admin/reset", headers={"X-Admin-Token": "s3cret"})
     assert r.status_code == 200 and r.json() == {"ok": True}
     assert c.get(f"/api/loan/{loan_id}").json()["photos"] == []
+
+
+# ---------- draft cache + reasoning_effort + price ----------
+
+def _counting_llm(monkeypatch):
+    calls = []
+
+    def fake(settings, messages):
+        calls.append(settings.llm_reasoning_effort)
+        return json.dumps({"text_uz": "Matn", "facts": []}), 1000, 500
+
+    monkeypatch.setattr(llm, "_chat", fake)
+    return calls
+
+
+def test_draft_is_cached_per_sandbox_and_regenerate_bypasses(make_client, monkeypatch, loan_id):
+    c = make_client(llm_base_url="http://llm.invalid/v1", llm_model="m",
+                    llm_price_in_per_mtok=1.0, llm_price_out_per_mtok=2.0)
+    calls = _counting_llm(monkeypatch)
+    first = c.post("/api/draft_report", json={"loan_id": loan_id}).json()
+    assert first["cached"] is False and first["cost_usd"] == pytest.approx(0.002)  # 1000/1e6*1 + 500/1e6*2
+    assert (first["input_tokens"], first["output_tokens"]) == (1000, 500)
+    again = c.post("/api/draft_report", json={"loan_id": loan_id}).json()
+    assert again["cached"] is True and again["cost_usd"] == 0.0 and again["input_tokens"] is None and again["text_uz"] == first["text_uz"]
+    assert len(calls) == 1
+    fresh = c.post("/api/draft_report", json={"loan_id": loan_id, "regenerate": True}).json()
+    assert fresh["cached"] is False and len(calls) == 2
+    assert c.post("/api/draft_report", json={"loan_id": loan_id}).json()["cached"] is True  # new draft is cached
+    c.cookies.clear()  # another sandbox does not see it
+    assert c.post("/api/draft_report", json={"loan_id": loan_id}).json()["cached"] is False
+    assert len(calls) == 3
+
+
+def test_failed_draft_is_not_cached(make_client, monkeypatch, loan_id):
+    c = make_client(llm_base_url="http://llm.invalid/v1", llm_model="m")
+    monkeypatch.setattr(llm, "_chat", lambda s, m: ("not json", None, None))
+    assert c.post("/api/draft_report", json={"loan_id": loan_id}).status_code == 502
+    calls = _counting_llm(monkeypatch)
+    assert c.post("/api/draft_report", json={"loan_id": loan_id}).json()["cached"] is False
+    assert len(calls) == 1
+
+
+def test_reasoning_effort_is_sent_when_set(monkeypatch):
+    from dataclasses import replace
+    from backend.app.config import Settings
+    sent = {}
+
+    class R:
+        status_code, is_error = 200, False
+        def json(self):
+            return {"choices": [{"message": {"content": "{}"}}], "usage": {}}
+
+    monkeypatch.setattr(llm.httpx, "post", lambda url, json, **k: sent.update(json) or R())
+    base = replace(Settings.from_env(), llm_base_url="http://x/v1", llm_model="m", llm_api_key="")
+    llm._chat(replace(base, llm_reasoning_effort="minimal"), [])
+    assert sent["reasoning_effort"] == "minimal"
+    sent.clear()
+    llm._chat(replace(base, llm_reasoning_effort=""), [])
+    assert "reasoning_effort" not in sent
+
+
+def test_price_env_names(monkeypatch):
+    from backend.app.config import Settings
+    monkeypatch.setenv("LLM_PRICE_IN_PER_1M", "0.5")
+    monkeypatch.setenv("LLM_PRICE_OUT_PER_1M", "2.5")
+    s = Settings.from_env()
+    assert (s.llm_price_in_per_mtok, s.llm_price_out_per_mtok) == (0.5, 2.5)

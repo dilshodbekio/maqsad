@@ -276,6 +276,16 @@ build and runtime), `HF_HUB_OFFLINE=1`, `MAQSAD_ASSET_CHECK=off` (switch the ass
    ikkalasi `"missing"` va 503 qaytaradi.
 4. Frontend: `/scenario` sahifasi, navbatda "Ssenariy sinash" havolasi. `.github/workflows/ci.yml` smoke testi yangilandi.
 
+## v1.7 o'zgarishlar (dalolatnoma keshi va narx, backend + frontend)
+
+1. `POST /api/draft_report` so'rovi: `regenerate: bool = false` qo'shildi (`true` = keshni chetlab o'tish, "Qayta yaratish").
+2. Javobga qo'shildi: `cached: bool`, `input_tokens`, `output_tokens` (`int|null`). Kesh: bir sandbox + kredit uchun bitta qoralama,
+   kalit = dalillar + sabablar + model + prompt versiyasi (dalil o'zgarsa, masalan rasm yuklansa, kesh o'z-o'zidan yaroqsiz bo'ladi).
+   Keshdan javobda `cached: true`, `cost_usd: 0.0`, tokenlar `null`, `latency_ms` = keshdan o'qish vaqti. Xato javob keshga yozilmaydi.
+   Admin reset keshni ham tozalaydi.
+3. Env: `LLM_REASONING_EFFORT` (default `minimal`, bo'sh = yuborilmaydi), narx `LLM_PRICE_IN_PER_1M` / `LLM_PRICE_OUT_PER_1M`
+   (eski `..._PER_MTOK` nomlari ham o'qiladi). ml tomonda o'zgarish yo'q.
+
 ## Open points
 - Backend: call `ml.api.warm_up()` at start-up and show `clip_loaded` / `clip_error` in `/api/health`.
 - CLIP weights licence for production needs a legal review (see "Known failure cases" in `docs/metrics.md`).

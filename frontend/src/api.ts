@@ -179,6 +179,9 @@ export type DraftReport = {
   model: string;
   latency_ms: number;
   cost_usd: number | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cached?: boolean; // served from the cache: no LLM call, latency_ms is the lookup time
 };
 
 export type DecisionAction = "approve" | "reject" | "visit";
@@ -285,7 +288,8 @@ export const api = {
   scenarioPresets: () => getJson<ScenarioPreset[]>("/api/scenario_presets"),
   scoreScenario: (scenario: Scenario) => postJson<ScenarioScore>("/api/score_scenario", scenario),
   checkPhoto: (form: FormData) => postForm<CheckPhotoResult>("/api/check_photo", form),
-  draftReport: (loanId: string) => postJson<DraftReport>("/api/draft_report", { loan_id: loanId }),
+  draftReport: (loanId: string, regenerate = false) =>
+    postJson<DraftReport>("/api/draft_report", { loan_id: loanId, regenerate }),
   decision: (body: { loan_id: string; officer_id: string; action: DecisionAction; comment: string }) =>
     postJson<{ audit_id: number }>("/api/decision", body),
 };

@@ -222,6 +222,7 @@ class CheckPhotoJSON(CheckPhotoFields):
 
 class DraftReportRequest(BaseModel):
     loan_id: LoanId
+    regenerate: bool = False  # True: bypass the cache ("Qayta yaratish")
 
 
 class Fact(BaseModel):
@@ -235,7 +236,10 @@ class DraftReport(BaseModel):
     facts: List[Fact]
     model: str
     latency_ms: float
-    cost_usd: Optional[float] = None  # None = price unknown (never guessed)
+    cost_usd: Optional[float] = None  # None = price unknown (never guessed); 0.0 on a cache hit (no LLM call made)
+    input_tokens: Optional[int] = None  # as reported by the LLM API; None on a cache hit (no call made)
+    output_tokens: Optional[int] = None  # includes thinking tokens for Gemini
+    cached: bool = False  # True: served from the cache, latency_ms is the lookup time
 
 
 class DecisionRequest(BaseModel):

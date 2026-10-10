@@ -47,6 +47,15 @@ CREATE TABLE IF NOT EXISTS photos (
 );
 CREATE INDEX IF NOT EXISTS photos_sandbox_loan ON photos (sandbox_id, loan_id);
 
+CREATE TABLE IF NOT EXISTS draft_cache (
+    sandbox_id TEXT NOT NULL,
+    loan_id TEXT NOT NULL,
+    inputs_hash TEXT NOT NULL,
+    response_json TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    PRIMARY KEY (sandbox_id, loan_id)
+);
+
 CREATE TABLE IF NOT EXISTS llm_calls (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ts TEXT NOT NULL,
@@ -179,8 +188,22 @@ class Database:
         """Admin reset: removes sandbox photos. The audit log is append-only and is kept."""
         with self._write_lock, self.conn() as c:
             c.execute("DELETE FROM photos")
+            c.execute("DELETE FROM draft_cache")
         shutil.rmtree(self.photo_dir, ignore_errors=True)
         self.photo_dir.mkdir(parents=True, exist_ok=True)
+
+    # ---------- draft report cache (one draft per sandbox + loan; valid while the inputs are unchanged) ----------
+
+    def draft_cache_get(self, sandbox_id: str, loan_id: str, inputs_hash: str) -> Optional[dict]:
+        with self.conn() as c:
+            r = c.execute("SELECT response_json FROM draft_cache WHERE sandbox_id = ? AND loan_id = ? "
+                          "AND inputs_hash = ?", (sandbox_id, loan_id, inputs_hash)).fetchone()
+        return json.loads(r["response_json"]) if r else None
+
+    def draft_cache_put(self, sandbox_id: str, loan_id: str, inputs_hash: str, response: dict) -> None:
+        with self._write_lock, self.conn() as c:
+            c.execute("INSERT OR REPLACE INTO draft_cache VALUES (?, ?, ?, ?, ?)",
+                      (sandbox_id, loan_id, inputs_hash, json.dumps(response, ensure_ascii=False), utc_now()))
 
     # ---------- LLM call log ----------
 

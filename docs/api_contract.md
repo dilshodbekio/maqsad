@@ -142,7 +142,8 @@ inside a copy of the demo portfolio's context; the cached portfolio is never mod
   (`blurred_image`, internal) and a perceptual hash are kept.
 - `faces_count` = faces found; `faces_blurred` = `faces_count > 0` (faces were found and blurred).
 - `asset_match` is `null` until the CLIP step is added. `geo_ok` / `time_ok` are `null` when the input is missing.
-- The photo result does **not** change the money-trail `risk` / `color` (combination comes later).
+- The photo result does **not** change the money-trail `risk`. It can only raise the queue colour / priority through the evidence-fusion
+  policy below (`ml/fusion.py`); `score_loan` and `score_scenario` stay money-trail only.
 
 ## Open points (to agree)
-- Combination of photo signals with the money-trail risk (later step).
+- Photo asset match (CLIP) is not wired yet; `PHOTO_ASSET_MISMATCH` stays inactive until it is.

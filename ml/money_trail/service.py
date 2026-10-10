@@ -8,6 +8,7 @@ colour and reason comes from the model and the features.
 """
 from __future__ import annotations
 
+import copy
 import threading
 import time
 from functools import cached_property
@@ -158,7 +159,7 @@ class Portfolio:
     def queue(self, sandbox_id=None) -> list[dict]:
         """Queue sorted by priority (colour rank, then risk). With a sandbox_id the escalations from that sandbox's
         uploaded photos are included; other sandboxes and the default view are unaffected."""
-        items = [dict(q) for q in self._queue]
+        items = copy.deepcopy(self._queue)          # callers may edit what they get; the cache must stay intact
         if sandbox_id is None:
             return items
         from ml.photo.checker import sandbox_signals
@@ -210,7 +211,7 @@ class Portfolio:
         policy_reasons = [dict(code=e["code"], text_uz=e["text_uz"], weight=None, evidence_refs=e["evidence_refs"],
                                source="fusion_policy") for e in fused["escalations"]]
         photo_evidence = {s["evidence_ref"]: s["evidence"] for s in signals}
-        photo_items = [photo_evidence[r] for r in dict.fromkeys(e["evidence_refs"][0] for e in fused["escalations"])]
+        photo_items = copy.deepcopy([photo_evidence[r] for r in dict.fromkeys(e["evidence_refs"][0] for e in fused["escalations"])])
         return dict(
             loan={"loan_id": loan_id, **{k: _py(self.loans.at[loan_id, k]) for k in LOAN_FIELDS[1:]}},
             transactions=[{k: _py(r[k]) for k in TXN_FIELDS} for _, r in txs.iterrows()],

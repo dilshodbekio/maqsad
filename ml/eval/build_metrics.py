@@ -346,7 +346,7 @@ def render() -> str:
       "its effect on recall / precision cannot be measured without labelled photo data.")
     w("- **Scenarios:** a hand-built scenario can describe behaviour the generator never produces; the score then shows what the "
       "model does outside the synthetic world, not that the behaviour is fraud. Assumptions are listed in section 5.")
-    w("- The photo result does not change the money-trail `risk` value; it only raises the colour / priority.")
+    w("- The photo result does not change the money-trail `risk` value; it only raises the colour / priority (policy in section 5).")
     w("")
     w("## 7. Reproduce")
     w("")

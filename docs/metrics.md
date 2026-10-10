@@ -270,7 +270,7 @@ Detection is count based (no box annotations), so a miss and a false alarm on th
 - **Larger rotation / mirroring** were not tested (only 5 degrees).
 - **Faces:** a decorated bull head was detected as a face once (`faces_test_04`); a dark, out-of-focus face in the background (`faces_test_08`) is not counted and was not detected, so it is not blurred. Side and tiny faces are the weak spot of any detector; the 'faces left' numbers above only show that *detectable* faces are gone.
 - **Small library:** hard negatives come from ~10 images per purpose and half; with a real portfolio of thousands of photos the false-positive rate at this threshold must be re-measured.
-- The photo result does not change the money-trail risk; combining them is a later step.
+- The photo result does not change the money-trail risk; it can only raise the queue colour via the fusion policy (section 5).
 
 ## 5. Scenario scoring and evidence fusion
 
@@ -312,7 +312,7 @@ The demo portfolio's own photos are evaluated with the same policy (duplicates i
 - **Photo module:** see the failure cases in section 4 (hash crop robustness, screen photos, side faces).
 - **Fusion is a policy, not a measured model:** its thresholds (e.g. 5 km) and escalation colours are choices, not fitted values; its effect on recall / precision cannot be measured without labelled photo data.
 - **Scenarios:** a hand-built scenario can describe behaviour the generator never produces; the score then shows what the model does outside the synthetic world, not that the behaviour is fraud. Assumptions are listed in section 5.
-- The photo result does not change the money-trail `risk` value; it only raises the colour / priority.
+- The photo result does not change the money-trail `risk` value; it only raises the colour / priority (policy in section 5).
 
 ## 7. Reproduce
 

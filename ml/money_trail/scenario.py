@@ -14,6 +14,7 @@ existing supplier, otherwise the first branch of the chosen region (BR-00 withou
 """
 from __future__ import annotations
 
+import math
 import re
 import time
 
@@ -43,7 +44,10 @@ def _som(v) -> str:
 
 
 def _int(v, what, lo=None, hi=None) -> int:
-    if isinstance(v, bool) or not isinstance(v, (int, float, np.integer, np.floating)) or float(v) != int(v):
+    """Exact integer from an int or an integral finite float; bool, str, NaN, inf are rejected (ScenarioError)."""
+    if isinstance(v, (float, np.floating)) and math.isfinite(v) and float(v).is_integer():
+        v = int(v)
+    if isinstance(v, bool) or not isinstance(v, (int, np.integer)):
         raise ScenarioError(f"{what}: butun son kiritilishi kerak")
     v = int(v)
     if (lo is not None and v < lo) or (hi is not None and v > hi):
@@ -61,7 +65,7 @@ def validate(scn, P) -> dict:
     amount = _int(scn.get("amount_uzs"), "Kredit summasi (amount_uzs)", 1, MAX_AMOUNT)
     snap_day = _int(scn.get("snapshot_day"), "snapshot_day (kredit berilganidan baholash kunigacha kunlar)", 0, MAX_SNAPSHOT_DAY)
     region = scn.get("region")
-    if region is not None and region not in {r[0] for r in REGIONS}:
+    if region is not None and not (isinstance(region, str) and region in {r[0] for r in REGIONS}):
         raise ScenarioError(f"Noma'lum hudud: {region!r}")
     sup = scn.get("supplier")
     if not isinstance(sup, dict) or sup.get("mode") not in ("existing", "new"):

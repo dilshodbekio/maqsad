@@ -47,6 +47,7 @@ TEMPLATES = {
     "cash_share_d30": lambda v, c: f"Kredit tushgandan keyin 30 kun ichida mablag'ning {_pct(v, 'i')} naqd yechilgan",
     "cash_share_all": lambda v, c: f"Kredit tushganidan beri mablag'ning {_pct(v, 'i')} naqd yechilgan",
     "sup_pay_share": lambda v, c: ("Ta'minotchiga to'lov o'tkazilmagan" if v <= 0 else
+                                   "Ta'minotchiga kredit summasining 1 foizidan kami o'tkazilgan" if v < 0.005 else
                                    f"Ta'minotchiga kredit summasining atigi {_pct(v, 'i')} o'tkazilgan" if v < LOW_PAY_SHARE else
                                    f"Ta'minotchiga kredit summasining {_pct(v, 'i')} o'tkazilgan"),
     "first_sup_pay_days": lambda v, c: ("Ta'minotchiga hali to'lov o'tkazilmagan" if v >= NEVER else

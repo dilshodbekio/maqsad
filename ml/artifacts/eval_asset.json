@@ -1,0 +1,306 @@
+{
+ "n": 143,
+ "counts": {
+  "tikuv_dastgohi": 20,
+  "chorva": 20,
+  "issiqxona": 20,
+  "parranda": 20,
+  "asalarichilik": 20,
+  "other": 43
+ },
+ "c": 10.0,
+ "folds": 5,
+ "seed": 0,
+ "zero_shot": {
+  "acc": 0.8811188811188811,
+  "per_class": {
+   "tikuv_dastgohi": 1.0,
+   "chorva": 1.0,
+   "issiqxona": 0.95,
+   "parranda": 0.75,
+   "asalarichilik": 1.0,
+   "other": 0.7441860465116279
+  },
+  "taus": [
+   0.74,
+   0.74,
+   0.74,
+   0.74,
+   0.78
+  ],
+  "binary": {
+   "tp": 90,
+   "fp": 5,
+   "fn": 10,
+   "precision": 0.9473684210526315,
+   "recall": 0.9,
+   "n_pos": 100,
+   "n_neg": 615,
+   "f1": 0.9230769230769231
+  }
+ },
+ "probe_cv": {
+  "acc": 0.986013986013986,
+  "per_class": {
+   "tikuv_dastgohi": 1.0,
+   "chorva": 1.0,
+   "issiqxona": 1.0,
+   "parranda": 1.0,
+   "asalarichilik": 0.9,
+   "other": 1.0
+  },
+  "taus": [
+   0.33,
+   0.38,
+   0.41,
+   0.37,
+   0.31
+  ],
+  "binary": {
+   "tp": 97,
+   "fp": 6,
+   "fn": 3,
+   "precision": 0.941747572815534,
+   "recall": 0.97,
+   "n_pos": 100,
+   "n_neg": 615,
+   "f1": 0.9556650246305419
+  }
+ },
+ "robustness": {
+  "JPEG q=30": {
+   "n": 143,
+   "probe_correct": 0.986013986013986,
+   "probe_same": 1.0,
+   "zs_correct": 0.8461538461538461,
+   "zs_same": 0.951048951048951
+  },
+  "resize 50%": {
+   "n": 143,
+   "probe_correct": 0.986013986013986,
+   "probe_same": 1.0,
+   "zs_correct": 0.8881118881118881,
+   "zs_same": 0.9790209790209791
+  },
+  "screenshot": {
+   "n": 143,
+   "probe_correct": 0.958041958041958,
+   "probe_same": 0.965034965034965,
+   "zs_correct": 0.8811188811188811,
+   "zs_same": 0.9300699300699301
+  },
+  "rotate 5 deg": {
+   "n": 143,
+   "probe_correct": 0.9790209790209791,
+   "probe_same": 0.9790209790209791,
+   "zs_correct": 0.8881118881118881,
+   "zs_same": 0.958041958041958
+  }
+ },
+ "held_out": {
+  "n": 10,
+  "probe_acc": 1.0,
+  "zero_shot_acc": 1.0,
+  "tau_probe": 0.37,
+  "tau_zero_shot": 0.74,
+  "probe_binary": {
+   "tp": 10,
+   "fp": 0,
+   "fn": 0,
+   "precision": 1.0,
+   "recall": 1.0,
+   "n_pos": 10,
+   "n_neg": 40,
+   "f1": 1.0
+  },
+  "zero_shot_binary": {
+   "tp": 10,
+   "fp": 0,
+   "fn": 0,
+   "precision": 1.0,
+   "recall": 1.0,
+   "n_pos": 10,
+   "n_neg": 40,
+   "f1": 1.0
+  },
+  "wrong": []
+ },
+ "false_match": {
+  "probe": {
+   "other_rate": 0.018604651162790697,
+   "other_pairs": 215,
+   "wrong_asset_rate": 0.005,
+   "wrong_asset_pairs": 400
+  },
+  "zero_shot": {
+   "other_rate": 0.018604651162790697,
+   "other_pairs": 215,
+   "wrong_asset_rate": 0.0025,
+   "wrong_asset_pairs": 400
+  }
+ },
+ "misclassified": [
+  {
+   "file": "issiqxona_11.jpg",
+   "true": "issiqxona",
+   "probe": "issiqxona",
+   "score": 0.553,
+   "zero_shot": "parranda"
+  },
+  {
+   "file": "parranda_06.jpg",
+   "true": "parranda",
+   "probe": "parranda",
+   "score": 0.816,
+   "zero_shot": "asalarichilik"
+  },
+  {
+   "file": "parranda_09.jpg",
+   "true": "parranda",
+   "probe": "parranda",
+   "score": 0.422,
+   "zero_shot": "issiqxona"
+  },
+  {
+   "file": "parranda_11.jpg",
+   "true": "parranda",
+   "probe": "parranda",
+   "score": 0.863,
+   "zero_shot": "asalarichilik"
+  },
+  {
+   "file": "parranda_12.jpg",
+   "true": "parranda",
+   "probe": "parranda",
+   "score": 0.642,
+   "zero_shot": "chorva"
+  },
+  {
+   "file": "parranda_14.jpg",
+   "true": "parranda",
+   "probe": "parranda",
+   "score": 0.511,
+   "zero_shot": "asalarichilik"
+  },
+  {
+   "file": "asalarichilik_09.jpg",
+   "true": "asalarichilik",
+   "probe": "other",
+   "score": 0.499,
+   "zero_shot": "asalarichilik"
+  },
+  {
+   "file": "asalarichilik_10.jpg",
+   "true": "asalarichilik",
+   "probe": "parranda",
+   "score": 0.297,
+   "zero_shot": "asalarichilik"
+  },
+  {
+   "file": "other_01.jpg",
+   "true": "other",
+   "probe": "other",
+   "score": 0.42,
+   "zero_shot": "tikuv_dastgohi"
+  },
+  {
+   "file": "other_02.jpg",
+   "true": "other",
+   "probe": "other",
+   "score": 0.737,
+   "zero_shot": "asalarichilik"
+  },
+  {
+   "file": "other_14.jpg",
+   "true": "other",
+   "probe": "other",
+   "score": 0.723,
+   "zero_shot": "asalarichilik"
+  },
+  {
+   "file": "other_15.jpg",
+   "true": "other",
+   "probe": "other",
+   "score": 0.724,
+   "zero_shot": "asalarichilik"
+  },
+  {
+   "file": "other_19.jpg",
+   "true": "other",
+   "probe": "other",
+   "score": 0.662,
+   "zero_shot": "asalarichilik"
+  },
+  {
+   "file": "other_21.jpg",
+   "true": "other",
+   "probe": "other",
+   "score": 0.529,
+   "zero_shot": "tikuv_dastgohi"
+  },
+  {
+   "file": "other_22.jpg",
+   "true": "other",
+   "probe": "other",
+   "score": 0.667,
+   "zero_shot": "tikuv_dastgohi"
+  },
+  {
+   "file": "other_23.jpg",
+   "true": "other",
+   "probe": "other",
+   "score": 0.691,
+   "zero_shot": "asalarichilik"
+  },
+  {
+   "file": "other_29.jpg",
+   "true": "other",
+   "probe": "other",
+   "score": 0.567,
+   "zero_shot": "asalarichilik"
+  },
+  {
+   "file": "other_31.jpg",
+   "true": "other",
+   "probe": "other",
+   "score": 0.643,
+   "zero_shot": "asalarichilik"
+  },
+  {
+   "file": "other_33.jpg",
+   "true": "other",
+   "probe": "other",
+   "score": 0.332,
+   "zero_shot": "chorva"
+  }
+ ],
+ "tau_final": 0.37,
+ "clip_load": [
+  {
+   "seconds": 16.087616199976765,
+   "rss_mb": 1268.890625
+  },
+  {
+   "seconds": 15.364510599989444,
+   "rss_mb": 1266.37890625
+  },
+  {
+   "seconds": 15.10296379995998,
+   "rss_mb": 1269.23828125
+  }
+ ],
+ "warm_up_total": [
+  {
+   "seconds": 24.163342600048054,
+   "rss_mb": 1421.80859375
+  },
+  {
+   "seconds": 24.06937199999811,
+   "rss_mb": 1423.1171875
+  },
+  {
+   "seconds": 24.327045599988196,
+   "rss_mb": 1423.93359375
+  }
+ ]
+}

@@ -33,6 +33,9 @@ QUERIES = {
     "issiqxona": ["greenhouse vegetables", "greenhouse tomatoes", "polytunnel greenhouse", "greenhouse interior"],
     "parranda": ["poultry farm", "chickens farm", "hens", "broiler chickens"],
     "asalarichilik": ["beehives", "apiary", "beekeeping hives", "bee hives field"],
+    "other": ["bedroom interior", "kitchen interior", "passenger car street", "smartphone", "laptop computer", "pizza food",
+              "mountain landscape", "lake landscape", "city street", "paper document", "bicycle", "airplane", "sofa furniture",
+              "forest trees", "dog", "cat", "bus", "train", "office desk", "bridge"],
     "faces_test": ["farmer with cow", "woman sewing machine", "beekeeper with hive", "farmer with chickens",
                    "worker greenhouse", "tailor at sewing machine", "man with cattle", "woman feeding chickens"],
 }
@@ -76,18 +79,23 @@ def search(term: str, limit: int = 50) -> list[dict]:
     return out
 
 
-def candidates(work: Path, per_purpose: int = 40):
+def candidates(work: Path, per_purpose: int = 40, only: list[str] | None = None):
     work.mkdir(parents=True, exist_ok=True)
     allc = {}
     for purpose, terms in QUERIES.items():
+        if only and purpose not in only:
+            continue
         seen, items = set(), []
+        cap = 4 if purpose == "other" else None                # "other": a few per term for variety
         for term in terms:
+            taken = 0
             for c in search(term):
-                if c["source_url"] not in seen:
+                if c["source_url"] not in seen and (cap is None or taken < cap):
                     seen.add(c["source_url"])
                     items.append(c)
+                    taken += 1
             time.sleep(1.0)
-        items = items[:per_purpose if purpose != "faces_test" else 60]
+        items = items[:per_purpose if purpose not in ("faces_test", "other") else 90]
         for i, c in enumerate(items):
             c["id"] = f"{purpose}_{i:02d}"
             try:
@@ -106,6 +114,10 @@ def candidates(work: Path, per_purpose: int = 40):
 def build(work: Path, keep: dict[str, list[str]]):
     allc = json.loads((work / "candidates.json").read_text(encoding="utf-8"))
     OUT.mkdir(parents=True, exist_ok=True)
+    old = []
+    if (OUT / "manifest.csv").exists():                     # keep the rows of purposes that are not rebuilt now
+        old = [[r[k] for k in ("file", "purpose", "title", "author", "license", "source_url")]
+               for r in csv.DictReader(open(OUT / "manifest.csv", encoding="utf-8")) if r["purpose"] not in keep]
     rows = []
     for purpose, ids in keep.items():
         by_id = {c["id"]: c for c in allc[purpose]}
@@ -117,7 +129,7 @@ def build(work: Path, keep: dict[str, list[str]]):
     with open(OUT / "manifest.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["file", "purpose", "title", "author", "license", "source_url"])
-        w.writerows(rows)
+        w.writerows(old + rows)
     print(len(rows), "images,", sum(p.stat().st_size for p in OUT.glob("*.jpg")) // 1024, "KB")
 
 
@@ -126,8 +138,9 @@ def main():
     ap.add_argument("stage", choices=["candidates", "build"])
     ap.add_argument("--work", required=True, type=Path)
     ap.add_argument("--keep", type=Path)
+    ap.add_argument("--only", nargs="*", help="candidates stage: only these purposes")
     a = ap.parse_args()
-    candidates(a.work) if a.stage == "candidates" else build(a.work, json.loads(a.keep.read_text(encoding="utf-8")))
+    candidates(a.work, only=a.only) if a.stage == "candidates" else build(a.work, json.loads(a.keep.read_text(encoding="utf-8")))
 
 
 if __name__ == "__main__":

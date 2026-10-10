@@ -19,6 +19,7 @@ RES_HOLDOUT = ARTIFACTS / "eval_money_trail_holdout.json"
 RES_LATENCY = ARTIFACTS / "eval_latency.json"
 RES_PHOTO = ARTIFACTS / "eval_photo.json"
 RES_SCENARIO = ARTIFACTS / "eval_scenario.json"
+RES_ASSET = ARTIFACTS / "eval_asset.json"
 M = "Money-trail model (LightGBM)"
 EVAL = "`python -m ml.eval.eval_money_trail`"
 
@@ -131,6 +132,91 @@ def render_latency() -> list[str]:
          f"(of which portfolio build {min(c['init_s'] for c in lat['cold']):.1f} - {max(c['init_s'] for c in lat['cold']):.1f} s) |"]
     mp = artifact_paths("money_trail_v2")[0]
     L += [f"| Model artifact `money_trail_v2.txt` | {mp.stat().st_size / 1024:.0f} KB |", "| Cost per check | 0 (local model, no external API) |", ""]
+    return L
+
+
+def render_asset() -> list[str]:
+    a = _load(RES_ASSET)
+    L = []
+    w = L.append
+    w("### Asset check: is the thing in the photo what the loan was for? (OpenCLIP ViT-B-32, CPU)")
+    w("")
+    if not a:
+        w("_Not evaluated yet: `python -m ml.eval.eval_asset`._")
+        w("")
+        return L
+    z, p, h, fm = a["zero_shot"], a["probe_cv"], a["held_out"], a["false_match"]
+    cls = list(a["counts"])
+    w(f"Produced by `python -m ml.eval.eval_asset`. Library: {a['n']} images, " + ", ".join(f"{k} {v}" for k, v in a["counts"].items()) +
+      " (`other` = random things: rooms, vehicles, phones / laptops, food, landscapes, documents, animals, people; all openly licensed, "
+      "`ml/assets/photos/manifest.csv`). Zero-shot = cosine similarity to English prompts per class; probe = logistic regression on the CLIP image "
+      f"embeddings. **Stratified {a['folds']}-fold cross-validation**; the threshold tau of the 'matches the loan purpose' decision (probability of the loan's purpose >= tau) "
+      "is chosen inside every training fold (inner out-of-fold probabilities, best F1), never on the test fold. These are tiny, hand-picked "
+      "Wikimedia images: the numbers say how the method behaves on this library, not on real borrower photos.")
+    w("")
+    w("**6-class accuracy (what is in the photo)**")
+    w("")
+    w("| Class | n | zero-shot | linear probe (CV) |")
+    w("|---|---|---|---|")
+    for c in cls:
+        w(f"| {c} | {a['counts'][c]} | {pct(z['per_class'][c])} | {pct(p['per_class'][c])} |")
+    w(f"| **all** | {a['n']} | **{pct(z['acc'])}** | **{pct(p['acc'])}** |")
+    w("")
+    zb, pb = z["binary"], p["binary"]
+    w("**Binary task: the photo matches the loan purpose** (every image paired with each of the 5 purposes; positive = the image shows that purpose; "
+      f"{pb['n_pos']} positive and {pb['n_neg']} negative pairs, pooled over the CV test folds)")
+    w("")
+    w("| Method | tau per fold | precision | recall | F1 | TP / FP / FN |")
+    w("|---|---|---|---|---|---|")
+    for name, d, taus in (("zero-shot", zb, z["taus"]), ("linear probe", pb, p["taus"])):
+        w(f"| {name} | {', '.join(f'{t:.2f}' for t in taus)} | {pct(d['precision'])} | {pct(d['recall'])} | {pct(d['f1'])} | {d['tp']} / {d['fp']} / {d['fn']} |")
+    w("")
+    w("False matches on photos of random things (the situation of a judge photographing something else): out of "
+      f"{fm['probe']['other_pairs']} pairs (an `other` image x a purpose) the probe says 'matches' "
+      f"{pct(fm['probe']['other_rate'])} of the time, zero-shot {pct(fm['zero_shot']['other_rate'])}; for assets of a different purpose "
+      f"({fm['probe']['wrong_asset_pairs']} pairs) {pct(fm['probe']['wrong_asset_rate'])} (probe) and {pct(fm['zero_shot']['wrong_asset_rate'])} (zero-shot).")
+    w("")
+    hb, hz = h["probe_binary"], h["zero_shot_binary"]
+    w(f"**The {h['n']} images left out of the portfolio photo index** (probe trained on the other images, tau chosen on them): probe accuracy "
+      f"{pct(h['probe_acc'])} ({round(h['probe_acc'] * h['n'])}/{h['n']}), zero-shot {pct(h['zero_shot_acc'])} ({round(h['zero_shot_acc'] * h['n'])}/{h['n']}); "
+      f"binary task probe TP/FP/FN {hb['tp']}/{hb['fp']}/{hb['fn']} (n_pos {hb['n_pos']}, n_neg {hb['n_neg']}), zero-shot {hz['tp']}/{hz['fp']}/{hz['fn']}. "
+      "With 10 images these are counts, not rates to rely on.")
+    w("")
+    w(f"Deployed: the probe fitted on all {a['n']} images, tau = {a['tau_final']:.2f} (from all-data out-of-fold probabilities); artifact "
+      "`ml/artifacts/asset_probe_v1.npz` (+ `.json`). `check_photo().asset_match = {label, score, matches_purpose, label_uz}`; "
+      "`matches_purpose == false` escalates the loan to at least yellow (`PHOTO_ASSET_MISMATCH`, section 5).")
+    w("")
+    w("**Robustness** (same transforms as the duplicate test; each transformed copy is classified by the probe / zero-shot of its CV fold; "
+      "'label kept' = same predicted class as the untransformed image):")
+    w("")
+    w("| Transform | probe accuracy | probe label kept | zero-shot accuracy | zero-shot label kept |")
+    w("|---|---|---|---|---|")
+    for t, d in a["robustness"].items():
+        w(f"| {t} | {pct(d['probe_correct'])} | {pct(d['probe_same'])} | {pct(d['zs_correct'])} | {pct(d['zs_same'])} |")
+    w(f"| (no transform) | {pct(p['acc'])} | 100.0% | {pct(z['acc'])} | 100.0% |")
+    w("")
+    cl, wu = a["clip_load"], a["warm_up_total"]
+    w("**Warm-up and memory** (fresh processes, 3 runs; CLIP weights already in the cache directory; the one-off 354 MB weights download is not included): "
+      f"loading CLIP (imports + model + prompts) {min(c['seconds'] for c in cl):.1f} - {max(c['seconds'] for c in cl):.1f} s, process memory after loading CLIP "
+      f"{min(c['rss_mb'] for c in cl):.0f} - {max(c['rss_mb'] for c in cl):.0f} MB; full `ml.api.warm_up()` (portfolio + face detector + CLIP) "
+      f"{min(c['seconds'] for c in wu):.1f} - {max(c['seconds'] for c in wu):.1f} s, memory {min(c['rss_mb'] for c in wu):.0f} - {max(c['rss_mb'] for c in wu):.0f} MB. "
+      "Both are within the deploy limits we set (warm-up <= 30 s, memory <= 4 GB). `check_photo` latency with CLIP is in the photo latency table above; "
+      "CPU time per component and cost per 1 000 checks: [`docs/cost.md`](cost.md).")
+    w("")
+    bad = a["misclassified"]
+    w(f"**Failure cases measured on this library** ({len(bad)} of {a['n']} images are wrong for the probe (CV) or for zero-shot):")
+    w("")
+    w("| Image | true | probe (CV) | zero-shot |")
+    w("|---|---|---|---|")
+    for b in bad[:14]:
+        w(f"| `{b['file']}` | {b['true']} | {b['probe']} | {b['zero_shot']} |")
+    if len(bad) > 14:
+        w(f"| ... | | | ({len(bad) - 14} more in `ml/artifacts/eval_asset.json`) |")
+    w("")
+    w("Not measured but expected: a toy or a picture / painting of a cow or a sewing machine looks like the real thing to CLIP; a cluttered workshop with "
+      "several objects; poultry vs wild birds; a screen showing a photo; the probe only knows 6 classes, so the name in `label_uz` for non-assets "
+      "comes from a separate zero-shot list of 13 everyday categories and can be wrong. The check is a flag for the officer, not proof.")
+    w("")
     return L
 
 
@@ -336,6 +422,7 @@ def render() -> str:
         w("_Not evaluated yet: `python -m ml.eval.eval_photo`._")
         w("")
 
+    L += render_asset()
     L += render_scenario_fusion()
     w("## 6. Known failure cases")
     w("")
@@ -371,7 +458,10 @@ def render() -> str:
     w(".venv/Scripts/python -m ml.eval.eval_photo --write-config        # photo duplicate variant + threshold")
     w(".venv/Scripts/python -m ml.photo.index                           # photo index on the demo split")
     w(".venv/Scripts/python -m ml.eval.eval_photo")
+    w(".venv/Scripts/python -m ml.eval.eval_asset                       # CLIP: zero-shot vs probe, CV, robustness, warm-up (writes the probe)")
+    w(".venv/Scripts/python -m ml.photo.index                           # rebuild the photo index (adds the asset check of the portfolio photos)")
     w(".venv/Scripts/python -m ml.eval.eval_scenario                    # scenario latency + example")
+    w(".venv/Scripts/python -m ml.eval.measure_cost                     # CPU time per component -> docs/cost.md")
     w(".venv/Scripts/python -m ml.eval.build_metrics                    # regenerate this file from the stored results")
     w(".venv/Scripts/python -m pytest ml/tests -q")
     w("```")

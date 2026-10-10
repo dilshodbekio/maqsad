@@ -22,8 +22,9 @@ POLICY = {
                       when=f"geo_ok == False: the photo was taken more than {photo_config.GEO_MAX_KM:g} km from the borrower (assumed limit)"),
     "PHOTO_TIME": dict(min_color="yellow", active=True,
                        when="time_ok == False: captured before disbursement or in the future"),
-    "PHOTO_ASSET_MISMATCH": dict(min_color="yellow", active=False,
-                                 when="asset_match below a threshold (switched on when the CLIP step is added)"),
+    "PHOTO_ASSET_MISMATCH": dict(min_color="yellow", active=True,
+                                 when="asset_match.matches_purpose == False: the photo does not show the asset the loan was for "
+                                      "(CLIP + linear probe, `ml/photo/asset.py`)"),
 }
 
 
@@ -43,7 +44,8 @@ def photo_signals(*, ref: str, photo_label: str, duplicates: list[dict], geo_ok,
     subject = "Yuklangan rasm" if uploaded else "Bu kreditdagi rasm"
     out = []
     data = dict(photo=photo_label, uploaded=uploaded, duplicate_of=duplicates, geo_ok=geo_ok,
-                distance_km=None if distance_km is None else round(float(distance_km), 1), time_ok=time_ok)
+                distance_km=None if distance_km is None else round(float(distance_km), 1), time_ok=time_ok,
+                asset_match=asset_match)
 
     def add(code, text):
         if POLICY[code]["active"]:
@@ -55,6 +57,8 @@ def photo_signals(*, ref: str, photo_label: str, duplicates: list[dict], geo_ok,
     if geo_ok is False:
         km = f"{distance_km:.0f} km uzoqda" if distance_km is not None else "uzoqda"
         add("PHOTO_FAR", f"Rasm olingan joy qarz oluvchining manzilidan {km} (ruxsat etilgan masofa: {photo_config.GEO_MAX_KM:g} km)")
+    if asset_match is not None and asset_match.get("matches_purpose") is False:
+        add("PHOTO_ASSET_MISMATCH", f"Rasmda kredit maqsadiga mos aktiv aniqlanmadi (aniqlangan: {asset_match['label_uz']})")
     if time_ok is False:
         add("PHOTO_TIME", "Rasm olingan vaqt ishonchli emas (kredit berilishidan oldin yoki kelajakda ko'rsatilgan)")
     return out

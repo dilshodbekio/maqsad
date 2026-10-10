@@ -255,7 +255,7 @@ def test_get_loan_photos(P, idx):
     d = api.get_loan(lid)
     assert len(d["photos"]) == 1
     p = d["photos"][0]
-    assert set(p) == {"photo_id", "path", "purpose", "captured_at", "lat", "lon", "duplicate_of", "source"}
+    assert set(p) == {"photo_id", "path", "purpose", "captured_at", "lat", "lon", "duplicate_of", "asset_match", "source"}
     assert p["source"] == "portfolio"
     assert (config.ROOT / p["path"]).is_file() and p["purpose"] == str(P.loans.at[lid, "purpose"])
     for l in loans_without_photo(P, idx, 3):

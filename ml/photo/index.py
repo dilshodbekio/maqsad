@@ -58,8 +58,12 @@ def build_index() -> dict:
         for lid in picked:
             images.append(dict(file=fs.pop(0), purpose=p, photo_id=loans.at[lid, "photo_id"], loans=[lid]))
         reserved += fs
+    from .asset import get_asset_model
+    am = get_asset_model()
     for im in images:
-        im["hash"] = hashing.to_json(_hash_file(im["file"]))
+        rgb = imageio.decode((config.ASSETS / im["file"]).read_bytes())
+        im["hash"] = hashing.to_json(hashing.hash_image(rgb))
+        im["asset"] = am.asset_match(rgb, im["purpose"])                # asset check of the portfolio photo (in-sample for the probe)
     n_loans = sorted({x for im in images for x in im["loans"]})
     out = dict(version="photo_index_v1", portfolio=dict(split="demo", seed=SPLITS["demo"].seed),
                seed=SEED, images=images, reserved=sorted(reserved),
@@ -97,7 +101,7 @@ class PhotoIndex:
         out = []
         for im in self.by_loan.get(loan_id, []):
             out.append(dict(photo_id=im["photo_id"], path=f"ml/assets/photos/{im['file']}", purpose=im["purpose"],
-                            duplicate_of=self.matches(im["hash"], exclude_loan=loan_id)))
+                            duplicate_of=self.matches(im["hash"], exclude_loan=loan_id), asset_match=im.get("asset")))
         return out
 
 

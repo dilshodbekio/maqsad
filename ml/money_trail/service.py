@@ -153,7 +153,8 @@ class Portfolio:
             time_ok = bool(row["disbursed_at"] <= row["photo_captured_at"] <= row["snapshot_date"])
             for p in idx.photos_of(lid):
                 sig = fusion.photo_signals(ref=f"photo:{p['photo_id']}", photo_label=p["path"], duplicates=p["duplicate_of"],
-                                           geo_ok=km <= photo_config.GEO_MAX_KM, distance_km=km, time_ok=time_ok, uploaded=False)
+                                           geo_ok=km <= photo_config.GEO_MAX_KM, distance_km=km, time_ok=time_ok,
+                                           asset_match=p.get("asset_match"), uploaded=False)
                 if sig:
                     out.setdefault(lid, []).extend(sig)
         return out
@@ -202,7 +203,8 @@ class Portfolio:
         row = self.loans.loc[loan_id]
         return [dict(photo_id=p["photo_id"], path=p["path"], purpose=p["purpose"],
                      captured_at=_py(row["photo_captured_at"]), lat=float(row["photo_lat"]),
-                     lon=float(row["photo_lon"]), duplicate_of=p["duplicate_of"], source="portfolio")
+                     lon=float(row["photo_lon"]), duplicate_of=p["duplicate_of"], asset_match=p.get("asset_match"),
+                     source="portfolio")
                 for p in get_index().photos_of(loan_id)]
 
     def loan(self, loan_id: str, sandbox_id=None) -> dict:

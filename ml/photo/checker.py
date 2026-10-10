@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import threading
 import time
+import warnings
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
@@ -83,6 +84,22 @@ def _time_ok(captured_at, loan) -> Optional[bool]:
     return t >= loan["disbursed_at"].to_pydatetime()
 
 
+def _asset_match(rgb, purpose) -> Optional[dict]:
+    """CLIP + probe asset check, or None if the optional CLIP stack / weights are not available (warned once)."""
+    global _asset_warned
+    try:
+        from .asset import get_asset_model
+        return get_asset_model().asset_match(rgb, purpose)
+    except (ImportError, OSError, RuntimeError) as e:
+        if not _asset_warned:
+            _asset_warned = True
+            warnings.warn(f"asset check disabled: {type(e).__name__}: {e}")
+        return None
+
+
+_asset_warned = False
+
+
 def _match_and_remember(sandbox_id, loan_id, h, geo_ok, distance_km, time_ok, asset=None) -> list[dict]:
     """ATOMIC (one critical section): the earlier uploads of this sandbox that duplicate `h`, then this upload is
     stored. Two concurrent uploads of the same photo therefore always see each other in exactly one direction."""
@@ -126,7 +143,7 @@ def sandbox_signals(sandbox_id: Optional[str]) -> dict[str, list[dict]]:
                       key=lambda x: (-x["similarity"], x["loan_id"]))
         sig = photo_signals(ref=f"photo:sandbox:{e['loan_id']}:{e['seq']}", photo_label=f"sandbox upload #{e['seq']}",
                             duplicates=dups, geo_ok=e["geo_ok"], distance_km=e["distance_km"], time_ok=e["time_ok"],
-                            uploaded=True)
+                            asset_match=e.get("asset"), uploaded=True)
         if sig:
             out.setdefault(e["loan_id"], []).extend(sig)
     return out
@@ -147,12 +164,13 @@ def check_photo(loan_id: str, image_bytes: bytes, lat: Optional[float] = None, l
     time_ok = _time_ok(captured_at, loan)
     blurred, n_faces = blur_faces(_detector(), rgb)
     jpeg = imageio.encode_jpeg(blurred)                              # re-encoding drops EXIF / metadata
+    asset = _asset_match(rgb, str(loan["purpose"]))                  # on the (unblurred) pixels, in memory
     dups = get_index().matches(h, exclude_loan=loan_id)
     if sandbox_id is not None:
-        dups = sorted(dups + _match_and_remember(sandbox_id, loan_id, h, geo_ok, km, time_ok),
+        dups = sorted(dups + _match_and_remember(sandbox_id, loan_id, h, geo_ok, km, time_ok, asset),
                       key=lambda x: (-x["similarity"], x["loan_id"]))
     return dict(
-        asset_match=None,                                            # CLIP asset check comes later
+        asset_match=asset,                                           # {label, score, matches_purpose, label_uz} | None
         duplicate_of=dups,
         geo_ok=geo_ok, time_ok=time_ok,
         faces_blurred=n_faces > 0,                                   # True = faces were found and blurred

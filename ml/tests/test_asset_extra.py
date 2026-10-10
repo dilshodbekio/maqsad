@@ -335,7 +335,7 @@ def test_warm_up_is_idempotent_and_does_not_reload_clip():
     assert asset._model is m and first["clip_loaded"] and second["clip_loaded"]
     assert second["clip_s"] <= max(1.0, first["clip_s"])
     assert asset.get_asset_model() is m
-    assert set(second) == {"portfolio_s", "face_detector_s", "clip_s", "total_s", "clip_loaded"}
+    assert set(second) == {"portfolio_s", "face_detector_s", "clip_s", "total_s", "clip_loaded", "clip_error"}
 
 
 def test_get_asset_model_is_a_singleton_under_threads():

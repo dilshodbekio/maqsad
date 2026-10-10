@@ -154,7 +154,7 @@ class Portfolio:
             for p in idx.photos_of(lid):
                 sig = fusion.photo_signals(ref=f"photo:{p['photo_id']}", photo_label=p["path"], duplicates=p["duplicate_of"],
                                            geo_ok=km <= photo_config.GEO_MAX_KM, distance_km=km, time_ok=time_ok,
-                                           asset_match=p.get("asset_match"), uploaded=False)
+                                           asset_match=p.get("asset_match"), uploaded=False, purpose=str(row["purpose"]))
                 if sig:
                     out.setdefault(lid, []).extend(sig)
         return out

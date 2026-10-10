@@ -163,9 +163,9 @@ inside a copy of the demo portfolio's context; the cached portfolio is never mod
   (`blurred_image`, internal) and a perceptual hash are kept.
 - `faces_count` = faces found; `faces_blurred` = `faces_count > 0` (faces were found and blurred).
 - `asset_match` = `{label, score, matches_purpose, label_uz}` from OpenCLIP ViT-B-32 (CPU) + a linear probe: `label` is the most likely of the 5 loan
-  purposes or `other`, `score` its probability, `matches_purpose` = probability of the loan's own purpose >= a threshold chosen in cross-validation,
+  purposes or `other`, `score` its probability, `matches_purpose` = (`label` == the loan's purpose) **and** its probability >= a threshold chosen in cross-validation (one rule; the reason text never says "no matching asset" when `label` equals the purpose),
   `label_uz` an Uzbek name of what was found (for non-assets one of a few everyday categories, e.g. "avtomobil"). It is `null` only if the CLIP
-  stack / weights are unavailable (a warning is logged once and no `PHOTO_ASSET_MISMATCH` is raised). `geo_ok` / `time_ok` are `null` when the input is missing.
+  stack / weights are unavailable (the failure is cached and logged once, nothing is downloaded at request time, no `PHOTO_ASSET_MISMATCH` is raised; deployment commands and env vars: `ml/README.md`). `geo_ok` / `time_ok` are `null` when the input is missing.
 - The photo result does **not** change the money-trail `risk`. It can only raise the queue colour / priority through the evidence-fusion
   policy below (`ml/fusion.py`); `score_loan` and `score_scenario` stay money-trail only.
 

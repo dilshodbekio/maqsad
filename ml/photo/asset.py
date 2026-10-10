@@ -7,13 +7,19 @@
   NOT committed).
 * "matches the loan purpose" = probe probability of the loan's purpose >= tau (tau chosen inside cross-validation).
 
-CLIP weights (OpenAI ViT-B-32, MIT licence) are downloaded once into a cache directory: env `MAQSAD_CLIP_CACHE`
-(default `ml/.cache/clip`). A Dockerfile can pre-download them at build time with `python -m ml.photo.asset --download`.
+CLIP weights (OpenAI ViT-B-32) live in a cache directory: env `MAQSAD_CLIP_CACHE` (default `ml/.cache/clip`). They are NEVER
+downloaded at request time: the service only loads `ViT-B-32.pt` from that directory; a Dockerfile pre-downloads it at build time with
+`python -m ml.photo.asset --download` (see ml/README.md). If CLIP cannot be loaded (no torch, no weights, corrupt probe) the failure is cached and logged
+once, `check_photo` returns `asset_match: None` without retrying, and no PHOTO_ASSET_MISMATCH is raised. `MAQSAD_ASSET_CHECK=off` switches the check off.
 `torch` threads: env `MAQSAD_TORCH_THREADS` (default: torch's default).
+
+Decision rule (one rule for label, matches_purpose and the reason text): `matches_purpose = (argmax class == the loan's purpose) and
+p(purpose) >= tau`.
 """
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 from pathlib import Path
@@ -25,7 +31,14 @@ from ml.generator.config import PURPOSES
 
 from . import config
 
+os.environ.setdefault("HF_HUB_OFFLINE", "1")          # open_clip must never reach out to the Hugging Face hub at runtime
 MODEL_NAME, PRETRAINED = "ViT-B-32", "openai"
+WEIGHTS_FILE = "ViT-B-32.pt"
+log = logging.getLogger("maqsad.asset")
+
+
+class AssetUnavailable(RuntimeError):
+    """CLIP could not be loaded (cached): check_photo then returns asset_match None."""
 CLASSES = (*PURPOSES, "other")
 PROBE_NPZ = config.ARTIFACTS / "asset_probe_v1.npz"
 PROBE_JSON = config.ARTIFACTS / "asset_probe_v1.json"
@@ -55,6 +68,10 @@ def cache_dir() -> Path:
     return Path(os.environ.get("MAQSAD_CLIP_CACHE") or DEFAULT_CACHE)
 
 
+def weights_path() -> Path:
+    return cache_dir() / WEIGHTS_FILE
+
+
 def softmax(z: np.ndarray) -> np.ndarray:
     z = z - z.max(axis=-1, keepdims=True)
     e = np.exp(z)
@@ -64,10 +81,14 @@ def softmax(z: np.ndarray) -> np.ndarray:
 class AssetModel:
     """CLIP + prompts (+ the probe if its artifact exists). Thread-safe; one instance per process."""
 
-    def __init__(self):
+    def __init__(self, allow_download: bool = False):
+        if os.environ.get("MAQSAD_ASSET_CHECK", "").lower() in ("off", "0", "false", "no"):
+            raise OSError("asset check switched off (MAQSAD_ASSET_CHECK=off)")
+        if not allow_download and not weights_path().exists():     # never download at request time
+            raise OSError(f"CLIP weights not found at {weights_path()} (pre-download at build time: python -m ml.photo.asset --download)")
         import open_clip
         import torch
-        if os.environ.get("MAQSAD_TORCH_THREADS"):
+        if os.environ.get("MAQSAD_TORCH_THREADS", "").isdigit():
             torch.set_num_threads(int(os.environ["MAQSAD_TORCH_THREADS"]))
         self._torch = torch
         cache_dir().mkdir(parents=True, exist_ok=True)
@@ -88,10 +109,13 @@ class AssetModel:
         self.tau = None
         self.meta = {}
         if PROBE_NPZ.exists() and PROBE_JSON.exists():
-            z = np.load(PROBE_NPZ)
-            self.W, self.b = z["W"], z["b"]
-            self.meta = json.loads(PROBE_JSON.read_text(encoding="utf-8"))
-            self.tau = float(self.meta["tau"])
+            try:
+                z = np.load(PROBE_NPZ)
+                self.W, self.b = z["W"], z["b"]
+                self.meta = json.loads(PROBE_JSON.read_text(encoding="utf-8"))
+                self.tau = float(self.meta["tau"])
+            except (ValueError, KeyError, OSError) as e:
+                raise RuntimeError(f"asset probe artifact is corrupt: {type(e).__name__}") from e
 
     def _text(self, prompts, tok) -> np.ndarray:
         with self._torch.no_grad():
@@ -122,31 +146,56 @@ class AssetModel:
         """{label, score, matches_purpose, label_uz} for a photo uploaded for a loan of this purpose."""
         if self.W is None:
             raise RuntimeError("asset probe artifact missing: run `python -m ml.eval.eval_asset`")
-        emb = self.embed(rgb)
+        return self.decide(self.embed(rgb), purpose)
+
+    def decide(self, emb: np.ndarray, purpose: str) -> dict:
+        """The decision from an embedding: label = most likely class; matches_purpose = (label == purpose) and p(purpose) >= tau."""
+        pi = CLASSES.index(purpose)                       # ValueError for an unknown purpose
         p = self.probe_probs(emb)[0]
         k = int(np.argmax(p))
         label = CLASSES[k]
         return dict(label=label, score=round(float(p[k]), 4),
-                    matches_purpose=bool(p[CLASSES.index(purpose)] >= self.tau),
+                    matches_purpose=bool(k == pi and p[pi] >= self.tau),
                     label_uz=self.other_name(emb) if label == "other" else LABEL_UZ[label])
 
 
 _init_lock = threading.Lock()
 _model: Optional[AssetModel] = None
+_failed: Optional[str] = None
 
 
 def get_asset_model() -> AssetModel:
-    """Load CLIP once (thread-safe). Call it during warm-up (ml.api.warm_up) so no upload pays for the load."""
-    global _model
-    if _model is None:
-        with _init_lock:
-            if _model is None:
+    """Load CLIP once (thread-safe) from the local cache. Call it during warm-up (ml.api.warm_up) so no upload pays for the load.
+    A failed load is cached and logged ONCE; later calls raise AssetUnavailable immediately (no retry, no download, no blocking)."""
+    global _model, _failed
+    if _model is not None:
+        return _model
+    if _failed is not None:
+        raise AssetUnavailable(_failed)
+    with _init_lock:
+        if _model is None and _failed is None:
+            try:
                 _model = AssetModel()
+            except Exception as e:                         # noqa: BLE001 - any failure disables the check, the service keeps running
+                _failed = f"{type(e).__name__}: {e}"
+                log.warning("asset check disabled for this process (check_photo returns asset_match None): %s", _failed)
+    if _model is None:
+        raise AssetUnavailable(_failed)
     return _model
+
+
+def load_error() -> Optional[str]:
+    """Why CLIP is not available (None if it is, or was not tried yet)."""
+    return _failed
+
+
+def _reset_for_tests():
+    global _model, _failed
+    _model, _failed = None, None
 
 
 if __name__ == "__main__":
     import sys
-    if "--download" in sys.argv:
-        get_asset_model()
-        print("CLIP weights cached in", cache_dir())
+    if "--download" in sys.argv:                     # build time only: the one place that may fetch the weights
+        AssetModel(allow_download=True)
+        print("CLIP weights cached in", weights_path(), "-", weights_path().stat().st_size // 2 ** 20, "MB")

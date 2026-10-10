@@ -88,8 +88,8 @@ def _asset_match(rgb, purpose) -> Optional[dict]:
     """CLIP + probe asset check, or None if the optional CLIP stack / weights are not available (warned once)."""
     global _asset_warned
     try:
-        from .asset import get_asset_model
-        return get_asset_model().asset_match(rgb, purpose)
+        from . import asset
+        return asset.get_asset_model().asset_match(rgb, purpose)   # fast AssetUnavailable if loading failed: never retried
     except (ImportError, OSError, RuntimeError) as e:
         if not _asset_warned:
             _asset_warned = True
@@ -100,7 +100,7 @@ def _asset_match(rgb, purpose) -> Optional[dict]:
 _asset_warned = False
 
 
-def _match_and_remember(sandbox_id, loan_id, h, geo_ok, distance_km, time_ok, asset=None) -> list[dict]:
+def _match_and_remember(sandbox_id, loan_id, h, geo_ok, distance_km, time_ok, asset=None, purpose=None) -> list[dict]:
     """ATOMIC (one critical section): the earlier uploads of this sandbox that duplicate `h`, then this upload is
     stored. Two concurrent uploads of the same photo therefore always see each other in exactly one direction."""
     idx = get_index()
@@ -114,7 +114,7 @@ def _match_and_remember(sandbox_id, loan_id, h, geo_ok, distance_km, time_ok, as
                 out.append(dict(loan_id=e["loan_id"], similarity=round(1 - d, 4)))
         sb["n"] += 1
         sb["entries"].append(dict(seq=sb["n"], loan_id=loan_id, hash=h, geo_ok=geo_ok, distance_km=distance_km,
-                                  time_ok=time_ok, asset=asset))
+                                  time_ok=time_ok, asset=asset, purpose=purpose))
         del sb["entries"][:-MAX_PER_SANDBOX]
         while len(_sandboxes) > MAX_SANDBOXES:
             _sandboxes.popitem(last=False)
@@ -143,7 +143,7 @@ def sandbox_signals(sandbox_id: Optional[str]) -> dict[str, list[dict]]:
                       key=lambda x: (-x["similarity"], x["loan_id"]))
         sig = photo_signals(ref=f"photo:sandbox:{e['loan_id']}:{e['seq']}", photo_label=f"sandbox upload #{e['seq']}",
                             duplicates=dups, geo_ok=e["geo_ok"], distance_km=e["distance_km"], time_ok=e["time_ok"],
-                            asset_match=e.get("asset"), uploaded=True)
+                            asset_match=e.get("asset"), uploaded=True, purpose=e.get("purpose"))
         if sig:
             out.setdefault(e["loan_id"], []).extend(sig)
     return out
@@ -167,7 +167,7 @@ def check_photo(loan_id: str, image_bytes: bytes, lat: Optional[float] = None, l
     asset = _asset_match(rgb, str(loan["purpose"]))                  # on the (unblurred) pixels, in memory
     dups = get_index().matches(h, exclude_loan=loan_id)
     if sandbox_id is not None:
-        dups = sorted(dups + _match_and_remember(sandbox_id, loan_id, h, geo_ok, km, time_ok, dict(asset) if asset else None),
+        dups = sorted(dups + _match_and_remember(sandbox_id, loan_id, h, geo_ok, km, time_ok, dict(asset) if asset else None, str(loan["purpose"])),
                       key=lambda x: (-x["similarity"], x["loan_id"]))
     return dict(
         asset_match=asset,                                           # {label, score, matches_purpose, label_uz} | None

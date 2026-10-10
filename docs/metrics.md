@@ -276,7 +276,7 @@ Detection is count based (no box annotations), so a miss and a false alarm on th
 
 Produced by `python -m ml.eval.eval_asset`. Library: 143 images, tikuv_dastgohi 20, chorva 20, issiqxona 20, parranda 20, asalarichilik 20, other 43 (`other` = random things: rooms, vehicles, phones / laptops, food, landscapes, documents, animals, people; all openly licensed, `ml/assets/photos/manifest.csv`). Zero-shot = cosine similarity to English prompts per class; probe = logistic regression on the CLIP image embeddings.
 
-**Leakage control.** The library has series of photos of one object by the same author (near-duplicates for CLIP). Every split is therefore **grouped by author** (110 groups; `author` in the manifest): stratified-grouped 5-fold CV, repeated with seeds 0, 1, 2, 3, 4 (values below: mean, in brackets the range over seeds). The threshold tau of the 'matches the loan purpose' decision (probability of the loan's purpose >= tau) is chosen inside every training fold (inner grouped out-of-fold probabilities, best F1), never on the test fold. An earlier ungrouped run gave 98.6% accuracy; grouping lowers it, as expected. C = 10 and the choice of the probe over zero-shot were made on this same CV (there is no untouched test set), so the numbers are optimistic by that amount. These are tiny, hand-picked Wikimedia images: they say how the method behaves on this library, not on real borrower photos.
+**Leakage control.** The library has series of photos of one object by the same author (near-duplicates for CLIP). Every split is therefore **grouped by author** (110 groups; `author` in the manifest): stratified-grouped 5-fold CV, repeated with seeds 0, 1, 2, 3, 4 (values below: mean, in brackets the range over seeds). The rule 'matches the loan purpose' is **(most likely class == the loan's purpose) and probability >= tau** (one rule for `label`, `matches_purpose` and the reason text); tau is chosen inside every training fold (inner grouped out-of-fold probabilities, best F1), never on the test fold. An earlier ungrouped run gave 98.6% accuracy; grouping lowers it, as expected. C = 10 and the choice of the probe over zero-shot were made on this same CV (there is no untouched test set), so the numbers are optimistic by that amount. These are tiny, hand-picked Wikimedia images: they say how the method behaves on this library, not on real borrower photos.
 
 **6-class accuracy (what is in the photo)**
 
@@ -295,21 +295,21 @@ Produced by `python -m ml.eval.eval_asset`. Library: 143 images, tikuv_dastgohi 
 | Method | precision | recall | F1 |
 |---|---|---|---|
 | zero-shot (tau chosen in the training folds) | 94.6% (94.6% - 94.7%) | 88.2% (87.0% - 90.0%) | 91.3% (90.6% - 92.3%) |
-| linear probe | 90.0% (85.8% - 93.1%) | 93.0% (91.0% - 97.0%) | 91.4% (88.3% - 94.1%) |
+| linear probe | 93.4% (91.8% - 94.9%) | 91.2% (89.0% - 94.0%) | 92.3% (90.8% - 94.5%) |
 
 | Seed | probe 6-class accuracy | precision | recall | F1 | TP / FP / FN |
 |---|---|---|---|---|---|
-| 0 | 93.7% | 89.2% | 91.0% | 90.1% | 91 / 11 / 9 |
-| 1 | 95.1% | 93.1% | 95.0% | 94.1% | 95 / 7 / 5 |
-| 2 | 95.8% | 89.8% | 97.0% | 93.3% | 97 / 11 / 3 |
-| 3 | 93.0% | 91.9% | 91.0% | 91.5% | 91 / 8 / 9 |
-| 4 | 93.7% | 85.8% | 91.0% | 88.3% | 91 / 15 / 9 |
+| 0 | 93.7% | 92.9% | 92.0% | 92.5% | 92 / 7 / 8 |
+| 1 | 95.1% | 94.8% | 91.0% | 92.9% | 91 / 5 / 9 |
+| 2 | 95.8% | 94.9% | 94.0% | 94.5% | 94 / 5 / 6 |
+| 3 | 93.0% | 92.7% | 89.0% | 90.8% | 89 / 7 / 11 |
+| 4 | 93.7% | 91.8% | 90.0% | 90.9% | 90 / 8 / 10 |
 
-False matches (mean over seeds) on `other` images, which come from the same 20 search categories as the negatives the probe is trained on (so this is an in-distribution rate, not the rate for any random photo): out of 215 pairs (an `other` image x a purpose) the probe says 'matches' 1.1% of the time, zero-shot 1.9%; for assets of a different purpose (400 pairs) 2.0% (probe) and 0.2% (zero-shot).
+False matches (mean over seeds) on `other` images, which come from the same 20 search categories as the negatives the probe is trained on (so this is an in-distribution rate, not the rate for any random photo): out of 215 pairs (an `other` image x a purpose) the probe says 'matches' 0.2% of the time, zero-shot 1.9%; for assets of a different purpose (400 pairs) 1.5% (probe) and 0.2% (zero-shot).
 
 **The 10 images left out of the portfolio photo index.** The probe is trained on the other images without any photo of the same author (12 images dropped for that reason, 121 left) and tau is chosen on them: probe accuracy 90.0% (9/10), zero-shot 100.0% (10/10); binary task probe TP/FP/FN 9/1/1 (n_pos 10, n_neg 40), zero-shot 10/0/0. With 10 images these are counts, not rates to rely on.
 
-Deployed: the probe fitted on all 143 images, tau = 0.38 (all-data grouped out-of-fold probabilities); artifact `ml/artifacts/asset_probe_v1.npz` (+ `.json`). `check_photo().asset_match = {label, score, matches_purpose, label_uz}`; `matches_purpose == false` escalates the loan to at least yellow (`PHOTO_ASSET_MISMATCH`, section 5). The probe is trained on every library image, so the asset results shown for the **portfolio** photos (`photos[].asset_match`) are in-sample (training images) and say nothing about accuracy.
+Deployed: the probe fitted on all 143 images, tau = 0.36 (all-data grouped out-of-fold probabilities); artifact `ml/artifacts/asset_probe_v1.npz` (+ `.json`). `check_photo().asset_match = {label, score, matches_purpose, label_uz}`; `matches_purpose = (label == loan purpose) and p >= tau`; `false` escalates the loan to at least yellow (`PHOTO_ASSET_MISMATCH`, section 5). The reason text follows the same rule: a different thing found -> 'Rasmda kredit maqsadiga mos aktiv aniqlanmadi (aniqlangan: ...)'; the right class with low confidence -> 'Rasmdagi aktiv ishonchli aniqlanmadi (eng ehtimoliy: ..., ishonch past)'; never 'no matching asset' when the label equals the purpose. The probe is trained on every library image, so the asset results shown for the **portfolio** photos (`photos[].asset_match`) are in-sample (training images) and say nothing about accuracy.
 
 **Robustness** (seed 0 folds; each transformed copy is classified by the probe / zero-shot of its CV fold; 'label kept' = same predicted class as the untransformed image):
 
@@ -342,7 +342,7 @@ Deployed: the probe fitted on all 143 images, tau = 0.38 (all-data grouped out-o
 | `other_02.jpg` | other | other | asalarichilik |
 | ... | | | (9 more in `ml/artifacts/eval_asset.json`) |
 
-Known weak spots (some measured above, some only expected): the library contains a toy sewing machine and a model of a poultry pen labelled as assets, so the probe accepts such look-alikes; a picture or painting of a cow, a cluttered workshop with several objects, poultry vs wild birds and a screen showing a photo were not tested; the probe only knows 6 classes, so the name in `label_uz` for non-assets comes from a separate zero-shot list of 13 everyday categories and can be wrong; `label` is the most likely class while `matches_purpose` uses the lower threshold tau, so in rare cases they disagree. The check is a flag for the officer, not proof.
+Known weak spots (some measured above, some only expected): the library contains a toy sewing machine and a model of a poultry pen labelled as assets, so the probe accepts such look-alikes; a picture or painting of a cow, a cluttered workshop with several objects, poultry vs wild birds and a screen showing a photo were not tested; the probe only knows 6 classes, so the name in `label_uz` for non-assets comes from a separate zero-shot list of 13 everyday categories and can be wrong. The check is a flag for the officer, not proof.
 
 ## 5. Scenario scoring and evidence fusion
 
@@ -381,6 +381,10 @@ The demo portfolio's own photos are evaluated with the same policy (duplicates i
 - **Weakest fraud groups (holdout):** T3 resale not yet happened 4.8% in budget (n=21); T4 stealth 8.8% in budget (n=34); T4 45.4% in budget (n=130); T3 56.9% in budget (n=130).
 - **Honest look-alikes that get flagged most:** honest/oked_mismatch 37.2% (n=382); honest/livestock_seller 22.5% (n=271).
 - **Fraud that has not happened yet cannot be seen:** 21 positives (T3 21) look honest at the snapshot by construction; they count against recall.
+- **CLIP weights licence (needs legal review):** the OpenAI ViT-B-32 weights are released under the MIT licence of the `openai/CLIP` repository, but OpenAI's model card calls any deployed use of the model out of scope. Production at a bank needs a legal review or a LAION-trained OpenCLIP checkpoint (for example `ViT-B-32` / `laion2b_s34b_b79k`) with its own weight licence; the probe would have to be re-trained and re-evaluated for it.
+- **Portfolio `asset_match` is in-sample:** the asset probe is fitted on every library image, including all portfolio photos, so the asset results shown for the demo portfolio's own photos (`photos[].asset_match`, 90 of 90 'matches') say nothing about accuracy and `PHOTO_ASSET_MISMATCH` never fires on the default portfolio; it fires for uploads.
+- **Toy and model objects:** the library labels a toy sewing machine (`tikuv_dastgohi_01`) and a model of a poultry pen (`parranda_08`) as assets, so the probe accepts such look-alikes; a picture of a cow or a toy would pass the asset check.
+- **Invoice below the payments shows a 'no invoice' reason:** if a scenario (or loan) has supplier payments larger than the invoice, `invoice_gap` goes negative and collides with the 'no invoice' value (-1), so the reason text reads 'Hisob-faktura mavjud emas'. The money-trail model is frozen; the fix (clip the gap at 0) is planned after the hackathon.
 - **'No income' and young loans:** v2 no longer penalises loans younger than 90 days, but the 90-day limit is an assumption about how our synthetic generator times income; real borrowers (seasonal income, grace periods) must be re-measured.
 - **Everything is synthetic:** fraud typologies, rates and the honest-but-suspicious profiles are assumptions; the generator's own structure (e.g. ring bursts, photo-reuse rates the same for all typologies) is what the model learns. See `ml/generator/README.md` (Known limitations: counterparty ID collisions, ring size up to ~12 vs. 71 in a real case).
 - **Photo module:** see the failure cases in section 4 (hash crop robustness, screen photos, side faces).

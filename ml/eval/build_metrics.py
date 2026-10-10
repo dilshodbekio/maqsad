@@ -158,8 +158,9 @@ def render_asset() -> list[str]:
     w("")
     w(f"**Leakage control.** The library has series of photos of one object by the same author (near-duplicates for CLIP). Every split is therefore "
       f"**grouped by author** ({a['n_groups']} groups; `author` in the manifest): stratified-grouped {a['folds']}-fold CV, repeated with seeds "
-      f"{', '.join(map(str, a['seeds']))} (values below: mean, in brackets the range over seeds). The threshold tau of the 'matches the loan purpose' decision "
-      "(probability of the loan's purpose >= tau) is chosen inside every training fold (inner grouped out-of-fold probabilities, best F1), never on the "
+      f"{', '.join(map(str, a['seeds']))} (values below: mean, in brackets the range over seeds). The rule 'matches the loan purpose' is "
+      "**(most likely class == the loan's purpose) and probability >= tau** (one rule for `label`, `matches_purpose` and the reason text); tau is chosen inside "
+      "every training fold (inner grouped out-of-fold probabilities, best F1), never on the "
       f"test fold. An earlier ungrouped run gave 98.6% accuracy; grouping lowers it, as expected. C = {a['c']:g} and the choice of the probe over zero-shot "
       "were made on this same CV (there is no untouched test set), so the numbers are optimistic by that amount. These are tiny, hand-picked Wikimedia "
       "images: they say how the method behaves on this library, not on real borrower photos.")
@@ -199,7 +200,10 @@ def render_asset() -> list[str]:
     w("")
     w(f"Deployed: the probe fitted on all {a['n']} images, tau = {a['tau_final']:.2f} (all-data grouped out-of-fold probabilities); artifact "
       "`ml/artifacts/asset_probe_v1.npz` (+ `.json`). `check_photo().asset_match = {label, score, matches_purpose, label_uz}`; "
-      "`matches_purpose == false` escalates the loan to at least yellow (`PHOTO_ASSET_MISMATCH`, section 5). The probe is trained on every library image, "
+      "`matches_purpose = (label == loan purpose) and p >= tau`; `false` escalates the loan to at least yellow (`PHOTO_ASSET_MISMATCH`, section 5). "
+      "The reason text follows the same rule: a different thing found -> 'Rasmda kredit maqsadiga mos aktiv aniqlanmadi (aniqlangan: ...)'; the right class with low "
+      "confidence -> 'Rasmdagi aktiv ishonchli aniqlanmadi (eng ehtimoliy: ..., ishonch past)'; never 'no matching asset' when the label equals the purpose. "
+      "The probe is trained on every library image, "
       "so the asset results shown for the **portfolio** photos (`photos[].asset_match`) are in-sample (training images) and say nothing about accuracy.")
     w("")
     w("**Robustness** (seed 0 folds; each transformed copy is classified by the probe / zero-shot of its CV fold; 'label kept' = same predicted class "
@@ -233,8 +237,7 @@ def render_asset() -> list[str]:
     w("Known weak spots (some measured above, some only expected): the library contains a toy sewing machine and a model of a poultry pen labelled as "
       "assets, so the probe accepts such look-alikes; a picture or painting of a cow, a cluttered workshop with several objects, poultry vs wild birds and a "
       "screen showing a photo were not tested; the probe only knows 6 classes, so the name in `label_uz` for non-assets comes from a separate zero-shot list "
-      "of 13 everyday categories and can be wrong; `label` is the most likely class while `matches_purpose` uses the lower threshold tau, so in rare "
-      "cases they disagree. The check is a flag for the officer, not proof.")
+      "of 13 everyday categories and can be wrong. The check is a flag for the officer, not proof.")
     w("")
     return L
 
@@ -454,6 +457,17 @@ def render() -> str:
         nv = ref["not_visible_by_typology"]
         w(f"- **Fraud that has not happened yet cannot be seen:** {sum(nv.values())} positives ({', '.join(f'{t} {c}' for t, c in nv.items() if c)}) "
           "look honest at the snapshot by construction; they count against recall.")
+    w("- **CLIP weights licence (needs legal review):** the OpenAI ViT-B-32 weights are released under the MIT licence of the `openai/CLIP` repository, but "
+      "OpenAI's model card calls any deployed use of the model out of scope. Production at a bank needs a legal review or a LAION-trained OpenCLIP checkpoint "
+      "(for example `ViT-B-32` / `laion2b_s34b_b79k`) with its own weight licence; the probe would have to be re-trained and re-evaluated for it.")
+    w("- **Portfolio `asset_match` is in-sample:** the asset probe is fitted on every library image, including all portfolio photos, so the asset results "
+      "shown for the demo portfolio's own photos (`photos[].asset_match`, 90 of 90 'matches') say nothing about accuracy and "
+      "`PHOTO_ASSET_MISMATCH` never fires on the default portfolio; it fires for uploads.")
+    w("- **Toy and model objects:** the library labels a toy sewing machine (`tikuv_dastgohi_01`) and a model of a poultry pen (`parranda_08`) as assets, so the "
+      "probe accepts such look-alikes; a picture of a cow or a toy would pass the asset check.")
+    w("- **Invoice below the payments shows a 'no invoice' reason:** if a scenario (or loan) has supplier payments larger than the invoice, `invoice_gap` goes "
+      "negative and collides with the 'no invoice' value (-1), so the reason text reads 'Hisob-faktura mavjud emas'. The money-trail model is frozen; the fix "
+      "(clip the gap at 0) is planned after the hackathon.")
     w("- **'No income' and young loans:** v2 no longer penalises loans younger than 90 days, but the 90-day limit is an assumption "
       "about how our synthetic generator times income; real borrowers (seasonal income, grace periods) must be re-measured.")
     w("- **Everything is synthetic:** fraud typologies, rates and the honest-but-suspicious profiles are assumptions; the generator's "

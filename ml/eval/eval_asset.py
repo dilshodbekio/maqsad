@@ -10,7 +10,7 @@ k-fold would put siblings of a test image into the training set, so **every spli
 (`manifest.csv` author = group): outer CV, the inner CV that chooses the threshold, the all-data out-of-fold threshold and the
 "held-out" images. The CV is repeated with 5 seeds and reported as mean and range.
 
-Protocol: stratified-grouped 5-fold; the "matches the loan purpose" threshold tau is chosen INSIDE every training fold (inner
+Protocol: stratified-grouped 5-fold; the rule "matches the loan purpose" = (most likely class == the purpose) and p(purpose) >= tau; tau is chosen INSIDE every training fold (inner
 5-fold out-of-fold probabilities, best F1), never on the test fold. The binary task pairs every image with each of the 5 loan
 purposes (positive = the image shows that purpose). C = 10 and the choice "probe vs zero-shot" were made on this same CV (there is
 no untouched test set; the numbers are optimistic by that amount). The deployed probe is fitted on all images with tau from the
@@ -62,8 +62,10 @@ def probs_of(clf, X):
 
 
 def expanded(P, y):
-    """(scores, labels) of the binary task: image x each of the 5 purposes -> p(purpose), is it that purpose."""
-    return np.concatenate([P[:, k] for k in range(5)]), np.concatenate([(y == k) for k in range(5)])
+    """(scores, labels) of the binary task: image x each of the 5 purposes. The score is p(purpose) when the purpose is the most
+    likely class and 0 otherwise, so `score >= tau` is exactly the deployed rule (argmax == purpose and p >= tau)."""
+    top = P.argmax(1)
+    return (np.concatenate([P[:, k] * (top == k) for k in range(5)]), np.concatenate([(y == k) for k in range(5)]))
 
 
 def prf(scores, labels, tau):
@@ -117,7 +119,7 @@ def cv_once(seed, X, y, g, Pz, trans_emb):
                 for k in range(5):
                     if y[i] == k:
                         continue
-                    hit = probs[local, k] >= tau
+                    hit = probs[local].argmax() == k and probs[local, k] >= tau      # the deployed rule
                     if y[i] == len(CLS) - 1:
                         fm[name][0] += hit
                         fm[name][1] += 1
@@ -246,8 +248,12 @@ def full_warmup(runs=3):
 def main():
     am = asset.get_asset_model()
     res = evaluate(am)
-    res["clip_load"] = warmup_and_memory()
-    res["warm_up_total"] = full_warmup()
+    if "--skip-timing" in sys.argv and RES.exists():           # reuse the warm-up / memory measurements of the previous run
+        old = json.loads(RES.read_text(encoding="utf-8"))
+        res["clip_load"], res["warm_up_total"] = old["clip_load"], old["warm_up_total"]
+    else:
+        res["clip_load"] = warmup_and_memory()
+        res["warm_up_total"] = full_warmup()
     RES.write_text(json.dumps(res, indent=1), encoding="utf-8", newline="\n")
     print(json.dumps({k: res[k] for k in ("n_groups", "zero_shot", "held_out", "false_match", "tau_final")}, indent=1)[:2500])
     print(json.dumps(res["probe_cv"]["per_seed"], indent=1))

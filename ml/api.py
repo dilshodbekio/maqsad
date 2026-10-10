@@ -130,16 +130,16 @@ def warm_up() -> dict:
     from ml.photo.checker import _detector
     _detector()
     t2 = time.perf_counter()
-    clip = False
+    clip, clip_error = False, None
     try:
         from ml.photo.asset import get_asset_model
         get_asset_model()
         clip = True
-    except (ImportError, OSError, RuntimeError):
-        pass
+    except (ImportError, OSError, RuntimeError) as e:        # cached + logged once; check_photo then runs without asset_match
+        clip_error = str(e)
     t3 = time.perf_counter()
     return dict(portfolio_s=round(t1 - t0, 2), face_detector_s=round(t2 - t1, 2), clip_s=round(t3 - t2, 2),
-                total_s=round(t3 - t0, 2), clip_loaded=clip)
+                total_s=round(t3 - t0, 2), clip_loaded=clip, clip_error=clip_error)
 
 
 def reset_sandbox(sandbox_id: Optional[str]) -> None:

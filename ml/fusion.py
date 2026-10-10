@@ -39,7 +39,7 @@ def _ids(loan_ids: list[str]) -> str:
 
 
 def photo_signals(*, ref: str, photo_label: str, duplicates: list[dict], geo_ok, distance_km, time_ok,
-                  asset_match=None, uploaded: bool) -> list[dict]:
+                  asset_match=None, uploaded: bool, purpose: str | None = None) -> list[dict]:
     """Triggered policy signals of ONE photo: [{code, text_uz, evidence_ref, evidence}] (evidence = kind 'photo' item)."""
     subject = "Yuklangan rasm" if uploaded else "Bu kreditdagi rasm"
     out = []
@@ -58,7 +58,11 @@ def photo_signals(*, ref: str, photo_label: str, duplicates: list[dict], geo_ok,
         km = f"{distance_km:.0f} km uzoqda" if distance_km is not None else "uzoqda"
         add("PHOTO_FAR", f"Rasm olingan joy qarz oluvchining manzilidan {km} (ruxsat etilgan masofa: {photo_config.GEO_MAX_KM:g} km)")
     if asset_match is not None and asset_match.get("matches_purpose") is False:
-        add("PHOTO_ASSET_MISMATCH", f"Rasmda kredit maqsadiga mos aktiv aniqlanmadi (aniqlangan: {asset_match['label_uz']})")
+        if purpose is not None and asset_match.get("label") == purpose:
+            # the most likely class IS the loan's asset, only with low confidence: never say "no matching asset"
+            add("PHOTO_ASSET_MISMATCH", f"Rasmdagi aktiv ishonchli aniqlanmadi (eng ehtimoliy: {asset_match['label_uz']}, ishonch past)")
+        else:
+            add("PHOTO_ASSET_MISMATCH", f"Rasmda kredit maqsadiga mos aktiv aniqlanmadi (aniqlangan: {asset_match['label_uz']})")
     if time_ok is False:
         add("PHOTO_TIME", "Rasm olingan vaqt ishonchli emas (kredit berilishidan oldin yoki kelajakda ko'rsatilgan)")
     return out

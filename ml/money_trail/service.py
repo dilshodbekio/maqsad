@@ -1,7 +1,7 @@
 """Serving side of the money-trail model (used by ml/api.py).
 
 The deployed service has no data/generated/ (gitignored). On first use the ML package generates the
-demo portfolio in memory - the TEST split config (seed 1337), deterministic, ~1 s - computes the
+demo portfolio in memory - the DEMO split config (seed 7), deterministic, ~1 s - computes the
 money-trail features once and scores every loan with the trained model from ml/artifacts/. Labels from
 the generator are dropped immediately and never reach the API. Nothing here is hard-coded: every risk,
 colour and reason comes from the model and the features.
@@ -20,10 +20,11 @@ from ml.generator.build import build
 from ml.generator.config import MATCHING_OKED, SPLITS
 
 from .features import build_features
+from .colors import color_of, rank_thresholds
 from .model import MODEL_VERSION, MoneyTrailModel, load_model
 from .reasons import NO_REASON_UZ, TEMPLATES, build_evidence, build_reasons
 
-DEMO_SPLIT = "test"
+DEMO_SPLIT = "demo"
 LOAN_FIELDS = ["loan_id", "borrower_id", "borrower_name_masked", "purpose", "amount_uzs", "term_months",
                "disbursed_at", "snapshot_date", "region", "branch_id", "supplier_id", "invoice_amount_uzs"]
 TXN_FIELDS = ["txn_id", "ts", "type", "amount_uzs", "counterparty_id", "counterparty_kind"]
@@ -52,14 +53,15 @@ class Portfolio:
         contrib = pd.DataFrame(self.model.contributions(self.features), index=self.features.index,
                                columns=self.model.features)
         self._contrib = contrib
+        self.thresholds = rank_thresholds(self.risk.to_numpy())      # colours by queue rank on THIS portfolio
         self.init_s = time.perf_counter() - t0
         self._bt = self.tx[self.tx.loan_id.notna()]
         self._queue = self._make_queue()
 
     # ------------------------------------------------------------------ helpers
     def _check(self, loan_id: str):
-        if loan_id not in self.loans.index:
-            raise LoanNotFoundError(loan_id)
+        if not isinstance(loan_id, str) or loan_id not in self.loans.index:
+            raise LoanNotFoundError(loan_id if isinstance(loan_id, str) else repr(loan_id))
 
     def _oked(self, loan_id: str) -> str:
         return self.suppliers.at[self.loans.at[loan_id, "supplier_id"], "oked_code"]
@@ -99,11 +101,18 @@ class Portfolio:
         out = []
         for i, lid in enumerate(order):
             j = top[i]
-            text = TEMPLATES[feats[j]](X[i, j], {"supplier_oked": oked[i]}) if C[i, j] > 1e-9 else NO_REASON_UZ
+            ctx = {"supplier_oked": oked[i]}
+            if C[i, j] <= 1e-9:
+                text = NO_REASON_UZ
+            elif feats[j] == "income_rate_per_month" and X[i, j] < 0:      # not a shown fact: take the full path
+                rs = build_reasons(feats, X[i], C[i], ctx, with_refs=False)
+                text = rs[0]["text_uz"] if rs else NO_REASON_UZ
+            else:
+                text = TEMPLATES[feats[j]](X[i, j], ctx)
             out.append(dict(
                 loan_id=lid, borrower_name_masked=cols["borrower_name_masked"][i], purpose=purpose[i],
                 amount_uzs=int(cols["amount_uzs"][i]), region=region[i], risk=float(risk[i]),
-                color=self.model.color(float(risk[i])),
+                color=color_of(float(risk[i]), self.thresholds),
                 top_reason=text))
         return out
 
@@ -120,7 +129,7 @@ class Portfolio:
         contrib = self.model.contributions(x)[0]
         reasons = build_reasons(self.model.features, x.iloc[0].to_numpy(float), contrib,
                                 {"supplier_oked": self._oked(loan_id)}, with_refs=False)
-        return dict(risk=risk, color=self.model.color(risk), reasons=reasons,
+        return dict(risk=risk, color=color_of(risk, self.thresholds), reasons=reasons,
                     model_version=MODEL_VERSION, latency_ms=round((time.perf_counter() - t0) * 1000, 3))
 
     def _photos(self, loan_id: str) -> list[dict]:
@@ -129,7 +138,7 @@ class Portfolio:
         row = self.loans.loc[loan_id]
         return [dict(photo_id=p["photo_id"], path=p["path"], purpose=p["purpose"],
                      captured_at=_py(row["photo_captured_at"]), lat=float(row["photo_lat"]),
-                     lon=float(row["photo_lon"]), duplicate_of=p["duplicate_of"])
+                     lon=float(row["photo_lon"]), duplicate_of=p["duplicate_of"], source="portfolio")
                 for p in get_index().photos_of(loan_id)]
 
     def loan(self, loan_id: str) -> dict:
@@ -143,7 +152,7 @@ class Portfolio:
             loan={"loan_id": loan_id, **{k: _py(self.loans.at[loan_id, k]) for k in LOAN_FIELDS[1:]}},
             transactions=[{k: _py(r[k]) for k in TXN_FIELDS} for _, r in txs.iterrows()],
             photos=self._photos(loan_id), invoice=ctx["invoice"],
-            risk=risk, color=self.model.color(risk), reasons=reasons,
+            risk=risk, color=color_of(risk, self.thresholds), reasons=reasons,
             evidence=build_evidence(refs, ctx), model_version=MODEL_VERSION)
 
 

@@ -156,6 +156,24 @@ def test_sandbox_isolation_and_reset(P, idx):
     api.reset_sandbox(a), api.reset_sandbox(b)
 
 
+def test_reset_sandbox_none_clears_all_but_not_the_portfolio(P, idx):
+    new = img_bytes(idx.reserved[2])
+    la, lb, lc = loans_without_photo(P, idx, 3)
+    n_index = len(get_index().images)
+    for sb in ("sbx-1", "sbx-2"):
+        api.check_photo(la, new, sandbox_id=sb)
+    assert [d["loan_id"] for d in api.check_photo(lb, new, sandbox_id="sbx-1")["duplicate_of"]] == [la]
+    assert [d["loan_id"] for d in api.check_photo(lb, new, sandbox_id="sbx-2")["duplicate_of"]] == [la]
+    api.reset_sandbox(None)                                               # clears ALL sandboxes
+    for sb in ("sbx-1", "sbx-2"):
+        assert api.check_photo(lc, new, sandbox_id=sb)["duplicate_of"] == []
+    # portfolio index untouched: portfolio photos are still found
+    single = next(i for i in idx.images if len(i["loans"]) == 1)
+    assert single["loans"][0] in {d["loan_id"] for d in api.check_photo(lc, img_bytes(single["file"]))["duplicate_of"]}
+    assert len(get_index().images) == n_index
+    api.reset_sandbox(None)
+
+
 # ---------------------------------------------------------------- geo / time
 def test_geo_and_time_checks(P):
     lid = P.loans.index[0]
@@ -237,7 +255,8 @@ def test_get_loan_photos(P, idx):
     d = api.get_loan(lid)
     assert len(d["photos"]) == 1
     p = d["photos"][0]
-    assert set(p) == {"photo_id", "path", "purpose", "captured_at", "lat", "lon", "duplicate_of"}
+    assert set(p) == {"photo_id", "path", "purpose", "captured_at", "lat", "lon", "duplicate_of", "source"}
+    assert p["source"] == "portfolio"
     assert (config.ROOT / p["path"]).is_file() and p["purpose"] == str(P.loans.at[lid, "purpose"])
     for l in loans_without_photo(P, idx, 3):
         assert api.get_loan(l)["photos"] == []

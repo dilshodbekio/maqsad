@@ -373,9 +373,9 @@ def report(split: str) -> str:
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("--split", choices=["train", "test", "all"], default="all")
+    ap.add_argument("--split", choices=["train", "dev", "all"], default="all")   # never the holdout
     args = ap.parse_args(argv)
-    for s in (["train", "test"] if args.split == "all" else [args.split]):
+    for s in (["train", "dev"] if args.split == "all" else [args.split]):
         text = report(s)
         print(text)
         (OUT_ROOT / s / "leakage_report.txt").write_text(text, encoding="utf-8")

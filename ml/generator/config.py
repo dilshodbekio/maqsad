@@ -1,10 +1,11 @@
 """Generator configuration: static reference data and per-split parameters.
 
-Everything that differs between the train and test portfolios lives in TRAIN / TEST
+Everything that differs between the portfolios (train / dev / holdout / demo) lives in TRAIN / DEV / HOLDOUT / DEMO
 below, so the distribution shift is documented in one place.
 """
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 
 PURPOSES = ("tikuv_dastgohi", "chorva", "issiqxona", "parranda", "asalarichilik")
@@ -94,11 +95,12 @@ TRAIN = Params(
     split="train", seed=42, snapshot_date="2026-03-31", id_offset=0,
 )
 
-# Test portfolio: different seed, different snapshot, disjoint ID space and slightly
-# shifted parameters (harder: more stealth, slower cash-out, smaller rings, more
-# honest-suspicious borrowers, bigger loans, different regional mix).
-TEST = Params(
-    split="test", seed=1337, snapshot_date="2026-07-31", id_offset=500_000,
+# Dev portfolio (was called "test" in v1): different seed, different snapshot, disjoint ID space and
+# slightly shifted parameters (harder: more stealth, slower cash-out, smaller rings, more
+# honest-suspicious borrowers, bigger loans, different regional mix). It was looked at during
+# development (feature / reason / threshold work), so it is NOT an unbiased test set any more.
+DEV = Params(
+    split="dev", seed=1337, snapshot_date="2026-07-31", id_offset=500_000,
     fraud_rate=0.13,
     p_stealth=0.35,
     t1_delay_mean_days=0.9,
@@ -113,4 +115,11 @@ TEST = Params(
     region_weights=REGION_WEIGHTS_TEST,
 )
 
-SPLITS = {"train": TRAIN, "test": TEST}
+# Holdout: same shifted parameters as dev, new seed, own ID space (hence own suppliers). Evaluated EXACTLY ONCE,
+# after the model is frozen (see ml/eval/eval_money_trail.py --split holdout).
+HOLDOUT = dataclasses.replace(DEV, split="holdout", seed=2026, id_offset=1_000_000)
+
+# Demo: what ml/api.py serves to the dashboard and what the photo index is built on. Never used for metrics.
+DEMO = dataclasses.replace(DEV, split="demo", seed=7, id_offset=1_500_000)
+
+SPLITS = {"train": TRAIN, "dev": DEV, "holdout": HOLDOUT, "demo": DEMO}

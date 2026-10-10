@@ -1,7 +1,9 @@
 """Synthetic portfolio builder.
 
     python -m ml.generator.build --split train        # seed 42, 5000 loans
-    python -m ml.generator.build --split test         # seed 1337, 5000 loans
+    python -m ml.generator.build --split dev          # seed 1337, 5000 loans (looked at during development)
+    python -m ml.generator.build --split holdout      # seed 2026 (evaluated once)
+    python -m ml.generator.build --split demo         # seed 7 (served by ml.api, never used for metrics)
     python -m ml.generator.build --split all
 
 Writes data/generated/<split>/{loans,transactions,suppliers,employees,labels,
@@ -457,11 +459,11 @@ def write(tables: dict, split: str, out_root: Path = OUT_ROOT) -> Path:
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("--split", choices=["train", "test", "all"], default="all")
+    ap.add_argument("--split", choices=[*SPLITS, "all"], default="all")
     ap.add_argument("--n", type=int, default=None, help="override number of loans")
     ap.add_argument("--seed", type=int, default=None, help="override seed")
     args = ap.parse_args(argv)
-    for name in (["train", "test"] if args.split == "all" else [args.split]):
+    for name in (list(SPLITS) if args.split == "all" else [args.split]):
         p = SPLITS[name]
         over = {k: v for k, v in (("n_loans", args.n), ("seed", args.seed)) if v is not None}
         p = dataclasses.replace(p, **over)

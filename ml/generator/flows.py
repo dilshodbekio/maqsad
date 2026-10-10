@@ -28,11 +28,13 @@ class Loan:
     stealth: bool = False
 
 
+INFLOW_TYPES = frozenset({"disbursement", "p2p_in", "income"})
+
+
 @dataclass
 class Emitter:
     snap_s: int
     rows: list = field(default_factory=list)
-    receipts: dict = field(default_factory=dict)  # supplier_idx -> [(ts, amount)]
     counter: int = 0
 
     def add(self, loan_id, account, ts, typ, amount, cp=None, kind="none"):
@@ -50,6 +52,36 @@ class Emitter:
 
     def external(self, rng):
         return f"X{rng.integers(100_000, 999_999)}"
+
+
+def cap_outflows(rows):
+    """Replay rows per account in time order and cap every outflow at the available balance.
+
+    Row = (loan_id, account_id, ts, type, amount, counterparty_id, counterparty_kind).
+    Inflows are disbursement / p2p_in / income; everything else is an outflow. An outflow that
+    exceeds the balance is reduced to it (floored to 1000 UZS); one that cannot be paid at all is
+    dropped. At equal timestamps inflows are applied first. No account can end up negative.
+    Returns (rows, n_reduced, n_dropped).
+    """
+    order = sorted(range(len(rows)), key=lambda i: (rows[i][1], rows[i][2],
+                                                    rows[i][3] not in INFLOW_TYPES, i))
+    out, bal, acct, reduced, dropped = [], 0, None, 0, 0
+    for i in order:
+        r = rows[i]
+        if r[1] != acct:
+            acct, bal = r[1], 0
+        if r[3] in INFLOW_TYPES:
+            bal += r[4]
+            out.append(r)
+            continue
+        amt = min(r[4], bal) // 1000 * 1000
+        if amt <= 0:
+            dropped += 1
+            continue
+        reduced += amt < r[4]
+        bal -= amt
+        out.append(r[:4] + (amt,) + r[5:])
+    return out, reduced, dropped
 
 
 def _chunks(rng, total, k):
@@ -70,7 +102,6 @@ def supplier_payment(em, rng, L, frac, mean_delay, max_delay=25.0):
     for part in _chunks(rng, pay, k):
         ts = L.t0 + d * DAY
         em.add(L.loan_id, L.account, ts, "supplier_payment", part, L.supplier_id, "supplier")
-        em.receipts.setdefault(L.supplier_idx, []).append((int(ts), part))
         d += rng.exponential(2.0)
     return pay
 
@@ -245,9 +276,12 @@ def t4_fake_invoice(em, rng, p, L):
 
 
 # ---------------------------------------------------------------- supplier-side outflows
-def supplier_outflows(em, rng, supplier_idx, supplier_id, account, spec):
-    """Cash-out / transfers from a supplier account after it received loan money."""
-    for ts, amt in em.receipts.get(supplier_idx, []):
+def supplier_outflows(em, rng, receipts, account, spec):
+    """Cash-out / transfers from a supplier account after it received loan money.
+
+    `receipts` = [(ts, amount)] of supplier payments that actually settled (after balance capping).
+    """
+    for ts, amt in receipts:
         share = float(np.clip(spec["cash_prop"] * rng.uniform(0.7, 1.3), 0, 1))
         total = amt * share
         if total <= 0:

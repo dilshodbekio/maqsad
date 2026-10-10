@@ -1,20 +1,22 @@
-"""Write data/sample/sample_loan.json: one honest + one fraud loan for the backend.
+"""Write data/sample/sample_loan.json: two example loans for the backend.
 
     python -m ml.generator.sample
 
-No labels / typology / generator-internal fields are included. Loans are picked
-deterministically (first match by loan_id) from the train split.
+No labels / typology / generator-internal fields are included. One loan is drawn at random from the
+honest loans and one from the visible-fraud loans of the train split (both with a readable history of
+5-12 transactions; fixed seed), and the pair is shuffled so the file order carries no information.
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
-from .build import OUT_ROOT
 from .check_leakage import load
 
+SEED = 20260401
 SAMPLE_PATH = Path(__file__).resolve().parents[2] / "data" / "sample" / "sample_loan.json"
 
 
@@ -50,18 +52,16 @@ def main():
     lab = t["labels"].set_index("loan_id")
     tx = t["transactions"]
     n_tx = tx[tx.loan_id.notna()].groupby("loan_id").size()
-    inc = tx[tx["type"].astype(str) == "income"].groupby("loan_id").size()
-    has_supplier_pay = set(tx[tx["type"].astype(str) == "supplier_payment"].loan_id)
-    honest = lab[(lab.profile == "normal") & lab.index.isin(has_supplier_pay)
-                 & lab.index.isin(inc[inc >= 2].index)].index
-    fraud = lab[(lab.typology == "T1") & ~lab.stealth & lab.fraud_visible].index
-    # pick loans with a readable, not-too-long history
-    pick = lambda idx: sorted(i for i in idx if 5 <= n_tx.get(i, 0) <= 12)[0]
+    rng = np.random.default_rng(SEED)
+    readable = set(n_tx[(n_tx >= 5) & (n_tx <= 12)].index)
+    honest = sorted(set(lab[~lab.is_fraud].index) & readable)
+    fraud = sorted(set(lab[lab.is_fraud & lab.fraud_visible].index) & readable)
+    picks = [honest[rng.integers(len(honest))], fraud[rng.integers(len(fraud))]]
+    rng.shuffle(picks)
     out = {
-        "_note": "Synthetic data (seed 42, train split). Two example loans: A and B. "
-                 "No labels included; risk/reasons are produced by ml.api.",
+        "_note": "Synthetic data (train split, seed 42). Risk and reasons are produced by ml.api.",
         "snapshot_date": str(t["loans"].snapshot_date.iloc[0].date()),
-        "loans": [loan_record(t, pick(honest)), loan_record(t, pick(fraud))],
+        "loans": [loan_record(t, i) for i in picks],
     }
     SAMPLE_PATH.parent.mkdir(parents=True, exist_ok=True)
     SAMPLE_PATH.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")

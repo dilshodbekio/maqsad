@@ -15,10 +15,10 @@ measures single-feature AUC per typology and a rule baseline.
 **Fraud typologies** (modelled on prosecuted cases, `docs/brief.md` §2):
 | Code | Pattern | Real-case basis |
 |---|---|---|
-| T1 fast cash-out | large share withdrawn as cash on day 0-1, little or no supplier payment (a "stealth" share drips out over 5-10 days) | embezzlement via fake documents, equipment never delivered ([yuz.uz](https://yuz.uz/uz/news/10-mlrddan-ziyod-imtiyozli-kredit-mablaglari-talon-toroj-qilindi)) |
+| T1 fast cash-out | large share withdrawn as cash on day 0-1, little or no supplier payment (a "stealth" share drips out over 5-10 days) | loan money cashed out instead of spent: `docs/brief.md` §2 case 3 (2.18 bn UZS cashed out for 71 borrowers, [yuz.uz](https://yuz.uz/uz/news/bank-xodimining-kirdikorlari-fosh-etildi)) and case 4 (386.7 mln UZS taken with fake salary data, [yuz.uz](https://yuz.uz/uz/news/mikroqarz-va-imtiyozli-kredit-mablaglarini-ozlashtirgan-shaxslar-aniqlandi)) |
 | T2 supplier ring | many borrowers pay one supplier, which cashes out fast; supplier may be linked to a bank employee | employee's relative as supplier for 71 citizens' loans ([yuz.uz](https://yuz.uz/uz/news/bank-xodimining-kirdikorlari-fosh-etildi)) |
 | T3 asset resale | supplier paid, later a one-off inflow resembling an asset sale, then cash-out; regular income often stops | 160 head of livestock sold for cash ([spot.uz](https://www.spot.uz/oz/2024/04/29/credit-money/)); sewing machines sold for cash ([yuz.uz](https://yuz.uz/uz/news/mikroqarz-va-imtiyozli-kredit-mablaglarini-ozlashtirgan-shaxslar-aniqlandi)) |
-| T4 fake invoice | supplier OKED does not match the purpose (~25% of T4 use a matching-OKED firm; only weak secondary signals remain) | fake documents (same sources as T1/T2) |
+| T4 fake invoice | supplier OKED does not match the purpose (~25% of T4 use a matching-OKED firm; only weak secondary signals remain) | `docs/brief.md` §2 case 1: equipment never delivered, "production started" on fake documents, 8 bn UZS ([yuz.uz](https://yuz.uz/uz/news/10-mlrddan-ziyod-imtiyozli-kredit-mablaglari-talon-toroj-qilindi)) |
 
 **Honest-but-suspicious profiles** (so models cannot simply flag "cash" or "mismatch"): livestock/poultry seller who
 legally sells stock; cash-heavy rural business; honest loans with generic-trade or unrelated OKED supplier (6-8% of honest loans);
@@ -32,8 +32,19 @@ smaller rings, fewer employee links, more honest-suspicious borrowers, loan size
 transactions after it are dropped. Features may only use data up to the snapshot. Some fraud events (T3 resale) have
 not happened yet for recent loans; they are still positives (`labels.fraud_visible` marks them).
 
-**Photos.** Currently only `photo_id`s and a manifest (`photo_manifest`); some photos are reused across loans.
-Real images are assigned later (see Licenses).
+**Ledger consistency.** Every account is replayed in time order and each outflow (cash withdrawal, supplier payment,
+P2P out, external transfer) is capped at the available balance, so no account (borrower or supplier) ever goes negative.
+Supplier accounts show the settled supplier payments as `income` rows and their own cash-outs / transfers.
+
+**Photos.** Currently only `photo_id`s and a manifest (`photo_manifest`); some photos are reused across loans. Only the
+image (`photo_id`) is reused: capture time and location always belong to the loan itself (capture is after disbursement,
+location is near or - with the configured far-photo probability - far from the borrower). Real images are assigned later
+(see Licenses).
+
+**Evaluation convention.** The headline metric is the **money-trail score only** (recall@20% etc.). Photo / geo signals
+(`photo_*`, coordinates) are evaluated separately and combined with the money-trail score later in the final risk score;
+the money-trail model never uses them. Any number that includes photo signals depends on our assumed photo rates (below)
+and must be labelled as such. `ml/generator/check_leakage.py` reports photo/geo features in a separate section.
 
 ## 2. Assumptions
 Assumption: fraud rate is 11% (train) and 13% (test); real rates are unknown and are measured in the pilot.
@@ -43,8 +54,9 @@ Assumption: region centroids are rounded approximations; borrower coordinates = 
 Assumption: OKED codes are illustrative and not checked against the official classifier.
 Assumption: honest livestock/poultry sellers are ~5% of loans, cash-heavy rural businesses ~5%, honest OKED mismatch 6-8% of honest loans.
 Assumption: 25-35% of T1/T2 are "stealth" (look clean); 25% of T4 use a matching-OKED supplier.
-Assumption: ring size is 4 + Poisson(3) (train) / Poisson(2.5) (test), stealth rings have 2-3 borrowers; 40% / 33% of ring suppliers link to a bank employee, 2.5% of honest suppliers do.
-Assumption: 35-37% of fraud loans and ~2% of honest loans reuse a photo; 25% of fraud and 4% of honest photos are taken far from the borrower.
+Assumption: ring size is 4 + Poisson(3) (train) / Poisson(2.5) (test), stealth rings have 2-3 borrowers; 40% / 33% of ring suppliers link to a bank employee, 2.5% of honest suppliers do. A linked employee works in the branch of one of the supplier's borrowers with probability 80% (rings) / 75% train, 70% test (honest suppliers).
+Assumption: 35% of fraud loans (both splits) and 2% of honest loans reuse a photo; 25% of fraud and 4% of honest photos are taken far from the borrower. These rates are the same for all typologies and not shifted between train and test.
+Assumption: 18% (both splits) of honest suppliers with >= 2 borrowers are active in a short window only (20-120 days): newly registered suppliers (registered 3-45 days before their first payment) and, for parranda / issiqxona, seasonal suppliers (March-August). Ring suppliers burst within 30-150 days (brief §2 case 3), so supplier activity span alone is a strong but not decisive T2 signal (single-feature AUC ~0.84).
 Assumption: all supplier-account flows are derived from loan payments only (no other business activity is simulated).
 Assumption: all numbers measured on this synthetic data say nothing about real accuracy; real accuracy is measured in the pilot.
 

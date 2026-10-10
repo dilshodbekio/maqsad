@@ -205,7 +205,7 @@ Reading the ablation: the age-aware encoding changes the honest false-positive r
 
 **All numbers are on a small library of openly licensed photos (CC / public domain) and are produced by `python -m ml.eval.eval_photo`. They say nothing about real borrower photos; real accuracy is measured in the pilot.**
 
-- Library: 100 asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) (the CLIP `other` negatives are not counted here); 5638 KB for all committed JPEGs in `ml/assets/photos/` including the `other` negatives. No committed photo shows a recognisable person (checked with two face detectors and by eye; background figures in one image are pixelated).
+- Library: 100 asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) (the CLIP `other` negatives are not counted here); 5674 KB for all committed JPEGs in `ml/assets/photos/` including the `other` negatives. No committed photo shows a recognisable person (checked with two face detectors and by eye; background figures in one image are pixelated).
 - Portfolio photo index (`ml/artifacts/photo_index_v1.json`): 90 images on 100 loans of the demo portfolio; 10 images are shared by 2-3 loans (the generator's photo-reuse groups). Photos are matched to the loan's purpose.
 
 | Purpose | library images | in index | loans with a photo |
@@ -258,8 +258,8 @@ Detection is count based (no box annotations), so a miss and a false alarm on th
 
 | Item | Value |
 |---|---|
-| `check_photo` p50 / p95 (500 calls, warm, 1600x1128 px, 187 KB JPEG; committed photo without people; decode, hashing, duplicate search, face detection, CLIP asset check, re-encode) | 291 ms / 330 ms |
-| same, wall clock | 292 ms / 331 ms |
+| `check_photo` p50 / p95 (500 calls, warm, 1600x1128 px, 187 KB JPEG; committed photo without people; decode, hashing, duplicate search, face detection, CLIP asset check, re-encode) | 287 ms / 380 ms |
+| same, wall clock | 287 ms / 381 ms |
 | Cost per check | 0 (local, no external API) |
 
 ### Known failure cases
@@ -287,23 +287,23 @@ Produced by `python -m ml.eval.eval_asset`. Library: 139 images, tikuv_dastgohi 
 | issiqxona | 20 | 95.0% | 82.0% |
 | parranda | 20 | 75.0% | 96.0% |
 | asalarichilik | 20 | 100.0% | 90.0% |
-| other | 39 | 79.5% | 99.0% |
-| **all** | 139 | **89.9%** | **95.1% (93.5% - 96.4%)** |
+| other | 39 | 79.5% | 97.9% |
+| **all** | 139 | **89.9%** | **94.8% (92.8% - 95.7%)** |
 
 **Binary task: the photo matches the loan purpose** (every image paired with each of the 5 purposes; positive = the image shows that purpose; 100 positive and 595 negative pairs per seed, pooled over the CV test folds)
 
 | Method | precision | recall | F1 |
 |---|---|---|---|
 | zero-shot (tau chosen in the training folds) | 94.9% (91.8% - 95.7%) | 89.6% (89.0% - 90.0%) | 92.2% (90.9% - 92.8%) |
-| linear probe | 94.9% (92.8% - 96.9%) | 92.2% (90.0% - 94.0%) | 93.5% (91.4% - 94.9%) |
+| linear probe | 94.9% (92.7% - 96.9%) | 92.4% (89.0% - 95.0%) | 93.6% (90.8% - 96.0%) |
 
 | Seed | probe 6-class accuracy | precision | recall | F1 | TP / FP / FN |
 |---|---|---|---|---|---|
 | 0 | 95.7% | 95.9% | 94.0% | 94.9% | 94 / 4 / 6 |
 | 1 | 95.0% | 93.8% | 91.0% | 92.4% | 91 / 6 / 9 |
 | 2 | 95.0% | 94.9% | 93.0% | 93.9% | 93 / 5 / 7 |
-| 3 | 96.4% | 96.9% | 93.0% | 94.9% | 93 / 3 / 7 |
-| 4 | 93.5% | 92.8% | 90.0% | 91.4% | 90 / 7 / 10 |
+| 3 | 95.7% | 96.9% | 95.0% | 96.0% | 95 / 3 / 5 |
+| 4 | 92.8% | 92.7% | 89.0% | 90.8% | 89 / 7 / 11 |
 
 False matches (mean over seeds) on `other` images, which come from the same 20 search categories as the negatives the probe is trained on (so this is an in-distribution rate, not the rate for any random photo): out of 195 pairs (an `other` image x a purpose) the probe says 'matches' 0.2% of the time, zero-shot 1.8%; for assets of a different purpose (400 pairs) 1.1% (probe) and 0.3% (zero-shot).
 
@@ -315,12 +315,12 @@ Deployed: the probe fitted on all 139 images, tau = 0.33 (all-data grouped out-o
 
 | Transform | probe accuracy | probe label kept | zero-shot accuracy | zero-shot label kept |
 |---|---|---|---|---|
-| JPEG q=30 | 96.4% | 99.3% | 86.3% | 95.0% |
+| JPEG q=30 | 95.7% | 98.6% | 86.3% | 95.0% |
 | resize 50% | 95.0% | 99.3% | 89.9% | 98.6% |
 | screenshot | 91.4% | 93.5% | 89.2% | 94.2% |
 | rotate 5 deg | 94.2% | 98.6% | 87.8% | 95.7% |
 
-**Warm-up and memory** (fresh processes, 3 runs; CLIP weights already in the cache directory; the one-off 354 MB weights download is not included; memory = process working set after loading, not the peak): loading CLIP (imports + model + prompts) 10.9 - 11.1 s, memory 1269 - 1275 MB; full `ml.api.warm_up()` (portfolio + face detector + CLIP) 16.3 - 16.5 s, memory 1410 - 1426 MB (within the limits we set: warm-up <= 30 s, memory <= 4 GB). `check_photo` latency with CLIP is in the photo latency table above; CPU time per component and cost per 1 000 checks: [`docs/cost.md`](cost.md). CLIP inference runs under one lock (about 200 ms of single-thread CPU per image), so concurrent uploads queue up.
+**Warm-up and memory** (fresh processes, 3 runs; CLIP weights already in the cache directory; the one-off 354 MB weights download is not included; memory = process working set after loading, not the peak): loading CLIP (imports + model + prompts) 10.7 - 12.0 s, memory 1268 - 1275 MB; full `ml.api.warm_up()` (portfolio + face detector + CLIP) 16.3 - 16.5 s, memory 1411 - 1427 MB (within the limits we set: warm-up <= 30 s, memory <= 4 GB). `check_photo` latency with CLIP is in the photo latency table above; CPU time per component and cost per 1 000 checks: [`docs/cost.md`](cost.md). CLIP inference runs under one lock (about 200 ms of single-thread CPU per image), so concurrent uploads queue up.
 
 **Failure cases measured on this library** (seed 0; 19 of 139 images are wrong for the probe (grouped CV) or for zero-shot):
 

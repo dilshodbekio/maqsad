@@ -125,7 +125,7 @@ def render() -> str:
     w("")
     w(f"**CLIP asset check** (author-grouped 5-fold CV, 5 seeds; [metrics §4]({MET}#asset-check-is-the-thing-in-the-photo-what-the-loan-was-for-openclip-vit-b-32-cpu)): "
       f"6-class accuracy {pct(p['acc']['mean'])} ({pct(p['acc']['min'])}-{pct(p['acc']['max'])}) for the probe vs {pct(z['acc'])} zero-shot; "
-      f"'matches the loan purpose' F1 {pct(p['binary']['f1']['mean'])} (probe) vs {pct(z['binary']['f1']['mean'])} (zero-shot): on this tiny library the probe is not better on the binary task.")
+      f"'matches the loan purpose' F1 {pct(p['binary']['f1']['mean'])} (probe) vs {pct(z['binary']['f1']['mean'])} (zero-shot) (tiny library, 5 CV seeds; see metrics for the ranges).")
     w("")
     w("## 5. Data")
     w("")

@@ -1,48 +1,48 @@
 {
  "single_thread": {
   "warm_up": {
-   "cpu_s": 15.640625,
-   "wall_s": 16.228259399998933,
-   "portfolio_s": 6.13,
-   "face_detector_s": 0.04,
-   "clip_s": 10.02,
-   "total_s": 16.19,
+   "cpu_s": 16.15625,
+   "wall_s": 20.158113699988462,
+   "portfolio_s": 6.09,
+   "face_detector_s": 0.11,
+   "clip_s": 13.92,
+   "total_s": 20.12,
    "clip_loaded": true,
    "clip_error": null
   },
   "score_loan": {
-   "cpu_ms": 3.4375,
-   "wall_ms": 3.3604229998309165,
+   "cpu_ms": 3.28125,
+   "wall_ms": 3.4223489998839796,
    "n": 100
   },
   "score_scenario": {
-   "cpu_ms": 94.921875,
-   "wall_ms": 99.17638750048354,
+   "cpu_ms": 101.953125,
+   "wall_ms": 105.01453499891795,
    "n": 40
   },
   "check_photo": {
-   "cpu_ms": 339.84375,
-   "wall_ms": 348.3649766664409,
+   "cpu_ms": 360.6770833333333,
+   "wall_ms": 374.42351000014844,
    "n": 60
   },
   "check_photo_parts": {
    "decode_and_hash": {
-    "cpu_ms": 37.109375,
-    "wall_ms": 36.963602498872206,
+    "cpu_ms": 34.765625,
+    "wall_ms": 35.356070000852924,
     "n": 40
    },
    "face_detect_and_blur": {
-    "cpu_ms": 84.375,
-    "wall_ms": 85.2560525003355,
+    "cpu_ms": 85.9375,
+    "wall_ms": 88.27225749992067,
     "n": 40
    },
    "clip_asset_check": {
-    "cpu_ms": 207.03125,
-    "wall_ms": 213.00340499874437,
+    "cpu_ms": 202.734375,
+    "wall_ms": 208.46736499952385,
     "n": 40
    }
   },
-  "rss_mb": 1181.203125,
+  "rss_mb": 1179.390625,
   "machine": {
    "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
    "logical_cores": 12,
@@ -52,48 +52,48 @@
  },
  "all_cores": {
   "warm_up": {
-   "cpu_s": 44.9375,
-   "wall_s": 14.033721400017384,
-   "portfolio_s": 3.2,
+   "cpu_s": 45.40625,
+   "wall_s": 13.851215900038369,
+   "portfolio_s": 3.09,
    "face_detector_s": 0.05,
-   "clip_s": 10.7,
-   "total_s": 13.95,
+   "clip_s": 10.62,
+   "total_s": 13.77,
    "clip_loaded": true,
    "clip_error": null
   },
   "score_loan": {
-   "cpu_ms": 62.81249999999999,
-   "wall_ms": 7.1686360001331195,
+   "cpu_ms": 51.71875,
+   "wall_ms": 5.770428000250831,
    "n": 100
   },
   "score_scenario": {
-   "cpu_ms": 948.4375,
-   "wall_ms": 150.50049249985022,
+   "cpu_ms": 961.71875,
+   "wall_ms": 147.14126750041032,
    "n": 40
   },
   "check_photo": {
-   "cpu_ms": 2301.041666666667,
-   "wall_ms": 287.96996833310305,
+   "cpu_ms": 2254.9479166666665,
+   "wall_ms": 280.37491333282867,
    "n": 60
   },
   "check_photo_parts": {
    "decode_and_hash": {
-    "cpu_ms": 48.828125,
-    "wall_ms": 37.99656750052236,
+    "cpu_ms": 51.5625,
+    "wall_ms": 38.582712500647176,
     "n": 40
    },
    "face_detect_and_blur": {
-    "cpu_ms": 521.875,
-    "wall_ms": 64.8803175005014,
+    "cpu_ms": 537.890625,
+    "wall_ms": 66.75186000065878,
     "n": 40
    },
    "clip_asset_check": {
-    "cpu_ms": 1111.71875,
-    "wall_ms": 144.91842499992345,
+    "cpu_ms": 1112.890625,
+    "wall_ms": 143.24881999928039,
     "n": 40
    }
   },
-  "rss_mb": 1203.40625,
+  "rss_mb": 1202.57421875,
   "machine": {
    "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
    "logical_cores": 12,

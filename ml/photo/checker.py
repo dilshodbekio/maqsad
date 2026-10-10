@@ -29,10 +29,14 @@ def _detector() -> FaceDetector:
     return FaceDetector()
 
 
-def reset_sandbox(sandbox_id: str) -> None:
-    """Forget every photo uploaded in this sandbox (idempotent)."""
+def reset_sandbox(sandbox_id: Optional[str]) -> None:
+    """Forget every photo uploaded in this sandbox (idempotent). `None` clears ALL sandboxes.
+    The portfolio index is never touched."""
     with _lock:
-        _sandboxes.pop(sandbox_id, None)
+        if sandbox_id is None:
+            _sandboxes.clear()
+        else:
+            _sandboxes.pop(sandbox_id, None)
 
 
 def _km(lat1, lon1, lat2, lon2) -> float:

@@ -33,10 +33,19 @@ def get_loan(loan_id: str) -> dict:
     Returns: {loan, transactions[], photos[], invoice | None,
               risk, color, reasons: [{code, text_uz, weight, evidence_refs}],
               evidence: [{ref, kind: "txn"|"invoice"|"graph", summary_uz, data}], model_version}
-    `photos`: [{photo_id, path (repo-relative), purpose, captured_at, lat, lon, duplicate_of: [{loan_id, similarity}]}]
+    `photos`: [{photo_id, path (repo-relative), purpose, captured_at, lat, lon,
+    duplicate_of: [{loan_id, similarity}], source: "portfolio"}]
     for the subset of loans that have a photo, [] otherwise. Raises: LoanNotFoundError
     """
     return get_portfolio().loan(loan_id)
+
+
+def get_color_thresholds() -> dict:
+    """Colour rule of the served portfolio: red = top 10% by risk, yellow = next 10%, green = rest.
+
+    Returns {red, yellow (risk scores at those ranks), n_red, n_yellow, n_loans, rule}.
+    """
+    return dict(get_portfolio().thresholds)
 
 
 def score_loan(loan_id: str) -> dict:
@@ -79,7 +88,8 @@ def check_photo(
     return _check(loan_id, image_bytes, lat, lon, captured_at, sandbox_id)
 
 
-def reset_sandbox(sandbox_id: str) -> None:
-    """Forget every photo hash uploaded in this demo sandbox (idempotent). Contract addition."""
+def reset_sandbox(sandbox_id: Optional[str]) -> None:
+    """Forget every photo hash uploaded in this demo sandbox (idempotent); `None` clears ALL sandboxes.
+    The portfolio photo index is never touched. Contract addition."""
     from ml.photo.checker import reset_sandbox as _reset
     _reset(sandbox_id)

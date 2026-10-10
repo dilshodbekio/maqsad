@@ -3,7 +3,7 @@
     .venv/Scripts/python -m ml.photo.index        # writes ml/artifacts/photo_index_v1.json
 
 Only a subset of loans has a photo (a borrower uploads one when asked): per purpose 2 images are shared by
-2-3 loans (taken from the generator's own photo-reuse groups of the demo portfolio = test split, seed 1337) and
+2-3 loans (taken from the generator's own photo-reuse groups of the demo portfolio = demo split, seed 7) and
 16 images belong to one loan each; 2 images per purpose are kept out of the index (used as "new photo" in tests).
 Deterministic (fixed seed). The index stores image -> loans and hashes only; capture time / location of a
 loan's photo come from the loan itself at serve time. Sandbox uploads are never added here.
@@ -35,7 +35,7 @@ def _hash_file(name: str) -> dict[str, int]:
 def build_index() -> dict:
     from ml.generator.build import build
     from ml.generator.config import SPLITS
-    t = build(SPLITS["test"])
+    t = build(SPLITS["demo"])
     loans = t["loans"].set_index("loan_id")
     purpose = loans["purpose"].astype(str)
     lab = t["labels"].set_index("loan_id")
@@ -61,7 +61,7 @@ def build_index() -> dict:
     for im in images:
         im["hash"] = hashing.to_json(_hash_file(im["file"]))
     n_loans = sorted({x for im in images for x in im["loans"]})
-    out = dict(version="photo_index_v1", portfolio=dict(split="test", seed=SPLITS["test"].seed),
+    out = dict(version="photo_index_v1", portfolio=dict(split="demo", seed=SPLITS["demo"].seed),
                seed=SEED, images=images, reserved=sorted(reserved),
                stats=dict(images=len(images), loans=len(n_loans), shared_images=sum(len(i["loans"]) > 1 for i in images),
                           reuse_loans_in_groups=int(sum(bool(lab.at[x, "photo_reused"]) for im in images

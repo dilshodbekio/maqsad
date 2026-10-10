@@ -3,9 +3,9 @@
     .venv/Scripts/python -m ml.money_trail.train
 
 The portfolio is generated in memory (deterministic, seed 42). Writes
-ml/artifacts/money_trail_v1.txt (LightGBM booster) and money_trail_v1.json (feature list, colour
-thresholds, CV metrics). Positives = ALL fraud loans, including T3 loans whose resale has not happened
-yet at the snapshot (generator convention). The test split is never touched here.
+ml/artifacts/money_trail_v2.txt (LightGBM booster) and money_trail_v2.json (feature list, CV metrics).
+Colours are NOT fixed here: they are assigned by queue rank on the served portfolio (ml/money_trail/colors.py). Positives = ALL fraud loans, including T3 loans whose resale has not happened
+yet at the snapshot (generator convention). Only the train split is used here (dev / holdout are never touched).
 """
 from __future__ import annotations
 
@@ -20,11 +20,11 @@ from sklearn.model_selection import StratifiedGroupKFold
 from ml.generator.build import build
 from ml.generator.config import SPLITS
 
+from .colors import rank_thresholds
 from .features import FEATURE_COLUMNS, build_features
 from .metrics import BUDGET, recall_at_budget
 from .model import LGB_PARAMS, META_PATH, MODEL_PATH, MODEL_VERSION, SEED
 
-RED_Q, YELLOW_Q = 0.90, 0.80      # red = top 10%, yellow = next 10% (red + yellow = the 20% budget)
 N_FOLDS = 5
 
 
@@ -54,15 +54,13 @@ def main():
                       pr_auc=float(average_precision_score(y, oof)),
                       recall_at_20=recall_at_budget(oof, y),
                       random_recall_at_20=BUDGET, pr_auc_random=float(y.mean()))
-    red, yellow = (float(np.quantile(oof, q)) for q in (RED_Q, YELLOW_Q))
+    oof_rank = rank_thresholds(oof)          # informational only: what the rank rule gives on train OOF scores
 
     final = fit(X, y)
     final.booster_.save_model(str(MODEL_PATH))
     meta = dict(
         model_version=MODEL_VERSION, features=FEATURE_COLUMNS,
-        thresholds=dict(red=red, yellow=yellow, red_quantile=RED_Q, yellow_quantile=YELLOW_Q,
-                        rule="score >= red -> red (top 10% of train OOF scores); score >= yellow -> yellow "
-                             "(next 10%); else green"),
+        train_oof_rank_thresholds=oof_rank,
         cv=dict(folds=N_FOLDS, grouped_by="supplier_id", split="train", **cv_metrics),
         train=dict(rows=int(len(y)), fraud=int(y.sum()), seed=SPLITS["train"].seed),
         lgb_params={k: v for k, v in LGB_PARAMS.items()}, scale_pos_weight=float((y == 0).sum() / (y == 1).sum()),
@@ -71,7 +69,7 @@ def main():
     META_PATH.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     print(f"CV ({N_FOLDS}-fold, grouped by supplier, train OOF): "
           + ", ".join(f"{k}={v:.3f}" for k, v in cv_metrics.items()))
-    print(f"thresholds: red>={red:.4f} yellow>={yellow:.4f}")
+    print(f"train OOF rank thresholds (informational): red>={oof_rank['red']:.4f} yellow>={oof_rank['yellow']:.4f}")
     print(f"saved {MODEL_PATH.name} ({MODEL_PATH.stat().st_size / 1024:.0f} KB) and {META_PATH.name}")
 
 

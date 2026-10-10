@@ -141,7 +141,7 @@ def latency_eval(n=500) -> dict:
     f = config.MAX_SIDE / max(h, w)
     big = cv2.resize(rgb, None, fx=f, fy=f, interpolation=cv2.INTER_CUBIC)
     data = imageio.encode_jpeg(big)
-    loan = "L500001"
+    loan = str(api.get_queue()[0]["loan_id"])
     for _ in range(10):
         api.check_photo(loan, data)
     ms, wall = [], []

@@ -1,0 +1,342 @@
+{
+ "split": "holdout",
+ "version": "v2",
+ "n": 5000,
+ "n_pos": 650,
+ "fraud_rate": 0.13,
+ "n_suppliers": 1070,
+ "baseline_feature": [
+  "income_gap_days",
+  1
+ ],
+ "not_visible_by_typology": {
+  "T1": 0,
+  "T2": 0,
+  "T3": 21,
+  "T4": 0
+ },
+ "group_n": {
+  "T1": 195,
+  "T2": 195,
+  "T3": 130,
+  "T4": 130,
+  "T1 plain": 133,
+  "T1 stealth": 62,
+  "T2 plain": 161,
+  "T2 stealth": 34,
+  "T4 plain": 96,
+  "T4 stealth": 34,
+  "T3 resale visible at snapshot": 109,
+  "T3 resale not yet happened": 21,
+  "honest/normal": 3410,
+  "honest/cash_heavy": 287,
+  "honest/livestock_seller": 271,
+  "honest/oked_mismatch": 382,
+  "honest/all": 4350
+ },
+ "recall": {
+  "Money-trail model (LightGBM)": 0.7815384615384615,
+  "Graded rule: cash_share_d1": 0.2738379176032533,
+  "Best single feature (chosen on train): income_gap_days": 0.46307692307692305,
+  "0/1 rule: cash_share_d1 >= 0.5": 0.26364234056541747
+ },
+ "roc": 0.909713881520778,
+ "pr": 0.7449462092449649,
+ "rule01": {
+  "flagged": 0.0172,
+  "precision": 0.7209302325581395,
+  "flag_recall": 0.09538461538461539
+ },
+ "groups": {
+  "T1": {
+   "Money-trail model (LightGBM)": 0.9897435897435898,
+   "Graded rule: cash_share_d1": 0.542430949970544,
+   "Best single feature (chosen on train): income_gap_days": 0.558974358974359,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.4448097012199576
+  },
+  "T2": {
+   "Money-trail model (LightGBM)": 0.9333333333333333,
+   "Graded rule: cash_share_d1": 0.17180001944668463,
+   "Best single feature (chosen on train): income_gap_days": 0.4461538461538462,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.18599918599918605
+  },
+  "T3": {
+   "Money-trail model (LightGBM)": 0.5692307692307692,
+   "Graded rule: cash_share_d1": 0.14205803119476998,
+   "Best single feature (chosen on train): income_gap_days": 0.6538461538461539,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.18599918599918602
+  },
+  "T4": {
+   "Money-trail model (LightGBM)": 0.45384615384615384,
+   "Graded rule: cash_share_d1": 0.15578510269565363,
+   "Best single feature (chosen on train): income_gap_days": 0.15384615384615385,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.18599918599918602
+  },
+  "T1 plain": {
+   "Money-trail model (LightGBM)": 0.9849624060150376,
+   "Graded rule: cash_share_d1": 0.6846901997353411,
+   "Best single feature (chosen on train): income_gap_days": 0.5488721804511278,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.5593379052025669
+  },
+  "T1 stealth": {
+   "Money-trail model (LightGBM)": 1.0,
+   "Graded rule: cash_share_d1": 0.23726191418476966,
+   "Best single feature (chosen on train): income_gap_days": 0.5806451612903226,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.19912823138629596
+  },
+  "T2 plain": {
+   "Money-trail model (LightGBM)": 0.9192546583850931,
+   "Graded rule: cash_share_d1": 0.1797861624937826,
+   "Best single feature (chosen on train): income_gap_days": 0.4409937888198758,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.18599918599918605
+  },
+  "T2 stealth": {
+   "Money-trail model (LightGBM)": 1.0,
+   "Graded rule: cash_share_d1": 0.13398328325307374,
+   "Best single feature (chosen on train): income_gap_days": 0.47058823529411764,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.18599918599918597
+  },
+  "T4 plain": {
+   "Money-trail model (LightGBM)": 0.5833333333333334,
+   "Graded rule: cash_share_d1": 0.15421220908617742,
+   "Best single feature (chosen on train): income_gap_days": 0.13541666666666666,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.18599918599918605
+  },
+  "T4 stealth": {
+   "Money-trail model (LightGBM)": 0.08823529411764706,
+   "Graded rule: cash_share_d1": 0.16022621406358664,
+   "Best single feature (chosen on train): income_gap_days": 0.20588235294117646,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.18599918599918597
+  },
+  "T3 resale visible at snapshot": {
+   "Money-trail model (LightGBM)": 0.6697247706422018,
+   "Graded rule: cash_share_d1": 0.14048382574742094,
+   "Best single feature (chosen on train): income_gap_days": 0.7798165137614679,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.18599918599918608
+  },
+  "T3 resale not yet happened": {
+   "Money-trail model (LightGBM)": 0.047619047619047616,
+   "Graded rule: cash_share_d1": 0.15022890708815312,
+   "Best single feature (chosen on train): income_gap_days": 0.0,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.18599918599918602
+  },
+  "honest/normal": {
+   "Money-trail model (LightGBM)": 0.0782991202346041,
+   "Graded rule: cash_share_d1": 0.16530549099465364,
+   "Best single feature (chosen on train): income_gap_days": 0.16129032258064516,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.1898185446572544
+  },
+  "honest/cash_heavy": {
+   "Money-trail model (LightGBM)": 0.07665505226480836,
+   "Graded rule: cash_share_d1": 0.539880042374561,
+   "Best single feature (chosen on train): income_gap_days": 0.07665505226480836,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.20018038484937442
+  },
+  "honest/livestock_seller": {
+   "Money-trail model (LightGBM)": 0.22509225092250923,
+   "Graded rule: cash_share_d1": 0.14725000473292707,
+   "Best single feature (chosen on train): income_gap_days": 0.2767527675276753,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.18900287903977947
+  },
+  "honest/oked_mismatch": {
+   "Money-trail model (LightGBM)": 0.3717277486910995,
+   "Graded rule: cash_share_d1": 0.16613430843453983,
+   "Best single feature (chosen on train): income_gap_days": 0.13612565445026178,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.19026097036568249
+  },
+  "honest/all": {
+   "Money-trail model (LightGBM)": 0.11310344827586206,
+   "Graded rule: cash_share_d1": 0.18896674794434146,
+   "Best single feature (chosen on train): income_gap_days": 0.1606896551724138,
+   "0/1 rule: cash_share_d1 >= 0.5": 0.19049022497298362
+  }
+ },
+ "thresholds": {
+  "red": 0.6939493010240273,
+  "yellow": 0.27487067093244844,
+  "n_red": 500,
+  "n_yellow": 500,
+  "n_loans": 5000,
+  "rule": "red = top 10% of the portfolio by risk, yellow = next 10%, green = rest (red + yellow = 20% inspection budget)"
+ },
+ "colors": {
+  "red": {
+   "n": 500,
+   "fraud_rate": 0.736
+  },
+  "yellow": {
+   "n": 500,
+   "fraud_rate": 0.28
+  },
+  "green": {
+   "n": 4000,
+   "fraud_rate": 0.0355
+  }
+ },
+ "red_yellow_recall": 0.7815384615384615,
+ "age": [
+  {
+   "bucket": "< 60 days",
+   "n": 744,
+   "n_fraud": 72,
+   "recall": 0.75,
+   "honest_fpr": 0.23363095238095238,
+   "n_honest": 672
+  },
+  {
+   "bucket": "60-180 days",
+   "n": 1762,
+   "n_fraud": 281,
+   "recall": 0.7864768683274022,
+   "honest_fpr": 0.11073598919648886,
+   "n_honest": 1481
+  },
+  {
+   "bucket": "> 180 days",
+   "n": 2494,
+   "n_fraud": 297,
+   "recall": 0.7845117845117845,
+   "honest_fpr": 0.07783340919435594,
+   "n_honest": 2197
+  }
+ ],
+ "young_no_income": {
+  "honest": 0.7976190476190477,
+  "fraud": 0.9166666666666666
+ },
+ "ci": {
+  "recall": {
+   "Money-trail model (LightGBM)": {
+    "plain": [
+     0.7499906855439642,
+     0.8129030331979937
+    ],
+    "clustered": [
+     0.7280639097744361,
+     0.8317097510807419
+    ]
+   },
+   "Graded rule: cash_share_d1": {
+    "plain": [
+     0.24941690928349186,
+     0.29900813366921053
+    ],
+    "clustered": [
+     0.24876154197863667,
+     0.3039941209358245
+    ]
+   },
+   "Best single feature (chosen on train): income_gap_days": {
+    "plain": [
+     0.4272471173066556,
+     0.4992441860465116
+    ],
+    "clustered": [
+     0.4185184429732544,
+     0.5073451101999226
+    ]
+   },
+   "0/1 rule: cash_share_d1 >= 0.5": {
+    "plain": [
+     0.2476603921714728,
+     0.27971564137270977
+    ],
+    "clustered": [
+     0.24724234659339067,
+     0.28535134323522515
+    ]
+   }
+  },
+  "roc": {
+   "plain": [
+    0.8956895549703502,
+    0.9230449072918641
+   ],
+   "clustered": [
+    0.8817108419363533,
+    0.9333929622689895
+   ]
+  },
+  "pr": {
+   "plain": [
+    0.713216767204947,
+    0.7728726316717169
+   ],
+   "clustered": [
+    0.6919558015478291,
+    0.7952530803533865
+   ]
+  },
+  "groups": {
+   "T1": [
+    0.9751545069682642,
+    1.0
+   ],
+   "T2": [
+    0.8506684491978609,
+    0.9927536231884058
+   ],
+   "T3": [
+    0.47007829977628635,
+    0.6567458758837392
+   ],
+   "T4": [
+    0.29096562641338763,
+    0.6174226234340456
+   ],
+   "T1 plain": [
+    0.9635014242478191,
+    1.0
+   ],
+   "T1 stealth": [
+    1.0,
+    1.0
+   ],
+   "T2 plain": [
+    0.8206765901219244,
+    0.9901106855968616
+   ],
+   "T2 stealth": null,
+   "T4 plain": [
+    0.38661538461538464,
+    0.7529532634971797
+   ],
+   "T4 stealth": null,
+   "T3 resale visible at snapshot": [
+    0.5581334149326805,
+    0.7653061224489796
+   ],
+   "T3 resale not yet happened": null,
+   "honest/normal": [
+    0.06568057732130726,
+    0.09242736647378476
+   ],
+   "honest/cash_heavy": [
+    0.04395604395604396,
+    0.11475409836065574
+   ],
+   "honest/livestock_seller": [
+    0.17113750904418554,
+    0.27564338235294117
+   ],
+   "honest/oked_mismatch": [
+    0.2897518245764671,
+    0.4501457870517296
+   ],
+   "honest/all": [
+    0.09852417138405156,
+    0.12560268966084367
+   ]
+  }
+ },
+ "run": {
+  "commit": "b6afbb7c38dc67712f5f705a45cb20f2fd096474",
+  "dirty": false,
+  "run_at": "2026-10-10T12:59:14+00:00",
+  "model_version": "money_trail_v2",
+  "model_sha256": "8b4767b0ff1e1a4284cd792061eab0bfb1272c7e4f5bc336243bcbadf3c4f174",
+  "meta_sha256": "817dc18c055fcb04d9b0a30ac903f04af0c59a36920d0d6e376c9fab3c3b273e",
+  "reruns": 0,
+  "first_run": null
+ }
+}

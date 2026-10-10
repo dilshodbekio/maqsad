@@ -1,15 +1,15 @@
 # ml/generator - synthetic portfolio generator
 
-    python -m ml.generator.build --split all        # train (seed 42) + test (seed 1337), 5000 loans each
+    python -m ml.generator.build --split all        # train (42), dev (1337), holdout (2026), demo (7); 5000 loans each
     python -m ml.generator.check_leakage --split all
     python -m ml.generator.sample                   # data/sample/sample_loan.json for the backend
 
-Output: `data/generated/{train,test}/*.parquet` + `meta.json` (gitignored).
+Output: `data/generated/{train,dev,holdout,demo}/*.parquet` + `meta.json` (gitignored).
 Tables: `loans`, `transactions` (borrower and supplier accounts; supplier rows have `loan_id = null`),
 `suppliers`, `employees`, `photo_manifest`. `labels.parquet` is evaluation-only
-(never a model feature). Parameter shifts between train and test: `config.py` (TRAIN vs TEST).
+(never a model feature). Parameter shifts between train and the other splits: `config.py` (TRAIN vs DEV; HOLDOUT and DEMO only change seed and ID space).
 
-All numbers here are ASSUMPTIONS about a synthetic world (fraud rate 11% train / 13% test,
+All numbers here are ASSUMPTIONS about a synthetic world (fraud rate 11% train / 13% dev, holdout, demo,
 typology mix 30/30/20/20, OKED codes illustrative); none come from real bank data.
 Photos: only `photo_id` + manifest for now (`image_file` / `license` filled when real images are assigned).
 
@@ -43,7 +43,7 @@ Photos: only `photo_id` + manifest for now (`image_file` / `license` filled when
 
 ## Known limitations
 - **Counterparty ID collisions:** person / business / external counterparty IDs are random numbers drawn independently,
-  so the same ID can appear on unrelated loans (and a few across train and test). Any counterparty-graph feature would
+  so the same ID can appear on unrelated loans (and a few across splits). Any counterparty-graph feature would
   pick up these false shared links; do not build one without first switching to counter-based unique IDs.
 - **Ring size:** rings have ~4 + Poisson(3) borrowers (max ~12); the real case in `docs/brief.md` §2 had 71 borrowers.
   Large rings are not modelled.

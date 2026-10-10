@@ -24,7 +24,7 @@ measures single-feature AUC per typology and a rule baseline.
 legally sells stock; cash-heavy rural business; honest loans with generic-trade or unrelated OKED supplier (6-8% of honest loans);
 honest buyers who pay the asset in cash; honest one-off large inflows; cash-heavy honest suppliers.
 
-**Train/test shift.** Train: seed 42, snapshot 2026-03-31. Test: seed 1337, snapshot 2026-07-31, disjoint ID space,
+**Splits and shift.** Train: seed 42, snapshot 2026-03-31. Dev (seed 1337, looked at during development), holdout (seed 2026, evaluated once) and demo (seed 7, served by the app, never used for metrics) share the shifted parameters below: snapshot 2026-07-31, disjoint ID spaces,
 different regional mix, and shifted parameters (fraud rate 11% -> 13%, stealth share 25% -> 35%, slower T1 cash-out,
 smaller rings, fewer employee links, more honest-suspicious borrowers, loan sizes +10%). See `ml/generator/config.py`.
 
@@ -47,18 +47,24 @@ the money-trail model never uses them. Any number that includes photo signals de
 and must be labelled as such. `ml/generator/check_leakage.py` reports photo/geo features in a separate section.
 
 ## 2. Assumptions
-Assumption: fraud rate is 11% (train) and 13% (test); real rates are unknown and are measured in the pilot.
+Assumption: fraud rate is 11% (train) and 13% (dev, holdout, demo); real rates are unknown and are measured in the pilot.
 Assumption: typology mix among fraud is T1 30% / T2 30% / T3 20% / T4 20%.
 Assumption: loan amounts are log-normal around illustrative medians per purpose (30-80 mln UZS), sigma 0.35.
 Assumption: region centroids are rounded approximations; borrower coordinates = centroid + noise (sd 0.25 deg).
 Assumption: OKED codes are illustrative and not checked against the official classifier.
 Assumption: honest livestock/poultry sellers are ~5% of loans, cash-heavy rural businesses ~5%, honest OKED mismatch 6-8% of honest loans.
 Assumption: 25-35% of T1/T2 are "stealth" (look clean); 25% of T4 use a matching-OKED supplier.
-Assumption: ring size is 4 + Poisson(3) (train) / Poisson(2.5) (test), stealth rings have 2-3 borrowers; 40% / 33% of ring suppliers link to a bank employee, 2.5% of honest suppliers do. A linked employee works in the branch of one of the supplier's borrowers with probability 80% (rings) / 75% train, 70% test (honest suppliers).
-Assumption: 35% of fraud loans (both splits) and 2% of honest loans reuse a photo; 25% of fraud and 4% of honest photos are taken far from the borrower. These rates are the same for all typologies and not shifted between train and test.
+Assumption: ring size is 4 + Poisson(3) (train) / Poisson(2.5) (dev, holdout, demo), stealth rings have 2-3 borrowers; 40% / 33% of ring suppliers link to a bank employee, 2.5% of honest suppliers do. A linked employee works in the branch of one of the supplier's borrowers with probability 80% (rings) / 75% train, 70% dev, holdout, demo (honest suppliers).
+Assumption: 35% of fraud loans (both splits) and 2% of honest loans reuse a photo; 25% of fraud and 4% of honest photos are taken far from the borrower. These rates are the same for all typologies and not shifted between the splits.
 Assumption: 18% (both splits) of honest suppliers with >= 2 borrowers are active in a short window only (20-120 days): newly registered suppliers (registered 3-45 days before their first payment) and, for parranda / issiqxona, seasonal suppliers (March-August). Ring suppliers burst within 30-150 days (brief §2 case 3), so supplier activity span alone is a strong but not decisive T2 signal (single-feature AUC ~0.84).
 Assumption: all supplier-account flows are derived from loan payments only (no other business activity is simulated).
 Assumption: all numbers measured on this synthetic data say nothing about real accuracy; real accuracy is measured in the pilot.
+
+## 2b. Evidence fusion and scenario scoring (not data, but assumptions)
+Assumption: there is no labelled data for photo signals, so photo evidence enters the queue through a **documented policy** (`ml/fusion.py`), not a learned model:
+a photo duplicate escalates a loan to at least red, a photo taken more than 5 km from the borrower (assumed limit) or with an implausible capture time to at least yellow;
+escalation never lowers the money-trail colour and never changes the money-trail `risk`. No accuracy is claimed for the policy.
+Assumption: scenario scoring (`ml.api.score_scenario`) gives a new supplier no outflows of its own; without an `invoice_amount_uzs` there is no invoice (the training convention for "no invoice" is used); scenarios are limited to loans 2-364 days old (the model's training range).
 
 ## 3. Licenses
 | Item | Use | License |

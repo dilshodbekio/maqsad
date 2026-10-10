@@ -10,33 +10,74 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from ml.errors import InvalidImageError, LoanNotFoundError  # noqa: F401  (re-exported for the backend)
+from ml.errors import InvalidImageError, LoanNotFoundError, ScenarioError  # noqa: F401  (re-exported for the backend)
 from ml.money_trail.model import MODEL_VERSION
 from ml.money_trail.service import get_portfolio
 
 
-def get_queue() -> list[dict]:
+def get_queue(sandbox_id: Optional[str] = None) -> list[dict]:
     """Risk queue, sorted by risk descending.
 
     Each item: {loan_id, borrower_name_masked, purpose, amount_uzs, region,
-                risk: float 0..1, color: "green"|"yellow"|"red", top_reason: str (Uzbek)}
+                risk: float 0..1 (money-trail only, never changed by photos),
+                color: "green"|"yellow"|"red" (after evidence fusion), top_reason: str (Uzbek),
+                base_color (money-trail colour), priority (sort key = colour rank + risk),
+                escalations: [{code, min_color, text_uz, evidence_refs, raises_color}]}
+    Sorted by priority, descending. `sandbox_id` (optional): the view of that demo sandbox, including the
+    escalations caused by photos uploaded there; other sandboxes and the default view are unaffected.
 
     The first call generates the demo portfolio (test-split config, seed 1337) in memory and scores it
     (~3 s); later calls are served from memory.
     """
-    return get_portfolio().queue()
+    return get_portfolio().queue(sandbox_id)
 
 
-def get_loan(loan_id: str) -> dict:
+def get_loan(loan_id: str, sandbox_id: Optional[str] = None) -> dict:
     """Full loan view.
 
     Returns: {loan, transactions[], photos[], invoice | None,
-              risk, color, reasons: [{code, text_uz, weight, evidence_refs}],
-              evidence: [{ref, kind: "txn"|"invoice"|"graph", summary_uz, data}], model_version}
-    `photos`: [{photo_id, path (repo-relative), purpose, captured_at, lat, lon, duplicate_of: [{loan_id, similarity}]}]
+              risk, color (after fusion), base_color, priority, escalations[],
+              reasons: [{code, text_uz, weight, evidence_refs}] (photo-policy reasons first: weight null, source "fusion_policy"),
+              evidence: [{ref, kind: "txn"|"invoice"|"graph"|"photo", summary_uz, data}], model_version}
+    `photos`: [{photo_id, path (repo-relative), purpose, captured_at, lat, lon,
+    duplicate_of: [{loan_id, similarity}], source: "portfolio"}]
     for the subset of loans that have a photo, [] otherwise. Raises: LoanNotFoundError
     """
-    return get_portfolio().loan(loan_id)
+    return get_portfolio().loan(loan_id, sandbox_id)
+
+
+def score_scenario(scenario: dict) -> dict:
+    """Score a loan + transactions built by the user (a judge), live, with the same model and reasons as `score_loan`.
+
+    Input: {purpose, amount_uzs, region?, snapshot_day,
+            supplier: {mode: "existing", supplier_id} | {mode: "new", oked, registered_days_before},
+            transactions: [{day, type, amount_uzs, counterparty_kind?}]}   (schema: docs/api_contract.md)
+    Returns: the `score_loan` shape + `percentile` (0-100 within the demo portfolio) + `features` (computed values).
+    The cached portfolio is never modified. Raises: ScenarioError (Uzbek message; backend -> HTTP 400)
+    """
+    from ml.money_trail.scenario import score_scenario as _score
+    return _score(scenario)
+
+
+def get_scenario_presets() -> list[dict]:
+    """4 editable starting scenarios [{id, title_uz, description_uz, scenario}]. Inputs only: scores are computed live."""
+    from ml.money_trail.scenario import get_scenario_presets as _presets
+    return _presets()
+
+
+def get_color_thresholds() -> dict:
+    """Colour rule of the served portfolio: red = top 10% by risk, yellow = next 10%, green = rest.
+
+    Returns {red, yellow (risk scores at those ranks), n_red, n_yellow (by risk), n_loans, rule} plus the effect of the
+    photo policy on the default queue: n_escalated_to_red (loans raised to red), n_escalated_to_yellow (green -> yellow),
+    n_red_total, n_yellow_total and `note` - the 20% budget is exceeded by exactly these escalations.
+    """
+    P = get_portfolio()
+    c = P.fused_counts()
+    note = (f"{P.thresholds['n_red']} red by risk + {c['n_escalated_to_red']} escalated to red by the photo policy = "
+            f"{c['n_red_total']} red; {c['n_yellow_total']} yellow ({P.thresholds['n_yellow']} by risk, "
+            f"{c['n_escalated_to_yellow']} green loans raised to yellow, the rest moved to red)")
+    return {**P.thresholds, **c, "note": note}
 
 
 def score_loan(loan_id: str) -> dict:
@@ -79,7 +120,8 @@ def check_photo(
     return _check(loan_id, image_bytes, lat, lon, captured_at, sandbox_id)
 
 
-def reset_sandbox(sandbox_id: str) -> None:
-    """Forget every photo hash uploaded in this demo sandbox (idempotent). Contract addition."""
+def reset_sandbox(sandbox_id: Optional[str]) -> None:
+    """Forget every photo hash uploaded in this demo sandbox (idempotent); `None` clears ALL sandboxes.
+    The portfolio photo index is never touched. Contract addition."""
     from ml.photo.checker import reset_sandbox as _reset
     _reset(sandbox_id)

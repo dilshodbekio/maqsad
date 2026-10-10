@@ -9,10 +9,14 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 
-MODEL_VERSION = "money_trail_v1"
+MODEL_VERSION = "money_trail_v2"
 ARTIFACTS = Path(__file__).resolve().parents[1] / "artifacts"
 MODEL_PATH = ARTIFACTS / f"{MODEL_VERSION}.txt"
 META_PATH = ARTIFACTS / f"{MODEL_VERSION}.json"
+
+
+def artifact_paths(version: str) -> tuple[Path, Path]:
+    return ARTIFACTS / f"{version}.txt", ARTIFACTS / f"{version}.json"
 SEED = 42
 # Modest, fixed hyper-parameters (no search). scale_pos_weight is set from the class ratio at fit time.
 LGB_PARAMS = dict(
@@ -26,8 +30,6 @@ LGB_PARAMS = dict(
 class MoneyTrailModel:
     booster: lgb.Booster
     features: list[str]
-    red: float          # score >= red    -> "red"     (top 10% of train OOF scores)
-    yellow: float       # score >= yellow -> "yellow"  (next 10%)
     meta: dict
 
     def score(self, X: pd.DataFrame) -> np.ndarray:
@@ -38,11 +40,8 @@ class MoneyTrailModel:
         """Per-feature log-odds contributions (LightGBM pred_contrib), shape (n, n_features); bias dropped."""
         return self.booster.predict(X[self.features].to_numpy(dtype=float), pred_contrib=True)[:, :-1]
 
-    def color(self, score: float) -> str:
-        return "red" if score >= self.red else "yellow" if score >= self.yellow else "green"
 
-
-def load_model(model_path: Path = MODEL_PATH, meta_path: Path = META_PATH) -> MoneyTrailModel:
+def load_model(version: str = MODEL_VERSION) -> MoneyTrailModel:
+    model_path, meta_path = artifact_paths(version)
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    return MoneyTrailModel(lgb.Booster(model_file=str(model_path)), meta["features"],
-                           meta["thresholds"]["red"], meta["thresholds"]["yellow"], meta)
+    return MoneyTrailModel(lgb.Booster(model_file=str(model_path)), meta["features"], meta)

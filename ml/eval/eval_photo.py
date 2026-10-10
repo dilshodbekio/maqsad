@@ -141,7 +141,7 @@ def latency_eval(n=500) -> dict:
     f = config.MAX_SIDE / max(h, w)
     big = cv2.resize(rgb, None, fx=f, fy=f, interpolation=cv2.INTER_CUBIC)
     data = imageio.encode_jpeg(big)
-    loan = "L500001"
+    loan = str(api.get_queue()[0]["loan_id"])
     for _ in range(10):
         api.check_photo(loan, data)
     ms, wall = [], []
@@ -169,6 +169,7 @@ def index_stats() -> dict:
 
 
 START, END = "<!-- photo:start -->", "<!-- photo:end -->"
+RES_PHOTO = config.ARTIFACTS / "eval_photo.json"
 SCRIPT = "`python -m ml.eval.eval_photo`"
 
 
@@ -265,20 +266,9 @@ def render(dup, faces, lat, idx) -> str:
       "of any detector; the 'faces left' numbers above only show that *detectable* faces are gone.")
     w("- **Small library:** hard negatives come from ~10 images per purpose and half; with a real portfolio of "
       "thousands of photos the false-positive rate at this threshold must be re-measured.")
-    w("- The photo result does not change the money-trail risk; combining them is a later step.")
+    w("- The photo result does not change the money-trail risk; it can only raise the queue colour via the fusion policy (section 5).")
     w(END)
     return "\n".join(L) + "\n"
-
-
-def write_docs(section: str):
-    from ml.eval.eval_money_trail import DOCS
-    text = DOCS.read_text(encoding="utf-8") if DOCS.exists() else "# Metrics\n"
-    if START in text and END in text:
-        a, b = text.index(START), text.index(END) + len(END)
-        text = text[:a] + section.rstrip("\n") + text[b:]
-    else:
-        text = text.rstrip("\n") + "\n\n" + section
-    DOCS.write_text(text, encoding="utf-8", newline="\n")
 
 
 def write_config():
@@ -297,11 +287,11 @@ def write_config():
 def main():
     dup = dup_eval()
     cfg = json.loads(config.DUP_PATH.read_text(encoding="utf-8"))
-    assert cfg["variant"] == choose_variant(dup) and abs(cfg["max_distance"] - dup["deploy"][cfg["variant"]]["max_distance"]) < 1e-9, \
-        "ml/artifacts/photo_dup_v1.json is out of date - run `python -m ml.eval.eval_photo --write-config`"
-    section = render(dup, faces_eval(), latency_eval(), index_stats())
-    write_docs(section)
-    print(section)
+    assert cfg["variant"] == choose_variant(dup) and abs(cfg["max_distance"] - dup["deploy"][cfg["variant"]]["max_distance"]) < 1e-9,         "ml/artifacts/photo_dup_v1.json is out of date - run `python -m ml.eval.eval_photo --write-config`"
+    out = dict(dup=dup, faces=faces_eval(), lat=latency_eval(), idx=index_stats())
+    RES_PHOTO.write_text(json.dumps(out, indent=1), encoding="utf-8")
+    from ml.eval.build_metrics import main as build_metrics
+    build_metrics()
 
 
 if __name__ == "__main__":

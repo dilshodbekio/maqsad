@@ -46,6 +46,16 @@ def photo_loan():
     return im["loans"][0], im
 
 
+def _all_items(client) -> list:
+    """Every queue item of the client's sandbox, page by page (max limit 200)."""
+    out, total = [], None
+    while total is None or len(out) < total:
+        page = client.get("/api/queue", params={"limit": 200, "offset": len(out)}).json()
+        total = page["total"]
+        out += page["items"]
+    return out
+
+
 def _keys_declared(model, items):
     undeclared = {k for item in items for k in item} - set(model.model_fields)
     assert not undeclared, f"ml returns keys not declared in {model.__name__}: {sorted(undeclared)}"
@@ -81,7 +91,7 @@ def test_ml_output_matches_schemas(adapter, photo_loan):
 def test_queue_loan_score_end_to_end(client):
     q = client.get("/api/queue")
     assert q.status_code == 200
-    items = q.json()
+    items = q.json()["items"]
     assert len(items) > 0 and [i["priority"] for i in items] == sorted((i["priority"] for i in items), reverse=True)
     assert all(i["color"] in ("green", "yellow", "red") and i["base_color"] for i in items)
     lid = items[0]["loan_id"]
@@ -105,7 +115,7 @@ def test_portfolio_photo_is_served_from_ml_assets(client, photo_loan):
 def test_check_photo_real_with_asset_image(client, photo_loan):
     owner, im = photo_loan
     img = (REPO_ROOT / "ml" / "assets" / "photos" / im["file"]).read_bytes()
-    other = next(i["loan_id"] for i in client.get("/api/queue").json() if i["loan_id"] != owner)
+    other = next(i["loan_id"] for i in client.get("/api/queue").json()["items"] if i["loan_id"] != owner)
     r = client.post("/api/check_photo", data={"loan_id": other, "lat": "41.3", "lon": "69.2",
                                                "captured_at": "2026-10-10T10:00:00Z"},
                     files={"image": (im["file"], img, "image/jpeg")})
@@ -125,7 +135,7 @@ def test_check_photo_real_with_asset_image(client, photo_loan):
 
 
 def test_check_photo_corrupt_jpeg_is_400(client):
-    lid = client.get("/api/queue").json()[0]["loan_id"]
+    lid = client.get("/api/queue").json()["items"][0]["loan_id"]
     r = client.post("/api/check_photo", data={"loan_id": lid},
                     files={"image": ("x.jpg", b"\xff\xd8\xff\xe0" + b"\x00" * 64, "image/jpeg")})
     assert r.status_code == 400
@@ -135,7 +145,7 @@ def test_check_photo_corrupt_jpeg_is_400(client):
 def test_admin_reset_with_real_ml(client, photo_loan):
     owner, im = photo_loan
     img = (REPO_ROOT / "ml" / "assets" / "photos" / im["file"]).read_bytes()
-    q = [i["loan_id"] for i in client.get("/api/queue").json() if i["loan_id"] != owner]
+    q = [i["loan_id"] for i in client.get("/api/queue").json()["items"] if i["loan_id"] != owner]
     client.post("/api/check_photo", data={"loan_id": q[0]}, files={"image": ("a.jpg", img, "image/jpeg")})
     assert client.post("/api/admin/reset", headers={"X-Admin-Token": "t"}).json() == {"ok": True}
     # after reset the sandbox upload is forgotten: only portfolio duplicates remain
@@ -145,8 +155,7 @@ def test_admin_reset_with_real_ml(client, photo_loan):
 
 def test_escalated_loan_served_by_api(client):
     """Loans with fusion reasons (weight null) and photo evidence must not 502."""
-    q = client.get("/api/queue").json()
-    lid = next(i["loan_id"] for i in q if i["escalations"])
+    lid = next(i["loan_id"] for i in _all_items(client) if i["escalations"])
     d = client.get(f"/api/loan/{lid}")
     assert d.status_code == 200, d.text
     d = d.json()
@@ -157,7 +166,7 @@ def test_escalated_loan_served_by_api(client):
 def test_sandbox_upload_escalates_only_own_view_until_reset(client, photo_loan):
     owner, im = photo_loan
     img = (REPO_ROOT / "ml" / "assets" / "photos" / im["file"]).read_bytes()
-    q = client.get("/api/queue").json()
+    q = client.get("/api/queue", params={"color": "green"}).json()["items"]
     target = next(i for i in q if i["loan_id"] != owner and i["color"] == "green" and not i["escalations"])
     r = client.post("/api/check_photo", data={"loan_id": target["loan_id"]},
                     files={"image": ("a.jpg", img, "image/jpeg")})
@@ -174,3 +183,25 @@ def test_sandbox_upload_escalates_only_own_view_until_reset(client, photo_loan):
     assert client.post("/api/admin/reset", headers={"X-Admin-Token": "t"}).status_code == 200
     after = client.get(f"/api/loan/{target['loan_id']}").json()
     assert after["color"] == "green" and after["escalations"] == []
+
+
+def test_queue_page_counts_match_color_thresholds(client):
+    """Fresh sandbox = default view: queue counts equal ml's colour budget (incl. photo escalations)."""
+    page = client.get("/api/queue").json()
+    lg = client.get("/api/queue/legend")
+    assert lg.status_code == 200, lg.text
+    lg = lg.json()
+    assert len(page["items"]) == 50 and page["total"] == lg["n_loans"]
+    assert page["counts"] == {"red": lg["n_red_total"], "yellow": lg["n_yellow_total"],
+                              "green": lg["n_loans"] - lg["n_red_total"] - lg["n_yellow_total"]}
+    red = client.get("/api/queue", params={"color": "red", "limit": 200}).json()
+    assert red["total"] == lg["n_red_total"] and all(i["color"] == "red" for i in red["items"])
+
+
+def test_queue_facets_real(client):
+    f = client.get("/api/queue/facets").json()
+    assert set(f["purposes"]) == {"tikuv_dastgohi", "chorva", "issiqxona", "parranda", "asalarichilik"}
+    assert len(f["regions"]) > 1 and f["regions"] == sorted(f["regions"])
+    region = f["regions"][0]
+    page = client.get("/api/queue", params={"region": region}).json()
+    assert page["total"] > 0 and all(i["region"] == region for i in page["items"])

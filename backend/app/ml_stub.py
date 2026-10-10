@@ -28,6 +28,7 @@ UZ_BBOX = (37.1, 45.6, 55.9, 73.2)  # lat_min, lat_max, lon_min, lon_max (coarse
 MAX_CLOCK_SKEW_S = 15 * 60
 
 _loans: Optional[dict] = None
+_thresholds: Optional[list] = None  # [yellow, red] stub-only fixed thresholds, from the fixture file
 _lock = threading.Lock()
 _photo_index: dict = {}  # sandbox_id -> list[(loan_id, sha256)]
 COLOR_RANK = {"green": 0, "yellow": 1, "red": 2}
@@ -38,9 +39,10 @@ def _fusion_fields(it: dict) -> dict:
 
 
 def _data() -> dict:
-    global _loans
+    global _loans, _thresholds
     if _loans is None:
         raw = json.loads(FIXTURES_PATH.read_text(encoding="utf-8"))
+        _thresholds = list(raw["stub_color_thresholds"])
         _loans = {item["loan"]["loan_id"]: item for item in raw["loans"]}
     return _loans
 
@@ -73,6 +75,21 @@ def get_queue(sandbox_id: Optional[str] = None) -> list:
 def get_loan(loan_id: str, sandbox_id: Optional[str] = None) -> dict:
     it = _item(loan_id)
     return {**it, **_fusion_fields(it), "model_version": MODEL_VERSION}
+
+
+def get_color_thresholds() -> dict:
+    """Same shape as ml.api.get_color_thresholds, counted from the fixtures. The stub colours come from
+    fixed thresholds (make_fixtures.py), so red/yellow are those thresholds, not ranks; no fusion here."""
+    loans = _data().values()
+    low, high = _thresholds
+    n_red = sum(1 for it in loans if it["color"] == "red")
+    n_yellow = sum(1 for it in loans if it["color"] == "yellow")
+    return {
+        "red": high, "yellow": low, "n_red": n_red, "n_yellow": n_yellow, "n_loans": len(loans),
+        "rule": f"STUB: fixed thresholds, red = risk >= {high}, yellow = risk >= {low}, green = rest",
+        "n_escalated_to_red": 0, "n_escalated_to_yellow": 0, "n_red_total": n_red, "n_yellow_total": n_yellow,
+        "note": "STUB fixtures, no evidence fusion",
+    }
 
 
 def score_loan(loan_id: str) -> dict:

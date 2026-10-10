@@ -43,14 +43,15 @@ def test_real_ml_without_sandbox_and_blur(make_client):
         return dict(RESULT)
 
     c = make_client(adapter=MLAdapter(_fake_ml(check_photo), "real"))
-    lid = c.get("/api/queue").json()[0]["loan_id"]
+    lid = c.get("/api/queue").json()["items"][0]["loan_id"]
     r = c.post("/api/check_photo", data={"loan_id": lid}, files={"image": ("a.png", png_bytes(), "image/png")})
     assert r.status_code == 200, r.text
     assert calls == [lid]
     h = c.get("/api/health").json()
     assert (h["ml_mode"], h["model_version"], h["warmup"]) == ("real", "fake-1", "done")
     assert h["functions"] == {"get_queue": "real", "get_loan": "real", "score_loan": "real",
-                              "check_photo": "real", "reset_sandbox": "missing"}
+                              "check_photo": "real", "reset_sandbox": "missing",
+                              "get_color_thresholds": "missing"}
     photo = c.get(f"/api/loan/{lid}").json()["photos"][0]
     assert photo["url"] is None  # no blurred_image -> nothing stored
     assert list(c.app.state.db.photo_dir.iterdir()) == []
@@ -64,7 +65,7 @@ def test_real_ml_with_sandbox_and_blur(make_client):
         return {**RESULT, "blurred_image": b"BLURRED" + image_bytes}
 
     c = make_client(adapter=MLAdapter(_fake_ml(check_photo), "real"))
-    lid = c.get("/api/queue").json()[0]["loan_id"]
+    lid = c.get("/api/queue").json()["items"][0]["loan_id"]
     img = png_bytes()
     r = c.post("/api/check_photo", data={"loan_id": lid}, files={"image": ("a.png", img, "image/png")})
     assert r.status_code == 200, r.text
@@ -84,7 +85,7 @@ def test_photo_visible_only_to_owner_sandbox(make_client):
         return {**RESULT, "blurred_image": image_bytes}
 
     owner = make_client(adapter=MLAdapter(_fake_ml(check_photo), "real"))
-    lid = owner.get("/api/queue").json()[0]["loan_id"]
+    lid = owner.get("/api/queue").json()["items"][0]["loan_id"]
     owner.post("/api/check_photo", data={"loan_id": lid}, files={"image": ("a.png", png_bytes(), "image/png")})
     url = owner.get(f"/api/loan/{lid}").json()["photos"][0]["url"]
 
@@ -108,7 +109,7 @@ def test_ml_exception_is_502(make_client):
         raise RuntimeError("model crashed")
 
     c = make_client(adapter=MLAdapter(_fake_ml(check_photo), "real"))
-    lid = c.get("/api/queue").json()[0]["loan_id"]
+    lid = c.get("/api/queue").json()["items"][0]["loan_id"]
     r = c.post("/api/check_photo", data={"loan_id": lid}, files={"image": ("a.png", png_bytes(), "image/png")})
     assert r.status_code == 502
     assert "Model xizmatida xatolik" in r.json()["detail"]
@@ -116,7 +117,7 @@ def test_ml_exception_is_502(make_client):
 
 def test_ml_contract_mismatch_is_502(make_client):
     c = make_client(adapter=MLAdapter(_fake_ml(lambda *a, **k: {"oops": 1}), "real"))
-    lid = c.get("/api/queue").json()[0]["loan_id"]
+    lid = c.get("/api/queue").json()["items"][0]["loan_id"]
     r = c.post("/api/check_photo", data={"loan_id": lid}, files={"image": ("a.png", png_bytes(), "image/png")})
     assert r.status_code == 502
 

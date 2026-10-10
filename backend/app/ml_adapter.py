@@ -28,13 +28,14 @@ from typing import Any, Callable, Optional, Tuple
 
 log = logging.getLogger("maqsad.ml")
 
-FUNCTIONS = ("get_queue", "get_loan", "score_loan", "check_photo", "reset_sandbox")
+FUNCTIONS = ("get_queue", "get_loan", "score_loan", "check_photo", "reset_sandbox", "get_color_thresholds")
 PROBE_LOAN_ID = "__maqsad_probe__"
 PROBES = {  # called after a successful get_queue(); any error except NotImplementedError = implemented
     "get_loan": (PROBE_LOAN_ID,),
     "score_loan": (PROBE_LOAN_ID,),
     "check_photo": (PROBE_LOAN_ID, b""),
     "reset_sandbox": (PROBE_LOAN_ID,),
+    "get_color_thresholds": (),  # read-only, cheap once the portfolio is built
 }
 
 
@@ -208,6 +209,9 @@ class MLAdapter:
 
     def score_loan(self, loan_id: str) -> dict:
         return self._call("score_loan", loan_id)
+
+    def get_color_thresholds(self) -> dict:
+        return self._call("get_color_thresholds")
 
     def check_photo(self, loan_id: str, image_bytes: bytes, lat=None, lon=None, captured_at=None,
                     sandbox_id: Optional[str] = None) -> Tuple[dict, Optional[bytes]]:

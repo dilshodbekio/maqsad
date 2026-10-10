@@ -10,6 +10,13 @@ export function StubBanner({ health }: { health: Health | null }) {
       </div>
     );
   }
+  if (health.warmup === "pending" || health.warmup === "running") {
+    return (
+      <div className="partial-banner" role="status">
+        Model tayyorlanmoqda… Navbat bir necha soniyadan keyin chiqadi.
+      </div>
+    );
+  }
   const notReady = Object.entries(health.functions)
     .filter(([, status]) => status === "not_ready" || status === "missing")
     .map(([name]) => name);

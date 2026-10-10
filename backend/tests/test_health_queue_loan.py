@@ -3,7 +3,8 @@ def test_health_stub(client):
     assert r.status_code == 200
     assert r.json() == {
         "ml_mode": "stub", "model_version": "stub", "warmup": "done",
-        "functions": {f: "stub" for f in ("get_queue", "get_loan", "score_loan", "check_photo", "reset_sandbox")},
+        "functions": {f: "stub" for f in ("get_queue", "get_loan", "score_loan", "check_photo", "reset_sandbox",
+                                          "get_color_thresholds")},
     }
     assert r.headers["X-ML-Mode"] == "stub"
     assert "sandbox_id" in r.cookies
@@ -24,8 +25,10 @@ def test_unknown_api_path_is_json_404(client):
 def test_queue_sorted_and_complete(client):
     r = client.get("/api/queue")
     assert r.status_code == 200
-    items = r.json()
-    assert len(items) == 40
+    page = r.json()
+    assert set(page) == {"items", "total", "counts"}
+    items = page["items"]
+    assert len(items) == 40 and page["total"] == 40  # stub has 40 loans < default limit 50
     assert [i["priority"] for i in items] == sorted((i["priority"] for i in items), reverse=True)
     assert set(items[0]) == {"loan_id", "borrower_name_masked", "purpose", "amount_uzs", "region",
                              "risk", "color", "top_reason", "base_color", "priority", "escalations"}

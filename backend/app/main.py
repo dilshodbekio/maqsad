@@ -1,4 +1,4 @@
-"""Maqsad API: FastAPI app serving /api/* (docs/api_contract.md v1.1) and the frontend build
+"""Maqsad API: FastAPI app serving /api/* (docs/api_contract.md v1.3) and the frontend build
 (frontend/dist) at /.
 
 Run:  uvicorn backend.app.main:create_app --factory --port 8000   (from the repo root)
@@ -30,9 +30,9 @@ from .ml_adapter import (MLAdapter, MLBadInput, MLFailure, MLInvalidImage, MLNot
                          load_adapter)
 from .ratelimit import RateLimiter
 from .schemas import (
-    LOAN_ID_PATTERN, AuditEntry, CheckPhotoFields, CheckPhotoJSON, CheckPhotoResponse, DecisionRequest,
-    DecisionResponse, DraftReport, DraftReportRequest, Health, LoanDetail, QueueItem, ResetResponse,
-    ScoreRequest, ScoreResponse,
+    LOAN_ID_PATTERN, AuditEntry, CheckPhotoFields, CheckPhotoJSON, CheckPhotoResponse, Color, ColorLegend,
+    DecisionRequest, DecisionResponse, DraftReport, DraftReportRequest, Health, LoanDetail, QueueFacets, QueueItem,
+    QueuePage, ResetResponse, ScoreRequest, ScoreResponse,
 )
 
 log = logging.getLogger("maqsad.api")
@@ -40,6 +40,8 @@ log = logging.getLogger("maqsad.api")
 SANDBOX_COOKIE = "sandbox_id"
 SANDBOX_MAX_AGE_S = 30 * 24 * 3600
 UPLOAD_PATHS = {"/api/check_photo"}
+QUEUE_DEFAULT_LIMIT = 50
+QUEUE_MAX_LIMIT = 200
 
 MSG_TOO_MANY = "Juda ko'p so'rov. Bir daqiqadan keyin qayta urinib ko'ring."
 MSG_BAD_TYPE = "Faqat JPEG, PNG yoki WebP rasm qabul qilinadi."
@@ -212,10 +214,37 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         return {"ml_mode": adapter.mode, "model_version": adapter.model_version,
                 "warmup": adapter.warmup_state, "functions": dict(adapter.status)}
 
-    @api.get("/queue", response_model=List[QueueItem])
-    def queue(request: Request):
+    def full_queue(request: Request) -> List[QueueItem]:
         items = _validated(List[QueueItem], adapter.get_queue(request.state.sandbox_id))
         return sorted(items, key=lambda x: -x.priority)  # ml already sorts; keep the contract even if it did not
+
+    @api.get("/queue", response_model=QueuePage)
+    def queue(
+        request: Request,
+        limit: Annotated[int, Query(ge=1, le=QUEUE_MAX_LIMIT)] = QUEUE_DEFAULT_LIMIT,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        color: Optional[Color] = None,
+        region: Annotated[Optional[str], Query(max_length=64)] = None,
+        purpose: Annotated[Optional[str], Query(max_length=64)] = None,
+    ):
+        items = full_queue(request)
+        counts = {c: 0 for c in ("red", "yellow", "green")}
+        for it in items:
+            counts[it.color] += 1  # whole sandbox queue, before filters
+        matched = [it for it in items
+                   if (not color or it.color == color)
+                   and (not region or it.region == region)
+                   and (not purpose or it.purpose == purpose)]
+        return {"items": matched[offset:offset + limit], "total": len(matched), "counts": counts}
+
+    @api.get("/queue/facets", response_model=QueueFacets)
+    def queue_facets(request: Request):
+        items = full_queue(request)
+        return {"regions": sorted({it.region for it in items}), "purposes": sorted({it.purpose for it in items})}
+
+    @api.get("/queue/legend", response_model=ColorLegend)
+    def queue_legend():
+        return _validated(ColorLegend, adapter.get_color_thresholds())
 
     @api.get("/loan/{loan_id}", response_model=LoanDetail)
     def loan(loan_id: LoanIdPath, request: Request):

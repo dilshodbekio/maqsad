@@ -52,7 +52,7 @@ def test_check_photo_json_base64_fallback(client, loan_id):
 
 def test_check_photo_duplicate_only_within_sandbox(client):
     from fastapi.testclient import TestClient
-    q = client.get("/api/queue").json()
+    q = client.get("/api/queue").json()["items"]
     a, b = q[0]["loan_id"], q[1]["loan_id"]
     img = png_bytes((1, 2, 3))
     assert _upload(client, a, img).json()["duplicate_of"] == []

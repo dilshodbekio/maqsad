@@ -1,0 +1,12 @@
+file,faces_visible,note
+faces_test_00.jpg,1,man in barn
+faces_test_01.jpg,1,man behind cow (small)
+faces_test_02.jpg,1,man standing by cow (small)
+faces_test_03.jpg,1,man behind cow (small; black and white)
+faces_test_04.jpg,1,man in white; the decorated bull head to his right is NOT a face
+faces_test_05.jpg,1,selfie in front of cattle
+faces_test_06.jpg,1,woman at sewing machine
+faces_test_07.jpg,1,woman at sewing machine
+faces_test_08.jpg,1,woman in profile; a second person in the background is dark and out of focus (not counted)
+faces_test_09.jpg,4,two people at the machine and two behind them (black and white)
+faces_test_10.jpg,1,woman in side view; the second woman is seen from behind (no face visible)

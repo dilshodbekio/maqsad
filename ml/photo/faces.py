@@ -9,6 +9,7 @@ import numpy as np
 from . import config
 
 SCORE_THRESHOLD = 0.6
+DETECT_SIDE = 960              # YuNet runs on a copy whose longest side is at most this (speed)
 MAX_PASSES = 3                 # blur -> re-detect -> blur again until no detectable face is left
 
 
@@ -28,11 +29,13 @@ class FaceDetector:
     def detect(self, rgb: np.ndarray) -> list[tuple[int, int, int, int]]:
         h, w = rgb.shape[:2]
         if self._yunet is not None:
-            bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+            s = min(1.0, DETECT_SIDE / max(h, w))
+            small = cv2.resize(rgb, None, fx=s, fy=s, interpolation=cv2.INTER_AREA) if s < 1 else rgb
+            bgr = cv2.cvtColor(small, cv2.COLOR_RGB2BGR)
             with self._lock:
-                self._yunet.setInputSize((w, h))
+                self._yunet.setInputSize((bgr.shape[1], bgr.shape[0]))
                 _, faces = self._yunet.detect(bgr)
-            return [] if faces is None else [tuple(int(v) for v in f[:4]) for f in faces]
+            return [] if faces is None else [tuple(int(v / s) for v in f[:4]) for f in faces]
         gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
         found = self._haar.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
         return [tuple(int(v) for v in f) for f in found]
@@ -44,7 +47,7 @@ class FaceDetector:
 
 
 def blur_boxes(rgb: np.ndarray, boxes, grow: float = 0.35) -> np.ndarray:
-    """Mosaic + Gaussian blur of every box (grown by `grow` on each side). Returns a new array."""
+    """Heavy pixelation + blur of every box (grown by `grow` on each side). Returns a new array."""
     out = rgb.copy()
     H, W = out.shape[:2]
     for x, y, w, h in boxes:
@@ -54,9 +57,8 @@ def blur_boxes(rgb: np.ndarray, boxes, grow: float = 0.35) -> np.ndarray:
             continue
         roi = out[y0:y1, x0:x1]
         small = cv2.resize(roi, (max(2, (x1 - x0) // 14), max(2, (y1 - y0) // 14)), interpolation=cv2.INTER_AREA)
-        mosaic = cv2.resize(small, (x1 - x0, y1 - y0), interpolation=cv2.INTER_NEAREST)
-        k = (max(x1 - x0, y1 - y0) // 3) | 1
-        out[y0:y1, x0:x1] = cv2.GaussianBlur(mosaic, (k, k), 0)
+        small = cv2.GaussianBlur(small, (3, 3), 0)            # blur on the tiny version: cheap and just as anonymising
+        out[y0:y1, x0:x1] = cv2.resize(small, (x1 - x0, y1 - y0), interpolation=cv2.INTER_LINEAR)
     return out
 
 

@@ -106,9 +106,204 @@ def choose_variant(res: dict) -> str:
     return max(d, key=lambda k: (d[k]["recall"], -d[k]["max_distance"]))
 
 
+def faces_eval() -> dict:
+    """Detected vs hand-counted faces on faces_test; then the detectors are re-run on the blurred output."""
+    import csv
+    from ml.photo.faces import FaceDetector, blur_faces
+    det = FaceDetector()
+    truth = {r["file"]: (int(r["faces_visible"]), r["note"])
+             for r in csv.DictReader(open(config.ASSETS / "faces_test_counts.csv", encoding="utf-8"))}
+    rows = []
+    for f, (n_true, note) in truth.items():
+        rgb = imageio.decode((config.ASSETS / f).read_bytes())
+        blurred, n_det = blur_faces(det, rgb)
+        rows.append(dict(file=f, truth=n_true, detected=n_det, note=note,
+                         left_yunet=len(det.detect(blurred)), left_haar=len(det.detect_haar(blurred)),
+                         haar_before=len(det.detect_haar(rgb))))
+    tp = sum(min(r["truth"], r["detected"]) for r in rows)
+    return dict(rows=rows, backend=det.backend, truth=sum(r["truth"] for r in rows),
+                detected=sum(r["detected"] for r in rows), tp=tp,
+                fp=sum(max(0, r["detected"] - r["truth"]) for r in rows),
+                fn=sum(max(0, r["truth"] - r["detected"]) for r in rows),
+                left_yunet=sum(r["left_yunet"] for r in rows), left_haar=sum(r["left_haar"] for r in rows),
+                haar_before=sum(r["haar_before"] for r in rows))
+
+
+def latency_eval(n=500) -> dict:
+    import time
+
+    import cv2
+
+    from ml import api
+    api.get_queue()
+    rgb = imageio.decode((config.ASSETS / "faces_test_09.jpg").read_bytes())
+    h, w = rgb.shape[:2]
+    f = config.MAX_SIDE / max(h, w)
+    big = cv2.resize(rgb, None, fx=f, fy=f, interpolation=cv2.INTER_CUBIC)
+    data = imageio.encode_jpeg(big)
+    loan = "L500001"
+    for _ in range(10):
+        api.check_photo(loan, data)
+    ms, wall = [], []
+    for _ in range(n):
+        t0 = time.perf_counter()
+        r = api.check_photo(loan, data)
+        wall.append((time.perf_counter() - t0) * 1000)
+        ms.append(r["latency_ms"])
+    q = lambda a, p: float(np.percentile(a, p))
+    return dict(n=n, size=big.shape[:2], kb=len(data) / 1024, p50=q(ms, 50), p95=q(ms, 95),
+                wall_p50=q(wall, 50), wall_p95=q(wall, 95))
+
+
+def index_stats() -> dict:
+    import csv
+    from collections import Counter
+    raw = json.loads(config.INDEX_PATH.read_text(encoding="utf-8"))
+    c = Counter(i["purpose"] for i in raw["images"])
+    cl = Counter(i["purpose"] for i in raw["images"] for _ in i["loans"])
+    lib = Counter(r["purpose"] for r in library())
+    rows = list(csv.DictReader(open(config.ASSETS / "manifest.csv", encoding="utf-8")))
+    faces = sum(1 for r in rows if r["purpose"] == "faces_test")
+    return dict(stats=raw["stats"], per_purpose={p: (lib[p], c[p], cl[p]) for p in lib}, faces=faces,
+                size_kb=sum(p.stat().st_size for p in config.ASSETS.glob("*.jpg")) // 1024)
+
+
+START, END = "<!-- photo:start -->", "<!-- photo:end -->"
+SCRIPT = "`python -m ml.eval.eval_photo`"
+
+
+def pct(x):
+    return f"{100 * x:.1f}%"
+
+
+def render(dup, faces, lat, idx) -> str:
+    cfg = json.loads(config.DUP_PATH.read_text(encoding="utf-8"))
+    v = cfg["variant"]
+    L = []
+    w = L.append
+    w(START)
+    w("## Photo module (openly licensed images)")
+    w("")
+    w("**All numbers are on a small library of openly licensed photos (CC / public domain) and are produced by "
+      f"{SCRIPT}. They say nothing about real borrower photos; real accuracy is measured in the pilot.**")
+    w("")
+    w(f"- Library: {dup['n_images']} asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) "
+      f"+ {idx['faces']} photos with people for the face-blur test; {idx['size_kb']} KB in the repo.")
+    w("- Portfolio photo index (`ml/artifacts/photo_index_v1.json`): "
+      f"{idx['stats']['images']} images on {idx['stats']['loans']} loans of the demo portfolio; "
+      f"{idx['stats']['shared_images']} images are shared by 2-3 loans (the generator's photo-reuse groups). "
+      "Photos are matched to the loan's purpose.")
+    w("")
+    w("| Purpose | library images | in index | loans with a photo |")
+    w("|---|---|---|---|")
+    for p, (a, b, c) in idx["per_purpose"].items():
+        w(f"| {p} | {a} | {b} | {c} |")
+    w("")
+    w("### Duplicate detection under transformations")
+    w("")
+    w("Hashes: pHash + dHash (64 bit each) of the whole image and of its central 80% crop; distance = hamming/128, "
+      "for the crop-tolerant variant the minimum over whole/central combinations. Positives = a transformed copy "
+      "against its own original. Hard negatives = the same transformed copy against a *different* image of the same "
+      "purpose (e.g. two different sewing machines). The threshold is the largest distance with pooled precision >= "
+      f"{cfg['min_precision']} on the tuning half; numbers below are on the other half "
+      f"({dup['n_test']} images; {dup['n_tune']} for tuning).")
+    w("")
+    w("| Variant | max distance (tuned on half A) | recall (held-out) | precision (held-out) | false positives |")
+    w("|---|---|---|---|---|")
+    for k, d in dup["variants"].items():
+        p = d["pooled"]
+        w(f"| {k} | {d['max_distance']:.3f} | {pct(p['recall'])} | {pct(p['precision'])} | {p['fp']} / {p['n_neg']} |")
+    w("")
+    d = dup["variants"][v]
+    w(f"**Deployed: `{v}`, max distance {cfg['max_distance']:.4f} (similarity >= {cfg['similarity_threshold']:.4f}).** "
+      f"The deployed variant and threshold were re-tuned on all {dup['n_images']} images (stricter threshold, "
+      "more hard negatives) after the held-out numbers were fixed; the table above shows how the tune-on-one-half "
+      "procedure generalises. With the deployed setting no two single-loan images of the portfolio index match each other. "
+      f"Held-out per-transform numbers for the {v} variant (threshold tuned on half A):")
+    w("")
+    w("| Transform | positives | recall | negatives | false positives | precision |")
+    w("|---|---|---|---|---|---|")
+    for t, m in d["per"].items():
+        w(f"| {t} | {m['n_pos']} | {pct(m['recall'])} | {m['n_neg']} | {m['fp']} | {pct(m['precision'])} |")
+    w("")
+    w("### Face blur (YuNet, OpenCV zoo, MIT; Haar cascade as fallback)")
+    w("")
+    w(f"Counted by eye on the {len(faces['rows'])} `faces_test` images (`ml/assets/photos/faces_test_counts.csv`; "
+      "faces that are very small, dark or out of focus are noted there and not counted).")
+    w("")
+    w("| Item | Value |")
+    w("|---|---|")
+    w(f"| Faces present (hand count) | {faces['truth']} |")
+    w(f"| Faces detected by `{faces['backend']}` | {faces['detected']} (true {faces['tp']}, false {faces['fp']}, missed {faces['fn']}) |")
+    w(f"| Face recall / precision (count based) | {pct(faces['tp'] / faces['truth'])} / {pct(faces['tp'] / faces['detected'])} |")
+    w(f"| Detectable faces left after blur (YuNet re-run) | {faces['left_yunet']} |")
+    w(f"| Detectable faces left after blur (independent Haar cascade; it found {faces['haar_before']} before blur) | {faces['left_haar']} |")
+    w("")
+    w("Detection is count based (no box annotations), so a miss and a false alarm on the same image can cancel out.")
+    w("")
+    w("### Latency")
+    w("")
+    w("| Item | Value |")
+    w("|---|---|")
+    w(f"| `check_photo` p50 / p95 ({lat['n']} calls, warm, {lat['size'][1]}x{lat['size'][0]} px, {lat['kb']:.0f} KB JPEG; "
+      "decode, hashing, duplicate search, face detection + blur, re-encode) | "
+      f"{lat['p50']:.0f} ms / {lat['p95']:.0f} ms |")
+    w(f"| same, wall clock | {lat['wall_p50']:.0f} ms / {lat['wall_p95']:.0f} ms |")
+    w("| Cost per check | 0 (local, no external API) |")
+    w("")
+    w("### Known failure cases")
+    w("")
+    w(f"- **Heavy crops:** crop 20% is found only {pct(d['per']['crop 20%']['recall'])} of the time, crop 10% "
+      f"{pct(d['per']['crop 10%']['recall'])} (random crop position). Hashing is not crop-proof.")
+    w("- **Different photo of the same thing** (the same cow from another angle, the same machine in another room) "
+      "is not a duplicate by hash; recognising an individual animal or machine is out of scope.")
+    w("- **Photo of a screen** is only covered by the simulated 'screenshot' transform (border + colour shift); moire "
+      "from a real screen photo and perspective distortion were not tested.")
+    w("- **Larger rotation / mirroring** were not tested (only 5 degrees).")
+    w("- **Faces:** a decorated bull head was detected as a face once (`faces_test_04`); a dark, out-of-focus face in "
+      "the background (`faces_test_08`) is not counted and was not detected, so it is not blurred. Side and tiny faces are the weak spot "
+      "of any detector; the 'faces left' numbers above only show that *detectable* faces are gone.")
+    w("- **Small library:** hard negatives come from ~10 images per purpose and half; with a real portfolio of "
+      "thousands of photos the false-positive rate at this threshold must be re-measured.")
+    w("- The photo result does not change the money-trail risk; combining them is a later step.")
+    w(END)
+    return "\n".join(L) + "\n"
+
+
+def write_docs(section: str):
+    from ml.eval.eval_money_trail import DOCS
+    text = DOCS.read_text(encoding="utf-8") if DOCS.exists() else "# Metrics\n"
+    if START in text and END in text:
+        a, b = text.index(START), text.index(END) + len(END)
+        text = text[:a] + section.rstrip("\n") + text[b:]
+    else:
+        text = text.rstrip("\n") + "\n\n" + section
+    DOCS.write_text(text, encoding="utf-8", newline="\n")
+
+
+def write_config():
+    """Write ml/artifacts/photo_dup_v1.json from the evaluation (variant + threshold; then rebuild the index)."""
+    dup = dup_eval()
+    v = choose_variant(dup)
+    d = dup["deploy"][v]
+    config.DUP_PATH.write_text(json.dumps(dict(
+        variant=v, max_distance=d["max_distance"], similarity_threshold=round(1 - d["max_distance"], 4),
+        tuned_on_images=dup["n_images"], min_precision=MIN_PRECISION, seed=SEED,
+        note="deployed variant/threshold tuned on all library images at pooled precision >= min_precision; "
+             "held-out numbers in docs/metrics.md (Photo module)"), indent=1), encoding="utf-8", newline="\n")
+    print("wrote", config.DUP_PATH, v, d)
+
+
+def main():
+    dup = dup_eval()
+    cfg = json.loads(config.DUP_PATH.read_text(encoding="utf-8"))
+    assert cfg["variant"] == choose_variant(dup) and abs(cfg["max_distance"] - dup["deploy"][cfg["variant"]]["max_distance"]) < 1e-9, \
+        "ml/artifacts/photo_dup_v1.json is out of date - run `python -m ml.eval.eval_photo --write-config`"
+    section = render(dup, faces_eval(), latency_eval(), index_stats())
+    write_docs(section)
+    print(section)
+
+
 if __name__ == "__main__":
-    r = dup_eval()
-    for v, d in r["variants"].items():
-        print(v, "max_dist", round(d["max_distance"], 3), "pooled", {k: round(x, 3) if isinstance(x, float) else x for k, x in d["pooled"].items()})
-        for t, m in d["per"].items():
-            print("   ", f"{t:16s} recall {m['recall']:.3f} precision {m['precision']:.3f} fp {m['fp']}/{m['n_neg']}")
+    import sys
+    write_config() if "--write-config" in sys.argv else main()

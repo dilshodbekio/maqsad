@@ -99,9 +99,8 @@ which is why the generator reproduces the schemes from the prosecuted cases in `
 | OpenCV Haar cascade `haarcascade_frontalface_default.xml` (shipped inside opencv) | fallback / second detector in tests | BSD-style (OpenCV / Intel license) |
 | Pillow 12.3.0 | image decode / re-encode | MIT-CMU (HPND) |
 | OpenCLIP `open_clip_torch` 3.3.0 | asset check (`ml/photo/asset.py`) | MIT ([mlfoundations/open_clip](https://github.com/mlfoundations/open_clip/blob/main/LICENSE)) |
-| CLIP ViT-B-32 weights (OpenAI), **not committed** | image embeddings for the asset check; downloaded once (354 MB, sha256 checked by open_clip) from OpenAI's public URL into the cache directory `MAQSAD_CLIP_CACHE` (default `ml/.cache/clip`, git-ignored). A Dockerfile can pre-download them at build time with `python -m ml.photo.asset --download`. | MIT ([openai/CLIP](https://github.com/openai/CLIP/blob/main/LICENSE)) |
+| CLIP ViT-B-32 weights (OpenAI), **not committed** | image embeddings for the asset check; downloaded once (354 MB, sha256 checked by open_clip) from OpenAI's public URL into the cache directory `MAQSAD_CLIP_CACHE` (default `ml/.cache/clip`, git-ignored). A Dockerfile can pre-download them at build time with `python -m ml.photo.asset --download`. | MIT ([openai/CLIP](https://github.com/openai/CLIP/blob/main/LICENSE)); **needs legal review for production**: OpenAI's model card calls any deployed use of the model out of scope; alternative: a LAION-trained OpenCLIP checkpoint with its own weight licence (`docs/metrics.md`, Known failure cases) |
 | torch 2.14.1 (CPU wheels), torchvision 0.29.1 | CLIP inference (`--extra-index-url https://download.pytorch.org/whl/cpu` in `ml/requirements.txt`) | BSD-3-Clause |
 | timm 1.0.30 | dependency of open_clip | Apache-2.0 |
 | psutil 7.2.2, openpyxl 3.1.5 | memory measurement (`ml/eval`), `docs/sample_loans.xlsx` | BSD-3-Clause, MIT |
 | Asset probe `ml/artifacts/asset_probe_v1.npz` | logistic regression on CLIP embeddings of our library (11 KB, committed) | project artifact (derived from the openly licensed library above) |
-| Models (CLIP, ...) | TBD | TBD |

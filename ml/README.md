@@ -35,7 +35,7 @@ The photo result never changes the money-trail `risk`; it can only raise the col
 
 | Component | Method | Built by us vs. pre-trained | Key metric (source) | Latency |
 |---|---|---|---|---|
-| Synthetic portfolio generator (`ml/generator`) | rule-based simulation of 4 fraud typologies + honest-but-suspicious profiles | all ours | per-typology leakage check with a flag at AUC >= 0.90 (`ml/generator/check_leakage.py`; the T1 cash features are intended) | demo portfolio in 4.3 s |
+| Synthetic portfolio generator (`ml/generator`) | rule-based simulation of 4 fraud typologies + honest-but-suspicious profiles | all ours | per-typology leakage check with a flag at AUC >= 0.90 (`ml/generator/check_leakage.py`; the T1 cash features are intended) | demo portfolio built in 3.7-4.3 s |
 | Money-trail model (`ml/money_trail`) | LightGBM on 29 features, supplier-grouped CV | features, labels, training, reasons: ours; LightGBM library | holdout recall@20% 0.782 (clustered CI [0.728, 0.832]), ROC-AUC 0.910 ([metrics §2](../docs/metrics.md#2-money-trail-v2-holdout--headline)) | `score_loan` p50 6.6-7.2 ms |
 | Reasons + evidence | LightGBM `pred_contrib` -> one Uzbek template per feature, de-duplicated | all ours | text audit: see [`docs/audit_texts.md`](../docs/audit_texts.md) | included above |
 | Scenario scoring (`ml/money_trail/scenario.py`) | user-built loan scored live by the same model | all ours | features equal to a full portfolio copy (test); example in [metrics §5](../docs/metrics.md#5-scenario-scoring-and-evidence-fusion) | p50 140-142 ms |
@@ -102,11 +102,11 @@ See [Known failure cases](../docs/metrics.md#6-known-failure-cases). In short: e
 
 - **Runs fully on-prem; no external API in the ML path.** The money-trail model, the photo checks and CLIP run locally on CPU. The only external LLM call of the prototype is `/draft_report` in the backend; production uses a local LLM (vLLM / Ollama) for the report.
 - **Privacy**: the original image is never written anywhere (decoded and hashed in memory); faces are blurred and EXIF is dropped by re-encoding; only the blurred JPEG and a perceptual hash are kept; sandbox photos live in memory only and are forgotten by `reset_sandbox`.
-- **Cost / sizing**: measured CPU time and cost per 1 000 checks, with sources and assumptions, are in [`docs/cost.md`](../docs/cost.md) (photo check 502 ms single-thread CPU; process start to a warm portfolio 6-7 s; loading CLIP alone 11-11 s).
+- **Cost / sizing**: measured CPU time and cost per 1 000 checks, with sources and assumptions, are in [`docs/cost.md`](../docs/cost.md) (photo check 502 ms single-thread CPU; process start to a warm portfolio 6-7 s; loading CLIP alone 10.6-11.2 s).
 
 ### Service start-up: call `ml.api.warm_up()` once
 
-`warm_up()` loads the demo portfolio (features, scores, queue), the face detector and CLIP, and returns the seconds each took plus `clip_loaded` / `clip_error` (measured ~16-25 s and ~1.4 GB in total, [metrics §4](../docs/metrics.md#asset-check-is-the-thing-in-the-photo-what-the-loan-was-for-openclip-vit-b-32-cpu)).
+`warm_up()` loads the demo portfolio (features, scores, queue), the face detector and CLIP, and returns the seconds each took plus `clip_loaded` / `clip_error` (measured 15.8-15.9 s and 1425-1428 MB in total, [metrics §4](../docs/metrics.md#asset-check-is-the-thing-in-the-photo-what-the-loan-was-for-openclip-vit-b-32-cpu)).
 
 ### CLIP weights (asset check): pre-download at BUILD time, never at request time
 

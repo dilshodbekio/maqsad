@@ -190,7 +190,8 @@ def render(dup, faces, lat, idx) -> str:
       f"{SCRIPT}. They say nothing about real borrower photos; real accuracy is measured in the pilot.**")
     w("")
     w(f"- Library: {dup['n_images']} asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) "
-      f"+ {idx['faces']} photos with people for the face-blur test; {idx['size_kb']} KB in the repo.")
+      f"+ {idx['faces']} photos with people for the face-blur test (the CLIP `other` negatives are not counted here); {idx['size_kb']} KB for all JPEGs "
+      "in `ml/assets/photos/` including the `other` negatives.")
     w("- Portfolio photo index (`ml/artifacts/photo_index_v1.json`): "
       f"{idx['stats']['images']} images on {idx['stats']['loans']} loans of the demo portfolio; "
       f"{idx['stats']['shared_images']} images are shared by 2-3 loans (the generator's photo-reuse groups). "

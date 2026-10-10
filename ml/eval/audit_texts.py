@@ -3,7 +3,7 @@
     .venv/Scripts/python -m ml.eval.audit_texts --tag before|after
 
 Collects: reasons, escalations, top_reason and evidence summaries of EVERY loan of the demo portfolio (default view); the 4 scenario
-presets and 30 random valid scenarios (reasons); the messages of ~30 invalid scenarios (ScenarioError); `asset_match.label_uz` and the
+presets and 30 random valid scenarios (reasons); the messages of the invalid scenarios (ScenarioError); `asset_match.label_uz` and the
 resulting reasons / escalations of `check_photo` on 20 committed images in a fresh sandbox. Flags: "None", "nan", "inf", braces,
 "0 foiz", "atigi 0", impossible negative numbers, > 100% shown as percent, English words, duplicated reasons, label / matches_purpose
 contradictions, empty or very short strings, doubled spaces, unbalanced brackets, lowercase start. Writes ml/artifacts/audit_texts_<tag>.json and docs/audit_texts.md.
@@ -239,7 +239,7 @@ def render():
     L = ["# Text audit (user-facing Uzbek strings)", "",
          "Produced by `python -m ml.eval.audit_texts --tag before|after`. Every reason, escalation, `top_reason`, evidence summary, scenario reason, "
          "`ScenarioError` message and asset label of: all loans of the demo portfolio (default view), the 4 scenario presets, 30 random valid scenarios, "
-         "~30 invalid scenarios and `check_photo` on 20 committed images in a fresh sandbox is checked for: None / nan / inf, braces, '0 foiz', 'atigi 0', "
+         "the invalid scenarios and `check_photo` on 20 committed images in a fresh sandbox is checked for: None / nan / inf, braces, '0 foiz', 'atigi 0', "
          "impossible negative numbers, > 100% shown as percent, English words, duplicated reasons, `top_reason` != `reasons[0]`, label / matches_purpose "
          "contradictions, empty or very short strings, double spaces, unbalanced brackets, lowercase start, percent-suffix style.", ""]
     L += ["**How to read the table.** 'before' = this checker run on the templates as they were before this round; 'after' = the final templates. "

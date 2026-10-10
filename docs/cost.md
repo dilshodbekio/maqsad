@@ -1,19 +1,19 @@
 # Cost per check
 
-All CPU times were **measured** by `python -m ml.eval.measure_cost` on the machine below (process CPU seconds, warm, 100 calls per component); prices are public prices with their source and date. Numbers are for the prototype code on synthetic data. The cost basis is the **single-thread** measurement (OpenCV, torch and OpenMP pinned to one thread = one vCPU): with all cores the process CPU time is inflated by spinning worker threads (see section 1b) and does not mean work done.
+All CPU times were **measured** by `python -m ml.eval.measure_cost` on the machine below (process CPU seconds, warm, the number of calls per row is in the table); prices are public prices with their source and date. Numbers are for the prototype code on synthetic data. The cost basis is the **single-thread** measurement (OpenCV, torch and OpenMP pinned to one thread = one vCPU): with all cores the process CPU time is inflated by spinning worker threads (see section 1b) and does not mean work done.
 
 Machine: Intel64 Family 6 Model 154 Stepping 3, GenuineIntel, 12 logical cores, Python 3.13.15. Resident memory after warm-up: 1179 MB.
 
 ## 1. Measured CPU time (single thread = one vCPU; the cost basis)
 
-| Component | CPU time per call | Wall time per call |
-|---|---|---|
-| Money-trail score (`score_loan`: model inference + reasons) | 3 ms | 3 ms |
-| Scenario score (`score_scenario`) | 96 ms | 98 ms |
-| `check_photo` total (decode, hash, duplicates, face detect + blur, CLIP asset check, re-encode; 1600 px) | 502 ms | 520 ms |
-| &nbsp;&nbsp;of which decode + perceptual hashes | 31 ms | 32 ms |
-| &nbsp;&nbsp;of which face detection + blur | 243 ms | 246 ms |
-| &nbsp;&nbsp;of which CLIP asset check (embedding + probe) | 200 ms | 201 ms |
+| Component | CPU time per call | Wall time per call | calls |
+|---|---|---|---|
+| Money-trail score (`score_loan`: model inference + reasons) | 3 ms | 3 ms | 100 |
+| Scenario score (`score_scenario`) | 96 ms | 98 ms | 40 |
+| `check_photo` total (decode, hash, duplicates, face detect + blur, CLIP asset check, re-encode; 1600 px) | 502 ms | 520 ms | 60 |
+| &nbsp;&nbsp;of which decode + perceptual hashes | 31 ms | 32 ms | 40 |
+| &nbsp;&nbsp;of which face detection + blur | 243 ms | 246 ms | 40 |
+| &nbsp;&nbsp;of which CLIP asset check (embedding + probe) | 200 ms | 201 ms | 40 |
 | Warm-up once at start (`ml.api.warm_up()`: demo portfolio + features + scores + queue, face detector, CLIP) | 15 s | 16 s |
 
 ### 1b. The same on all cores of this machine (latency, not cost)

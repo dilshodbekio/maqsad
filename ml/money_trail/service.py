@@ -1,7 +1,7 @@
 """Serving side of the money-trail model (used by ml/api.py).
 
 The deployed service has no data/generated/ (gitignored). On first use the ML package generates the
-demo portfolio in memory - the DEMO split config (seed 7), deterministic, ~1 s - computes the
+demo portfolio in memory - the DEMO split config (seed 7), deterministic, ~4 s - computes the
 money-trail features once and scores every loan with the trained model from ml/artifacts/. Labels from
 the generator are dropped immediately and never reach the API. Nothing here is hard-coded: every risk,
 colour and reason comes from the model and the features.

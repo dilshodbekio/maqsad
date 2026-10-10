@@ -43,7 +43,7 @@ def render() -> str:
     z, p = asset_["zero_shot"], asset_["probe_cv"]
     run = hold["run"]
     n_img = len(list(csv.DictReader(open(ROOT / "ml" / "assets" / "photos" / "manifest.csv", encoding="utf-8"))))
-    clip_s = rng([c["seconds"] for c in asset_["clip_load"]], "{:.0f}")
+    clip_s = rng([c["seconds"] for c in asset_["clip_load"]])
     L = []
     w = L.append
     w("# ml/ - AI / ML layer (owner: Dilshodbek)")
@@ -88,7 +88,7 @@ def render() -> str:
     w("")
     w("| Component | Method | Built by us vs. pre-trained | Key metric (source) | Latency |")
     w("|---|---|---|---|---|")
-    w(f"| Synthetic portfolio generator (`ml/generator`) | rule-based simulation of 4 fraud typologies + honest-but-suspicious profiles | all ours | per-typology leakage check with a flag at AUC >= 0.90 (`ml/generator/check_leakage.py`; the T1 cash features are intended) | demo portfolio in {lat['cold'][0]['init_s']:.1f} s |")
+    w(f"| Synthetic portfolio generator (`ml/generator`) | rule-based simulation of 4 fraud typologies + honest-but-suspicious profiles | all ours | per-typology leakage check with a flag at AUC >= 0.90 (`ml/generator/check_leakage.py`; the T1 cash features are intended) | demo portfolio built in {rng([c['init_s'] for c in lat['cold']])} s |")
     w(f"| Money-trail model (`ml/money_trail`) | LightGBM on 29 features, supplier-grouped CV | features, labels, training, reasons: ours; LightGBM library | holdout recall@20% {rec[M]:.3f} (clustered CI {ci(cl[M]['clustered'])}), ROC-AUC {hold['roc']:.3f} ([metrics §2]({MET}#2-money-trail-v2-holdout--headline)) | `score_loan` p50 {rng([r['p50'] for r in lat['runs']])} ms |")
     w(f"| Reasons + evidence | LightGBM `pred_contrib` -> one Uzbek template per feature, de-duplicated | all ours | text audit: see [`docs/audit_texts.md`](../docs/audit_texts.md) | included above |")
     w(f"| Scenario scoring (`ml/money_trail/scenario.py`) | user-built loan scored live by the same model | all ours | features equal to a full portfolio copy (test); example in [metrics §5]({MET}#5-scenario-scoring-and-evidence-fusion) | p50 {rng([r['p50'] for r in scen['runs']], '{:.0f}')} ms |")
@@ -173,7 +173,7 @@ def render() -> str:
     w("### Service start-up: call `ml.api.warm_up()` once")
     w("")
     w("`warm_up()` loads the demo portfolio (features, scores, queue), the face detector and CLIP, and returns the seconds each took plus `clip_loaded` / `clip_error` "
-      f"(measured ~16-25 s and ~1.4 GB in total, [metrics §4]({MET}#asset-check-is-the-thing-in-the-photo-what-the-loan-was-for-openclip-vit-b-32-cpu)).")
+      f"(measured {rng([c['seconds'] for c in asset_['warm_up_total']])} s and {rng([c['rss_mb'] for c in asset_['warm_up_total']], '{:.0f}')} MB in total, [metrics §4]({MET}#asset-check-is-the-thing-in-the-photo-what-the-loan-was-for-openclip-vit-b-32-cpu)).")
     w("")
     w("### CLIP weights (asset check): pre-download at BUILD time, never at request time")
     w("")

@@ -5,12 +5,12 @@ During development the backend may fall back to a visible STUB; **in the demo on
 Code: HTTP schemas in `backend/app/schemas.py` (1:1 with this file), Python interface in `ml/api.py`.
 
 **Demo portfolio.** `ml/` serves the **demo** portfolio (generator split `demo`, seed 7), generated in memory on the first call
-(~6 s including imports). The backend warms it at start-up by calling `get_queue()` once in a background thread, so
+(~6-7 s including imports, measured). The backend warms it at start-up by calling `get_queue()` once in a background thread, so
 `/api/health` answers immediately (`warmup: "running"` → `"done"`).
 **ML warm-up (v1.5): the recommended start-up call is `ml.api.warm_up()`**, not `get_queue()` alone: it loads the demo portfolio, the face
-detector **and CLIP** (~16-25 s in total on the development machine, ~1.4 GB memory) and returns
+detector **and CLIP** (measured on the development machine, see `docs/metrics.md` section 4: ~16 s and ~1.4 GB in total) and returns
 `{portfolio_s, face_detector_s, clip_s, total_s, clip_loaded, clip_error}`. If only `get_queue()` is called, CLIP is not preloaded and the
-first photo upload pays for loading it (~10-15 s). If CLIP cannot be loaded (`clip_loaded: false`, reason in `clip_error`), the service keeps
+first photo upload pays for loading it (~11 s measured). If CLIP cannot be loaded (`clip_loaded: false`, reason in `clip_error`), the service keeps
 working: `check_photo` returns `asset_match: null` and no asset escalation is raised (never retried, nothing is downloaded at request time).
 Build-time weight download and the `MAQSAD_*` environment variables: `ml/README.md`.
 
@@ -225,7 +225,7 @@ build and runtime), `HF_HUB_OFFLINE=1`, `MAQSAD_ASSET_CHECK=off` (switch the ass
 
 ## v1.2 o'zgarishlar (model v2)
 
-1. Demo portfel (`demo` split, seed 7), warm-up ~6 s; backend uni fonda isitadi.
+1. Demo portfel (`demo` split, seed 7), warm-up ~6-7 s (o'lchangan); backend uni fonda isitadi.
 2. Rang qoidasi: navbatdagi o'rin bo'yicha 10 % qizil / 10 % sariq; `ml.api.get_color_thresholds()`.
 3. Evidence fusion: queue / loan'da `base_color`, `priority`, `escalations[]`; navbat `priority` bo'yicha tartiblanadi;
    policy sabablari `weight: null`, `source: "fusion_policy"`; `evidence.kind` ga `photo` qo'shildi.

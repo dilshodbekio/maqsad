@@ -104,7 +104,7 @@ def render(multi: dict, m: dict) -> str:
     w("# Cost per check")
     w("")
     w("All CPU times were **measured** by `python -m ml.eval.measure_cost` on the machine below (process CPU seconds, warm, "
-      f"{N} calls per component); prices are public prices with their source and date. Numbers are for the prototype code on synthetic data. "
+      "the number of calls per row is in the table); prices are public prices with their source and date. Numbers are for the prototype code on synthetic data. "
       "The cost basis is the **single-thread** measurement (OpenCV, torch and OpenMP pinned to one thread = one vCPU): with all cores the process "
       "CPU time is inflated by spinning worker threads (see section 1b) and does not mean work done.")
     w("")
@@ -113,16 +113,16 @@ def render(multi: dict, m: dict) -> str:
     w("")
     w("## 1. Measured CPU time (single thread = one vCPU; the cost basis)")
     w("")
-    w("| Component | CPU time per call | Wall time per call |")
-    w("|---|---|---|")
+    w("| Component | CPU time per call | Wall time per call | calls |")
+    w("|---|---|---|---|")
     labels = [("score_loan", "Money-trail score (`score_loan`: model inference + reasons)"), ("score_scenario", "Scenario score (`score_scenario`)"),
               ("check_photo", "`check_photo` total (decode, hash, duplicates, face detect + blur, CLIP asset check, re-encode; 1600 px)")]
     for k, label in labels:
-        w(f"| {label} | {m[k]['cpu_ms']:.0f} ms | {m[k]['wall_ms']:.0f} ms |")
+        w(f"| {label} | {m[k]['cpu_ms']:.0f} ms | {m[k]['wall_ms']:.0f} ms | {m[k]['n']} |")
     for k, label in (("decode_and_hash", "of which decode + perceptual hashes"), ("face_detect_and_blur", "of which face detection + blur"),
                      ("clip_asset_check", "of which CLIP asset check (embedding + probe)")):
         p = m["check_photo_parts"][k]
-        w(f"| &nbsp;&nbsp;{label} | {p['cpu_ms']:.0f} ms | {p['wall_ms']:.0f} ms |")
+        w(f"| &nbsp;&nbsp;{label} | {p['cpu_ms']:.0f} ms | {p['wall_ms']:.0f} ms | {p['n']} |")
     wu = m["warm_up"]
     w(f"| Warm-up once at start (`ml.api.warm_up()`: demo portfolio + features + scores + queue, face detector, CLIP) | {wu['cpu_s']:.0f} s | {wu['wall_s']:.0f} s |")
     w("")

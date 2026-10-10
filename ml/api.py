@@ -15,29 +15,35 @@ from ml.money_trail.model import MODEL_VERSION
 from ml.money_trail.service import get_portfolio
 
 
-def get_queue() -> list[dict]:
+def get_queue(sandbox_id: Optional[str] = None) -> list[dict]:
     """Risk queue, sorted by risk descending.
 
     Each item: {loan_id, borrower_name_masked, purpose, amount_uzs, region,
-                risk: float 0..1, color: "green"|"yellow"|"red", top_reason: str (Uzbek)}
+                risk: float 0..1 (money-trail only, never changed by photos),
+                color: "green"|"yellow"|"red" (after evidence fusion), top_reason: str (Uzbek),
+                base_color (money-trail colour), priority (sort key = colour rank + risk),
+                escalations: [{code, min_color, text_uz, evidence_refs, raises_color}]}
+    Sorted by priority, descending. `sandbox_id` (optional): the view of that demo sandbox, including the
+    escalations caused by photos uploaded there; other sandboxes and the default view are unaffected.
 
     The first call generates the demo portfolio (test-split config, seed 1337) in memory and scores it
     (~3 s); later calls are served from memory.
     """
-    return get_portfolio().queue()
+    return get_portfolio().queue(sandbox_id)
 
 
-def get_loan(loan_id: str) -> dict:
+def get_loan(loan_id: str, sandbox_id: Optional[str] = None) -> dict:
     """Full loan view.
 
     Returns: {loan, transactions[], photos[], invoice | None,
-              risk, color, reasons: [{code, text_uz, weight, evidence_refs}],
-              evidence: [{ref, kind: "txn"|"invoice"|"graph", summary_uz, data}], model_version}
+              risk, color (after fusion), base_color, priority, escalations[],
+              reasons: [{code, text_uz, weight, evidence_refs}] (photo-policy reasons first: weight null, source "fusion_policy"),
+              evidence: [{ref, kind: "txn"|"invoice"|"graph"|"photo", summary_uz, data}], model_version}
     `photos`: [{photo_id, path (repo-relative), purpose, captured_at, lat, lon,
     duplicate_of: [{loan_id, similarity}], source: "portfolio"}]
     for the subset of loans that have a photo, [] otherwise. Raises: LoanNotFoundError
     """
-    return get_portfolio().loan(loan_id)
+    return get_portfolio().loan(loan_id, sandbox_id)
 
 
 def score_scenario(scenario: dict) -> dict:

@@ -10,7 +10,9 @@ from ml.money_trail.features import FEATURE_COLUMNS
 from ml.money_trail.model import META_PATH
 
 META = json.loads(META_PATH.read_text(encoding="utf-8"))
-QUEUE_KEYS = {"loan_id", "borrower_name_masked", "purpose", "amount_uzs", "region", "risk", "color", "top_reason"}
+QUEUE_KEYS = {"loan_id", "borrower_name_masked", "purpose", "amount_uzs", "region", "risk", "color", "top_reason",
+              "base_color", "priority", "escalations"}
+RANK = {"green": 0, "yellow": 1, "red": 2}
 FORBIDDEN = {"is_fraud", "typology", "profile", "stealth", "ring_id", "fraud_visible"}
 ACCUSATORY = ("firibgar", "aybdor", "jinoyat", "o'g'ri", "soxta")
 
@@ -23,14 +25,18 @@ def queue():
 def test_queue_sorted_and_colors_by_rank(queue):
     thr = api.get_color_thresholds()
     assert len(queue) == 5000 and (thr["n_red"], thr["n_yellow"], thr["n_loans"]) == (500, 500, 5000)
-    risks = [q["risk"] for q in queue]
-    assert risks == sorted(risks, reverse=True) and all(0.0 <= r <= 1.0 for r in risks)
-    assert [q["color"] for q in queue[:500]] == ["red"] * 500                 # queue rank defines the colour
-    assert [q["color"] for q in queue[500:1000]] == ["yellow"] * 500
-    assert {q["color"] for q in queue[1000:]} == {"green"}
-    assert queue[499]["risk"] >= thr["red"] > queue[500]["risk"] >= thr["yellow"] > queue[1000]["risk"]
+    pri = [q["priority"] for q in queue]
+    assert pri == sorted(pri, reverse=True)                                    # sorted by priority (colour rank + risk)
+    assert all(0.0 <= q["risk"] <= 1.0 for q in queue)
+    by_risk = sorted(queue, key=lambda q: -q["risk"])                          # money-trail colours: by risk rank
+    assert [q["base_color"] for q in by_risk[:500]] == ["red"] * 500
+    assert [q["base_color"] for q in by_risk[500:1000]] == ["yellow"] * 500
+    assert {q["base_color"] for q in by_risk[1000:]} == {"green"}
+    assert by_risk[499]["risk"] >= thr["red"] > by_risk[500]["risk"] >= thr["yellow"] > by_risk[1000]["risk"]
     for q in queue:
         assert set(q) == QUEUE_KEYS and q["top_reason"]
+        assert RANK[q["color"]] >= RANK[q["base_color"]]                      # fusion never lowers a colour
+        assert q["priority"] == pytest.approx(RANK[q["color"]] + q["risk"])
     assert len({q["loan_id"] for q in queue}) == len(queue)
 
 
@@ -46,28 +52,32 @@ def test_get_loan(queue, pos):
     assert {"loan", "transactions", "photos", "invoice", "risk", "color", "reasons", "evidence",
             "model_version"} <= set(d)
     assert d["model_version"] == "money_trail_v2" and isinstance(d["photos"], list)
-    assert d["risk"] == item["risk"] and d["color"] == item["color"]
+    assert d["risk"] == item["risk"] and d["color"] == item["color"] and d["base_color"] == item["base_color"]
     assert d["loan"]["loan_id"] == item["loan_id"] and d["transactions"]
     assert set(d["invoice"]) == {"supplier_name", "supplier_oked", "oked_matches_purpose", "invoice_amount_uzs"}
     assert not FORBIDDEN & set(d["loan"]) and not any(k.startswith("photo_") for k in d["loan"])
-    if d["color"] == "red":
-        assert d["reasons"]
-    assert len(d["reasons"]) <= 3
+    model_reasons = [r for r in d["reasons"] if r.get("source") != "fusion_policy"]
+    if d["base_color"] == "red":
+        assert model_reasons
+    assert len(model_reasons) <= 3
     refs = {e["ref"] for e in d["evidence"]}
     for r in d["reasons"]:
-        assert r["text_uz"] and 0 < r["weight"] <= 1 and r["code"] in FEATURE_COLUMNS
-        assert set(r["evidence_refs"]) <= refs
+        assert r["text_uz"] and set(r["evidence_refs"]) <= refs
+    for r in model_reasons:
+        assert 0 < r["weight"] <= 1 and r["code"] in FEATURE_COLUMNS
+    assert d["escalations"] == item["escalations"] and d["priority"] == item["priority"]
     for e in d["evidence"]:
         assert e["kind"] in ("txn", "invoice", "graph") and e["summary_uz"] and e["data"]
-    if d["reasons"]:
-        assert d["reasons"][0]["text_uz"] == item["top_reason"]
+    raised = [e for e in d["escalations"] if e["raises_color"]]
+    expected = raised[0]["text_uz"] if raised else (model_reasons[0]["text_uz"] if model_reasons else item["top_reason"])
+    assert item["top_reason"] == expected
 
 
 def test_score_loan_contract_and_consistency(queue):
     for item in (queue[0], queue[1234], queue[-1]):
         s = api.score_loan(item["loan_id"])
         assert set(s) == {"risk", "color", "reasons", "model_version", "latency_ms"}
-        assert s["risk"] == pytest.approx(item["risk"], abs=1e-9) and s["color"] == item["color"]
+        assert s["risk"] == pytest.approx(item["risk"], abs=1e-9) and s["color"] == item["base_color"]  # money-trail only
         assert s["latency_ms"] > 0 and s["model_version"] == "money_trail_v2"
         assert all(set(r) == {"code", "text_uz", "weight"} for r in s["reasons"])
 
@@ -96,7 +106,7 @@ def test_reasons_do_not_repeat_a_fact_and_texts_are_sane(queue):
     from ml.money_trail.reasons import DUPLICATE_GROUPS
     for item in queue[:300] + queue[2000:2100]:
         d = api.get_loan(item["loan_id"])
-        codes = [r["code"] for r in d["reasons"]]
+        codes = [r["code"] for r in d["reasons"] if r.get("source") != "fusion_policy"]
         for g in DUPLICATE_GROUPS:
             assert len(g & set(codes)) <= 1, codes
         for r in d["reasons"]:

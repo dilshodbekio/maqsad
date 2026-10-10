@@ -18,6 +18,7 @@ RES_DEV = ARTIFACTS / "eval_money_trail_dev.json"
 RES_HOLDOUT = ARTIFACTS / "eval_money_trail_holdout.json"
 RES_LATENCY = ARTIFACTS / "eval_latency.json"
 RES_PHOTO = ARTIFACTS / "eval_photo.json"
+RES_SCENARIO = ARTIFACTS / "eval_scenario.json"
 M = "Money-trail model (LightGBM)"
 EVAL = "`python -m ml.eval.eval_money_trail`"
 
@@ -130,6 +131,60 @@ def render_latency() -> list[str]:
          f"(of which portfolio build {min(c['init_s'] for c in lat['cold']):.1f} - {max(c['init_s'] for c in lat['cold']):.1f} s) |"]
     mp = artifact_paths("money_trail_v2")[0]
     L += [f"| Model artifact `money_trail_v2.txt` | {mp.stat().st_size / 1024:.0f} KB |", "| Cost per check | 0 (local model, no external API) |", ""]
+    return L
+
+
+def render_scenario_fusion() -> list[str]:
+    from ml import fusion
+    L = []
+    w = L.append
+    w("## 5. Scenario scoring and evidence fusion")
+    w("")
+    w("### Scenario scoring (judges build their own loan)")
+    w("")
+    w("`ml.api.score_scenario` scores a loan + transactions typed in by the user with the same frozen model v2, the same features "
+      "and the same reason templates as a portfolio loan. The scenario is added as one extra loan to a *copy* of the demo "
+      "portfolio's context (the cached portfolio is never modified); `percentile` is its rank among the demo portfolio's risks. "
+      "Every score is computed live: changing one transaction changes the score.")
+    w("")
+    sc = _load(RES_SCENARIO)
+    if sc:
+        ex = sc["example"]
+        w("Example (`fast_cash_out` preset, only the day of the 42 000 000 so'm cash withdrawal changed):")
+        w("")
+        w("| Cash withdrawal on day | risk | colour | percentile in the demo portfolio | cash_share_d1 | first top reason |")
+        w("|---|---|---|---|---|---|")
+        for e in ex:
+            w(f"| {e['cash_day']} | {e['risk']:.4f} | {e['color']} | {e['percentile']:.1f} | {e['cash_share_d1']:.2f} | {e['top_reason']} |")
+        w("")
+        w(f"Latency of `score_scenario` ({len(sc['runs'])} runs x {sc['runs'][0]['n']} calls over the 4 presets, inputs varied; {sc['cpu']}, "
+          f"Python {sc['python']}), range across runs: p50 {min(r['p50'] for r in sc['runs']):.0f} - {max(r['p50'] for r in sc['runs']):.0f} ms, "
+          f"p95 {min(r['p95'] for r in sc['runs']):.0f} - {max(r['p95'] for r in sc['runs']):.0f} ms, "
+          f"slowest call {max(r['max'] for r in sc['runs']):.0f} ms (limit in the tests: 500 ms). Produced by `python -m ml.eval.eval_scenario`.")
+    else:
+        w("_Not measured yet: `python -m ml.eval.eval_scenario`._")
+    w("")
+    w("Assumptions: the invoice amount equals the loan amount; a new supplier has no outflows of its own; for an existing supplier the "
+      "real demo ledger gives the supplier-graph features (in-degree, downstream cash share); the context is restricted to the "
+      "supplier's loans, which gives exactly the same features as a full copy (tested).")
+    w("")
+    w("### Fusion policy (photo -> queue)")
+    w("")
+    w("**There is no labelled data for photo signals, so fusion is a documented, configurable policy (`ml/fusion.py`, one dict), "
+      "not a learned model; no accuracy is claimed for it.** Each triggered signal escalates a loan to a minimum colour. "
+      "Escalation only raises priority: it never lowers the money-trail colour, and the money-trail `risk` is never changed. "
+      "`priority` = colour rank + risk (the queue sort key); `escalations[]` and policy reasons (Uzbek, factual, with evidence refs "
+      "to the photo) are added to the queue items and to `get_loan`.")
+    w("")
+    w("| Code | Minimum colour | Active | Triggered when |")
+    w("|---|---|---|---|")
+    for row in fusion.policy_table():
+        w(f"| `{row['code']}` | {row['min_color']} | {'yes' if row['active'] else 'no (later)'} | {row['when']} |")
+    w("")
+    w("The demo portfolio's own photos are evaluated with the same policy (duplicates in the index, distance, capture time); a sandbox's "
+      "uploaded photos escalate loans only in that sandbox's view (`get_queue(sandbox_id)`, `get_loan(loan_id, sandbox_id)`) and "
+      "`reset_sandbox` removes them. The 5 km distance limit and the photo rates of the generator are assumptions.")
+    w("")
     return L
 
 
@@ -269,7 +324,8 @@ def render() -> str:
         w("_Not evaluated yet: `python -m ml.eval.eval_photo`._")
         w("")
 
-    w("## 5. Known failure cases")
+    L += render_scenario_fusion()
+    w("## 6. Known failure cases")
     w("")
     ref = hold or (dev["v2"] if dev else None)
     if ref:
@@ -286,9 +342,13 @@ def render() -> str:
       "own structure (e.g. ring bursts, photo-reuse rates the same for all typologies) is what the model learns. See `ml/generator/README.md` "
       "(Known limitations: counterparty ID collisions, ring size up to ~12 vs. 71 in a real case).")
     w("- **Photo module:** see the failure cases in section 4 (hash crop robustness, screen photos, side faces).")
-    w("- The photo result does not change the money-trail risk; combining them is a later step.")
+    w("- **Fusion is a policy, not a measured model:** its thresholds (e.g. 5 km) and escalation colours are choices, not fitted values; "
+      "its effect on recall / precision cannot be measured without labelled photo data.")
+    w("- **Scenarios:** a hand-built scenario can describe behaviour the generator never produces; the score then shows what the "
+      "model does outside the synthetic world, not that the behaviour is fraud. Assumptions are listed in section 5.")
+    w("- The photo result does not change the money-trail `risk` value; it only raises the colour / priority.")
     w("")
-    w("## 6. Reproduce")
+    w("## 7. Reproduce")
     w("")
     w("```")
     w(".venv/Scripts/python -m pip install -r ml/requirements.txt")
@@ -299,6 +359,7 @@ def render() -> str:
     w(".venv/Scripts/python -m ml.eval.eval_photo --write-config        # photo duplicate variant + threshold")
     w(".venv/Scripts/python -m ml.photo.index                           # photo index on the demo split")
     w(".venv/Scripts/python -m ml.eval.eval_photo")
+    w(".venv/Scripts/python -m ml.eval.eval_scenario                    # scenario latency + example")
     w(".venv/Scripts/python -m ml.eval.build_metrics                    # regenerate this file from the stored results")
     w(".venv/Scripts/python -m pytest ml/tests -q")
     w("```")

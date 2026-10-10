@@ -46,7 +46,7 @@ def test_get_loan(queue, pos):
     d = api.get_loan(item["loan_id"])
     assert {"loan", "transactions", "photos", "invoice", "risk", "color", "reasons", "evidence",
             "model_version"} <= set(d)
-    assert d["model_version"] == "money_trail_v1" and d["photos"] == []
+    assert d["model_version"] == "money_trail_v1" and isinstance(d["photos"], list)
     assert d["risk"] == item["risk"] and d["color"] == item["color"]
     assert d["loan"]["loan_id"] == item["loan_id"] and d["transactions"]
     assert set(d["invoice"]) == {"supplier_name", "supplier_oked", "oked_matches_purpose", "invoice_amount_uzs"}
@@ -77,11 +77,6 @@ def test_unknown_loan():
     for fn in (api.get_loan, api.score_loan):
         with pytest.raises(api.LoanNotFoundError):
             fn("L-does-not-exist")
-
-
-def test_check_photo_not_wired():
-    with pytest.raises(NotImplementedError):
-        api.check_photo("L000001", b"x")
 
 
 def test_features_are_money_trail_only():

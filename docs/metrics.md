@@ -93,3 +93,76 @@ Red + yellow together are 26.2% of the test loans and contain 85.8% of all fraud
 
 Measured on: Intel64 Family 6 Model 154 Stepping 3, GenuineIntel, Python 3.13.15, single thread. `score_loan` uses the cached feature row of the loan; building features for the whole portfolio is a one-time batch step.
 <!-- money-trail:end -->
+
+<!-- photo:start -->
+## Photo module (openly licensed images)
+
+**All numbers are on a small library of openly licensed photos (CC / public domain) and are produced by `python -m ml.eval.eval_photo`. They say nothing about real borrower photos; real accuracy is measured in the pilot.**
+
+- Library: 100 asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) + 11 photos with people for the face-blur test; 4726 KB in the repo.
+- Portfolio photo index (`ml/artifacts/photo_index_v1.json`): 90 images on 101 loans of the demo portfolio; 10 images are shared by 2-3 loans (the generator's photo-reuse groups). Photos are matched to the loan's purpose.
+
+| Purpose | library images | in index | loans with a photo |
+|---|---|---|---|
+| tikuv_dastgohi | 20 | 18 | 20 |
+| chorva | 20 | 18 | 20 |
+| issiqxona | 20 | 18 | 20 |
+| parranda | 20 | 18 | 21 |
+| asalarichilik | 20 | 18 | 20 |
+
+### Duplicate detection under transformations
+
+Hashes: pHash + dHash (64 bit each) of the whole image and of its central 80% crop; distance = hamming/128, for the crop-tolerant variant the minimum over whole/central combinations. Positives = a transformed copy against its own original. Hard negatives = the same transformed copy against a *different* image of the same purpose (e.g. two different sewing machines). The threshold is the largest distance with pooled precision >= 0.999 on the tuning half; numbers below are on the other half (50 images; 50 for tuning).
+
+| Variant | max distance (tuned on half A) | recall (held-out) | precision (held-out) | false positives |
+|---|---|---|---|---|
+| p | 0.250 | 82.5% | 100.0% | 0 / 3840 |
+| pd | 0.297 | 87.8% | 98.3% | 6 / 3840 |
+| pd_crop | 0.211 | 84.5% | 100.0% | 0 / 3840 |
+
+**Deployed: `pd_crop`, max distance 0.2109 (similarity >= 0.7891).** The deployed variant and threshold were re-tuned on all 100 images (stricter threshold, more hard negatives) after the held-out numbers were fixed; the table above shows how the tune-on-one-half procedure generalises. With the deployed setting no two single-loan images of the portfolio index match each other. Held-out per-transform numbers for the pd_crop variant (threshold tuned on half A):
+
+| Transform | positives | recall | negatives | false positives | precision |
+|---|---|---|---|---|---|
+| original | 50 | 100.0% | 480 | 0 | 100.0% |
+| crop 10% | 50 | 64.0% | 480 | 0 | 100.0% |
+| crop 20% | 50 | 20.0% | 480 | 0 | 100.0% |
+| JPEG q=30 | 50 | 100.0% | 480 | 0 | 100.0% |
+| resize 50% | 50 | 100.0% | 480 | 0 | 100.0% |
+| rotate 5 deg | 50 | 96.0% | 480 | 0 | 100.0% |
+| brightness +30% | 50 | 100.0% | 480 | 0 | 100.0% |
+| brightness -30% | 50 | 100.0% | 480 | 0 | 100.0% |
+| screenshot | 50 | 96.0% | 480 | 0 | 100.0% |
+
+### Face blur (YuNet, OpenCV zoo, MIT; Haar cascade as fallback)
+
+Counted by eye on the 11 `faces_test` images (`ml/assets/photos/faces_test_counts.csv`; faces that are very small, dark or out of focus are noted there and not counted).
+
+| Item | Value |
+|---|---|
+| Faces present (hand count) | 14 |
+| Faces detected by `yunet` | 15 (true 14, false 1, missed 0) |
+| Face recall / precision (count based) | 100.0% / 93.3% |
+| Detectable faces left after blur (YuNet re-run) | 0 |
+| Detectable faces left after blur (independent Haar cascade; it found 6 before blur) | 1 |
+
+Detection is count based (no box annotations), so a miss and a false alarm on the same image can cancel out.
+
+### Latency
+
+| Item | Value |
+|---|---|
+| `check_photo` p50 / p95 (500 calls, warm, 1600x1119 px, 164 KB JPEG; decode, hashing, duplicate search, face detection + blur, re-encode) | 312 ms / 379 ms |
+| same, wall clock | 313 ms / 380 ms |
+| Cost per check | 0 (local, no external API) |
+
+### Known failure cases
+
+- **Heavy crops:** crop 20% is found only 20.0% of the time, crop 10% 64.0% (random crop position). Hashing is not crop-proof.
+- **Different photo of the same thing** (the same cow from another angle, the same machine in another room) is not a duplicate by hash; recognising an individual animal or machine is out of scope.
+- **Photo of a screen** is only covered by the simulated 'screenshot' transform (border + colour shift); moire from a real screen photo and perspective distortion were not tested.
+- **Larger rotation / mirroring** were not tested (only 5 degrees).
+- **Faces:** a decorated bull head was detected as a face once (`faces_test_04`); a dark, out-of-focus face in the background (`faces_test_08`) is not counted and was not detected, so it is not blurred. Side and tiny faces are the weak spot of any detector; the 'faces left' numbers above only show that *detectable* faces are gone.
+- **Small library:** hard negatives come from ~10 images per purpose and half; with a real portfolio of thousands of photos the false-positive rate at this threshold must be re-measured.
+- The photo result does not change the money-trail risk; combining them is a later step.
+<!-- photo:end -->

@@ -123,6 +123,15 @@ class Portfolio:
         return dict(risk=risk, color=self.model.color(risk), reasons=reasons,
                     model_version=MODEL_VERSION, latency_ms=round((time.perf_counter() - t0) * 1000, 3))
 
+    def _photos(self, loan_id: str) -> list[dict]:
+        """Portfolio photos of the loan (subset of loans only) with capture time / place and duplicates."""
+        from ml.photo.index import get_index
+        row = self.loans.loc[loan_id]
+        return [dict(photo_id=p["photo_id"], path=p["path"], purpose=p["purpose"],
+                     captured_at=_py(row["photo_captured_at"]), lat=float(row["photo_lat"]),
+                     lon=float(row["photo_lon"]), duplicate_of=p["duplicate_of"])
+                for p in get_index().photos_of(loan_id)]
+
     def loan(self, loan_id: str) -> dict:
         self._check(loan_id)
         ctx = self._context(loan_id)
@@ -133,7 +142,7 @@ class Portfolio:
         return dict(
             loan={"loan_id": loan_id, **{k: _py(self.loans.at[loan_id, k]) for k in LOAN_FIELDS[1:]}},
             transactions=[{k: _py(r[k]) for k in TXN_FIELDS} for _, r in txs.iterrows()],
-            photos=[], invoice=ctx["invoice"],
+            photos=self._photos(loan_id), invoice=ctx["invoice"],
             risk=risk, color=self.model.color(risk), reasons=reasons,
             evidence=build_evidence(refs, ctx), model_version=MODEL_VERSION)
 

@@ -3,7 +3,7 @@
 Contract: docs/api_contract.md. Signatures are stable; implementations are filled in
 module by module. Until a function is implemented it raises NotImplementedError —
 it never returns fake data. Wired: get_queue / get_loan / score_loan (money-trail model).
-Not wired yet: check_photo.
+check_photo / reset_sandbox: photo module (no CLIP asset match yet).
 """
 from __future__ import annotations
 
@@ -33,7 +33,8 @@ def get_loan(loan_id: str) -> dict:
     Returns: {loan, transactions[], photos[], invoice | None,
               risk, color, reasons: [{code, text_uz, weight, evidence_refs}],
               evidence: [{ref, kind: "txn"|"invoice"|"graph", summary_uz, data}], model_version}
-    `photos` is [] until the photo module is wired. Raises: LoanNotFoundError
+    `photos`: [{photo_id, path (repo-relative), purpose, captured_at, lat, lon, duplicate_of: [{loan_id, similarity}]}]
+    for the subset of loans that have a photo, [] otherwise. Raises: LoanNotFoundError
     """
     return get_portfolio().loan(loan_id)
 
@@ -63,15 +64,22 @@ def check_photo(
 
     sandbox_id: demo visitor's sandbox. Duplicate search covers the portfolio index
     + photos from THIS sandbox only. Sandbox photos are never added to the portfolio
-    index and are dropped when the sandbox is reset. None = production/portfolio mode.
+    index and are dropped by reset_sandbox(). None = production/portfolio mode (nothing is remembered).
 
-    Returns: {asset_match: {label, score} | None,
+    Returns: {asset_match: {label, score} | None   (None until the CLIP step is added),
               duplicate_of: [{loan_id, similarity}],
               geo_ok: bool | None, time_ok: bool | None,
-              faces_blurred: bool, faces_count: int,
-              blurred_image: bytes (JPEG, EXIF removed; internal — backend stores it,
+              faces_blurred: bool (True = faces were found and blurred), faces_count: int,
+              blurred_image: bytes (JPEG, EXIF removed; internal - backend stores it,
                              not exposed over HTTP),
               latency_ms}
-    Raises: LoanNotFoundError, InvalidImageError
+    Does not change the money-trail risk. Raises: LoanNotFoundError, InvalidImageError
     """
-    raise NotImplementedError("check_photo: photo module not wired yet")
+    from ml.photo.checker import check_photo as _check
+    return _check(loan_id, image_bytes, lat, lon, captured_at, sandbox_id)
+
+
+def reset_sandbox(sandbox_id: str) -> None:
+    """Forget every photo hash uploaded in this demo sandbox (idempotent). Contract addition."""
+    from ml.photo.checker import reset_sandbox as _reset
+    _reset(sandbox_id)

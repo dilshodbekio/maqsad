@@ -13,6 +13,10 @@ from ml.generator.config import MATCHING_OKED
 
 DAY = pd.Timedelta(days=1)
 NEVER = 400.0
+# ASSUMPTION: a regular income can legitimately be missing on a young loan. In the generator an honest loan's
+# first income arrives U(20, 90) days after disbursement (ml/generator/flows.py: _base / regular_income), so
+# "no income" is only informative once the loan is older than this many days at the snapshot.
+INCOME_DUE_DAYS = 90
 
 FEATURE_COLUMNS = [
     # cash timing / shares
@@ -23,7 +27,8 @@ FEATURE_COLUMNS = [
     "leave_share_30", "p2p_out_count", "p2p_in_count",
     # one-off inbound and what follows it
     "big_inbound_share", "big_inbound_day", "big_inbound_person", "post_inbound_exit",
-    "income_count", "income_after_big_count", "days_since_income", "income_stopped_after_inbound",
+    "income_rate_per_month", "income_missing_flag", "income_after_big_count", "income_gap_days",
+    "income_stopped_flag",
     # supplier graph
     "sup_in_degree", "sup_cash_share", "sup_exit_share", "sup_cash_lag_days",
     "sup_active_span_days", "sup_age_at_first_payment_days",
@@ -39,6 +44,7 @@ def build_features(loans: pd.DataFrame, transactions: pd.DataFrame, suppliers: p
     snap = L["snapshot_date"].max()
     tx = transactions[transactions["ts"] <= snap]
     amt, ix = L["amount_uzs"], L.index
+    age = (snap - L["disbursed_at"]) / DAY                      # loan age at the snapshot, days
     F = pd.DataFrame(index=ix)
 
     bt = tx[tx.loan_id.notna()].copy()
@@ -60,7 +66,8 @@ def build_features(loans: pd.DataFrame, transactions: pd.DataFrame, suppliers: p
     sp = bt["type"] == "supplier_payment"
     F["sup_pay_share"] = share(sp)
     F["first_sup_pay_days"] = bt[sp].groupby("loan_id")["day"].min().reindex(ix).fillna(NEVER)
-    F["invoice_gap"] = 1 - share(sp) * amt / L["invoice_amount_uzs"]
+    inv = L["invoice_amount_uzs"].where(L["invoice_amount_uzs"] > 0)
+    F["invoice_gap"] = (1 - share(sp) * amt / inv).fillna(-1)   # -1 = no invoice (not "fully paid")
 
     # ---- leaving the bank / P2P
     leave = bt["type"].isin(["cash_withdrawal", "external_transfer", "p2p_out"])
@@ -79,14 +86,18 @@ def build_features(loans: pd.DataFrame, transactions: pd.DataFrame, suppliers: p
     post = out.groupby("loan_id")["amount_uzs"].sum().reindex(ix).fillna(0)
     F["post_inbound_exit"] = (post / big["amount_uzs"].reindex(ix)).fillna(0)
     inc = bt[bt["type"] == "income"]
-    F["income_count"] = inc.groupby("loan_id").size().reindex(ix).fillna(0)
+    n_inc = inc.groupby("loan_id").size().reindex(ix).fillna(0)
+    # age-aware income features: young loans are not penalised for having no income yet
+    F["income_rate_per_month"] = n_inc / ((age - 30) / 30.4375).clip(lower=1)
+    F["income_missing_flag"] = ((n_inc == 0) & (age > INCOME_DUE_DAYS)).astype(float)
     after = inc.join(big[["day"]].add_prefix("b_"), on="loan_id")
     F["income_after_big_count"] = (after["day"] > after["b_day"]).groupby(after["loan_id"]).sum().reindex(ix).fillna(0)
     last_inc = inc.groupby("loan_id")["ts"].max().reindex(ix)
-    F["days_since_income"] = ((snap - last_inc) / DAY).fillna(NEVER)
+    # days since the last income; without any income: days since the first income was due (0 while young)
+    F["income_gap_days"] = ((snap - last_inc) / DAY).fillna((age - INCOME_DUE_DAYS).clip(lower=0))
     big_ts = L["disbursed_at"] + pd.to_timedelta(F["big_inbound_day"].clip(lower=0), unit="D")
-    F["income_stopped_after_inbound"] = ((last_inc.isna() | (last_inc < big_ts))
-                                         & (F["big_inbound_share"] > 0.1)).astype(float)
+    F["income_stopped_flag"] = ((((n_inc == 0) & (age > INCOME_DUE_DAYS)) | (last_inc < big_ts))
+                                & (F["big_inbound_share"] > 0.1)).astype(float)
 
     # ---- supplier graph (supplier accounts have loan_id = null)
     sid = L["supplier_id"]
@@ -106,7 +117,7 @@ def build_features(loans: pd.DataFrame, transactions: pd.DataFrame, suppliers: p
     F["sup_cash_share"] = (sid.map(s_cash).fillna(0) / rec).fillna(0).clip(upper=1.5)
     F["sup_exit_share"] = (sid.map(s_exit).fillna(0) / rec).fillna(0).clip(upper=1.5)
     F["sup_cash_lag_days"] = ((sid.map(first_cash) - sid.map(first_rec)) / DAY).fillna(NEVER)
-    F["sup_active_span_days"] = sid.map(span).fillna(0)
+    F["sup_active_span_days"] = sid.map(span).fillna(-1)       # -1 = supplier account has no activity yet
     F["sup_age_at_first_payment_days"] = ((sid.map(first_rec) - sid.map(sup["registered_at"])) / DAY).fillna(-1)
 
     # ---- bank-employee link, OKED vs purpose

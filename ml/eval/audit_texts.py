@@ -169,14 +169,14 @@ def collect_photos() -> tuple[list[tuple[str, str, str, str]], list[dict]]:
     idx = get_index()
     rows = list(csv.DictReader(open(config.ASSETS / "manifest.csv", encoding="utf-8")))
     pick = [r for p in PURPOSES for r in [x for x in rows if x["purpose"] == p][:2]] + [x for x in rows if x["purpose"] == "other"][:6] \
-        + [x for x in rows if x["purpose"] == "faces_test"][:4]
+        + [dict(file=f.name, purpose="faces_test", dir=config.FACES) for f in sorted(config.FACES.glob("*.jpg"))[:4]]
     free = {p: [l for l in P.loans.index if str(P.loans.at[l, "purpose"]) == p and l not in idx.by_loan] for p in PURPOSES}
     sb, out, contradictions = "audit-fresh", [], []
     api.reset_sandbox(sb)
     for k, r in enumerate(pick):
         target = PURPOSES[(PURPOSES.index(r["purpose"]) + (k % 2)) % 5] if r["purpose"] in PURPOSES else PURPOSES[k % 5]   # matching or not
         loan = free[target][k]
-        res = api.check_photo(loan, (config.ASSETS / r["file"]).read_bytes(), sandbox_id=sb)
+        res = api.check_photo(loan, (r.get("dir", config.ASSETS) / r["file"]).read_bytes(), sandbox_id=sb)
         am = res["asset_match"]
         if am is None:
             out.append(("photo.asset_match", "message", "asset_match is None", r["file"]))

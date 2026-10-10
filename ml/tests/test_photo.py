@@ -91,9 +91,10 @@ def test_large_image_is_downscaled(P):
     assert max(out.size) <= config.MAX_SIDE
 
 
+@pytest.mark.skipif(not (config.FACES / "faces_test_09.jpg").exists(), reason="faces_test images are local-only (not redistributed)")
 def test_faces_are_blurred_and_not_redetected(P):
     det = FaceDetector()
-    r = api.check_photo(P.loans.index[0], img_bytes("faces_test_09.jpg"))
+    r = api.check_photo(P.loans.index[0], (config.FACES / "faces_test_09.jpg").read_bytes())
     assert r["faces_count"] >= 3 and r["faces_blurred"] is True
     blurred = imageio.decode(r["blurred_image"])
     assert det.detect(blurred) == []
@@ -229,7 +230,7 @@ def test_original_bytes_are_never_written_to_disk(P, monkeypatch):
     monkeypatch.setattr(builtins, "open", guarded)
     monkeypatch.setattr(Path, "write_bytes", lambda *a, **k: writes.append(("write_bytes", a)))
     monkeypatch.setattr(Path, "write_text", lambda *a, **k: writes.append(("write_text", a)))
-    api.check_photo(P.loans.index[0], img_bytes("faces_test_09.jpg"), sandbox_id="sbx-disk")
+    api.check_photo(P.loans.index[0], img_bytes("issiqxona_00.jpg"), sandbox_id="sbx-disk")
     api.reset_sandbox("sbx-disk")
     monkeypatch.undo()
     assert writes == []

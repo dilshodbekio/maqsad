@@ -152,7 +152,7 @@ def render_asset() -> list[str]:
     z, p, h, fm = a["zero_shot"], a["probe_cv"], a["held_out"], a["false_match"]
     cls = list(a["counts"])
     w(f"Produced by `python -m ml.eval.eval_asset`. Library: {a['n']} images, " + ", ".join(f"{k} {v}" for k, v in a["counts"].items()) +
-      " (`other` = random things: rooms, vehicles, phones / laptops, food, landscapes, documents, animals, people; all openly licensed, "
+      " (`other` = random things: rooms, vehicles, phones / laptops, food, landscapes, documents, animals; all openly licensed, "
       "`ml/assets/photos/manifest.csv`). Zero-shot = cosine similarity to English prompts per class; probe = logistic regression on the CLIP image "
       "embeddings.")
     w("")

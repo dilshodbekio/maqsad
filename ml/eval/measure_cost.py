@@ -69,7 +69,7 @@ def measure(single_thread: bool = False) -> dict:
     out["score_loan"] = cpu_wall(lambda: api.score_loan(loans[next(it) % len(loans)]))
     presets = api.get_scenario_presets()
     out["score_scenario"] = cpu_wall(lambda: api.score_scenario(presets[next(it) % 4]["scenario"]), n=40)
-    rgb = imageio.decode((config.ASSETS / "faces_test_09.jpg").read_bytes())
+    rgb = imageio.decode((config.ASSETS / "tikuv_dastgohi_12.jpg").read_bytes())          # committed photo without people
     big = cv2.resize(rgb, None, fx=1600 / max(rgb.shape[:2]), fy=1600 / max(rgb.shape[:2]), interpolation=cv2.INTER_CUBIC)
     data = imageio.encode_jpeg(big)
     loan = loans[0]

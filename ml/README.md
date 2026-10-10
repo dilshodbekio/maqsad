@@ -41,7 +41,7 @@ The photo result never changes the money-trail `risk`; it can only raise the col
 | Scenario scoring (`ml/money_trail/scenario.py`) | user-built loan scored live by the same model | all ours | features equal to a full portfolio copy (test); example in [metrics §5](../docs/metrics.md#5-scenario-scoring-and-evidence-fusion) | p50 140-142 ms |
 | Photo duplicates (`ml/photo/hashing.py`) | pHash + dHash, whole image + central crop | hashing code ours (numpy / OpenCV) | held-out recall 84.5% at precision 100.0% over 8 transforms ([metrics §4](../docs/metrics.md#duplicate-detection-under-transformations)) | part of `check_photo` |
 | Face blur (`ml/photo/faces.py`) | YuNet detector, mosaic + blur, re-detect | detector pre-trained (OpenCV Zoo, MIT); pipeline ours | 14 of 14 hand-counted faces found (+1 false alarm), 0 detectable left after blur ([metrics §4](../docs/metrics.md#face-blur-yunet-opencv-zoo-mit-haar-cascade-as-fallback)) | part of `check_photo` |
-| Asset check (`ml/photo/asset.py`) | OpenCLIP ViT-B-32 embeddings + logistic-regression probe on our library | CLIP pre-trained (OpenAI weights); probe, library, threshold, evaluation ours | grouped CV accuracy 94.3% (probe) vs 88.1% (zero-shot) ([metrics §4](../docs/metrics.md#asset-check-is-the-thing-in-the-photo-what-the-loan-was-for-openclip-vit-b-32-cpu)) | `check_photo` p50 406 ms, p95 460 ms (all parts, 1600 px) |
+| Asset check (`ml/photo/asset.py`) | OpenCLIP ViT-B-32 embeddings + logistic-regression probe on our library | CLIP pre-trained (OpenAI weights); probe, library, threshold, evaluation ours | grouped CV accuracy 95.1% (probe) vs 89.9% (zero-shot) ([metrics §4](../docs/metrics.md#asset-check-is-the-thing-in-the-photo-what-the-loan-was-for-openclip-vit-b-32-cpu)) | `check_photo` p50 291 ms, p95 330 ms (all parts, 1600 px) |
 | Evidence fusion (`ml/fusion.py`) | documented policy dict, escalation only | all ours | no accuracy claimed (no labelled photo data) ([metrics §5](../docs/metrics.md#fusion-policy-photo---queue)) | negligible |
 
 ## 4. Headline results (synthetic data)
@@ -66,13 +66,13 @@ The honest false-positive rate inside the budget is 11.3%; honest look-alikes ar
 
 **Photo duplicates** (deployed `pd_crop`, held-out half of the library; [metrics §4](../docs/metrics.md#duplicate-detection-under-transformations)): crop 10% 64%, crop 20% 20%, JPEG q=30 100%, resize 50% 100%, rotate 5 deg 96%, brightness +30% 100%, brightness -30% 100%, screenshot 96% recall, precision 100.0%; crops are the weak spot.
 
-**CLIP asset check** (author-grouped 5-fold CV, 5 seeds; [metrics §4](../docs/metrics.md#asset-check-is-the-thing-in-the-photo-what-the-loan-was-for-openclip-vit-b-32-cpu)): 6-class accuracy 94.3% (93.0%-95.8%) for the probe vs 88.1% zero-shot; 'matches the loan purpose' F1 92.3% (probe) vs 91.3% (zero-shot): on this tiny library the probe is not better on the binary task.
+**CLIP asset check** (author-grouped 5-fold CV, 5 seeds; [metrics §4](../docs/metrics.md#asset-check-is-the-thing-in-the-photo-what-the-loan-was-for-openclip-vit-b-32-cpu)): 6-class accuracy 95.1% (93.5%-96.4%) for the probe vs 89.9% zero-shot; 'matches the loan purpose' F1 93.5% (probe) vs 92.2% (zero-shot): on this tiny library the probe is not better on the binary task.
 
 ## 5. Data
 
 - **Synthetic portfolio** (generator, 5 000 loans per split; method and every assumption in [`data/README.md`](../data/README.md)). Synthetic because the project rules forbid real personal or bank data and no public dataset has loan purpose + supplier + invoice + post-disbursement flows (see "Datasets considered" in `data/README.md`).
 - **Splits** ([metrics §1](../docs/metrics.md#1-data--splits)): `train` (seed 42), `dev` (1337, looked at during development), `holdout` (2026, evaluated **once**, run recorded with model sha256 and commit hash; the evaluation script refuses to run it twice), `demo` (7, served by the app, never used for metrics). Disjoint ID spaces, hence disjoint suppliers.
-- **Photos**: 154 openly licensed Wikimedia Commons images (5 asset purposes, `other` negatives, faces test) listed with author and licence in `ml/assets/photos/manifest.csv` and `data/README.md`.
+- **Photos**: 139 openly licensed Wikimedia Commons images (5 asset purposes, `other` negatives, faces test) listed with author and licence in `ml/assets/photos/manifest.csv` and `data/README.md`.
 
 ## 6. Honest limitations
 
@@ -102,11 +102,11 @@ See [Known failure cases](../docs/metrics.md#6-known-failure-cases). In short: e
 
 - **Runs fully on-prem; no external API in the ML path.** The money-trail model, the photo checks and CLIP run locally on CPU. The only external LLM call of the prototype is `/draft_report` in the backend; production uses a local LLM (vLLM / Ollama) for the report.
 - **Privacy**: the original image is never written anywhere (decoded and hashed in memory); faces are blurred and EXIF is dropped by re-encoding; only the blurred JPEG and a perceptual hash are kept; sandbox photos live in memory only and are forgotten by `reset_sandbox`.
-- **Cost / sizing**: measured CPU time and cost per 1 000 checks, with sources and assumptions, are in [`docs/cost.md`](../docs/cost.md) (photo check 502 ms single-thread CPU; process start to a warm portfolio 6-7 s; loading CLIP alone 10.6-11.2 s).
+- **Cost / sizing**: measured CPU time and cost per 1 000 checks, with sources and assumptions, are in [`docs/cost.md`](../docs/cost.md) (photo check 340 ms single-thread CPU; process start to a warm portfolio 6-7 s; loading CLIP alone 10.9-11.1 s).
 
 ### Service start-up: call `ml.api.warm_up()` once
 
-`warm_up()` loads the demo portfolio (features, scores, queue), the face detector and CLIP, and returns the seconds each took plus `clip_loaded` / `clip_error` (measured 15.8-15.9 s and 1425-1428 MB in total, [metrics §4](../docs/metrics.md#asset-check-is-the-thing-in-the-photo-what-the-loan-was-for-openclip-vit-b-32-cpu)).
+`warm_up()` loads the demo portfolio (features, scores, queue), the face detector and CLIP, and returns the seconds each took plus `clip_loaded` / `clip_error` (measured 16.3-16.5 s and 1410-1426 MB in total, [metrics §4](../docs/metrics.md#asset-check-is-the-thing-in-the-photo-what-the-loan-was-for-openclip-vit-b-32-cpu)).
 
 ### CLIP weights (asset check): pre-download at BUILD time, never at request time
 

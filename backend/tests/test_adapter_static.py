@@ -23,7 +23,8 @@ def _fake_ml(check_photo, **overrides):
 PROBE = "__maqsad_probe__"  # warm-up probes every function with this loan_id
 
 
-RESULT = {"asset_match": {"label": "tikuv_dastgohi", "score": 0.9}, "duplicate_of": [],
+RESULT = {"asset_match": {"label": "tikuv_dastgohi", "score": 0.9, "matches_purpose": True,
+                         "label_uz": "tikuv dastgohi"}, "duplicate_of": [],
           "geo_ok": None, "time_ok": None, "faces_blurred": True, "latency_ms": 1.0}
 
 

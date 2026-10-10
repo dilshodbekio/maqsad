@@ -75,12 +75,15 @@ class Duplicate(BaseModel):
 
 
 class AssetMatch(BaseModel):
+    """CLIP + linear probe (contract v1.5)."""
     label: str
     score: float
+    matches_purpose: bool
+    label_uz: str
 
 
 class CheckPhotoResponse(BaseModel):
-    asset_match: Optional[AssetMatch] = None  # None until ml adds the asset-type (CLIP) step
+    asset_match: Optional[AssetMatch] = None  # None only if CLIP is unavailable
     duplicate_of: List[Duplicate]
     geo_ok: Optional[bool] = None  # None = no geolocation given
     time_ok: Optional[bool] = None  # None = no client time given
@@ -98,6 +101,7 @@ class Photo(BaseModel):
     lat: Optional[float] = None
     lon: Optional[float] = None
     duplicate_of: List[Duplicate] = []
+    asset_match: Optional[AssetMatch] = None  # optional: ml leaves it out for portfolio photos (in-sample, v1.5)
     # added by backend
     url: Optional[str] = None
     source: Literal["portfolio", "borrower_upload"] = "portfolio"
@@ -126,6 +130,7 @@ class Health(BaseModel):
     model_version: str
     warmup: Literal["pending", "running", "done", "failed"]
     functions: Dict[str, FunctionStatus]
+    clip_loaded: bool = False  # ml.api.warm_up(): asset check available
 
 
 class QueueItem(BaseModel):

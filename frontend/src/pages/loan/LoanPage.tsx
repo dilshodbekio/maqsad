@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type LoanDetail } from "../../api";
 import { COLOR_ICON, COLOR_UZ, escalationLabel, formatDate, formatRisk, formatUzs, purposeName } from "../../format";
-import { lastQueueUrl, navigate } from "../../router";
+import { lastQueueUrl, navigate, onLinkClick } from "../../router";
 import { AuditLog } from "./AuditLog";
 import { Decision } from "./Decision";
 import { DraftReportBlock } from "./DraftReportBlock";
@@ -131,6 +131,13 @@ function LoanHeader({ detail }: { detail: LoanDetail }) {
         Kredit {loan.loan_id}
         {loan.borrower_name_masked && <span className="lh-name"> · {loan.borrower_name_masked}</span>}
       </h1>
+      <a
+        className="capture-link"
+        href={`/capture?loan=${encodeURIComponent(loan.loan_id)}`}
+        onClick={(e) => onLinkClick(e, `/capture?loan=${encodeURIComponent(loan.loan_id)}`)}
+      >
+        <span aria-hidden="true">📷</span> Rasm yuklash
+      </a>
       <dl className="lh-facts">
         <div>
           <dt>Maqsad</dt>

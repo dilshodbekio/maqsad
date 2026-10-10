@@ -178,3 +178,10 @@ button.secondary { background: transparent; color: var(--brand); border: 1px sol
   .table-wrap { display: block; }
   .queue-cards { display: none; }
 }
+
+/* link-button to /capture (queue, loan page, capture result) */
+.capture-link {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; padding: 0 16px; border-radius: 8px;
+  background: var(--brand); color: #fff; font-weight: 600; text-decoration: none;
+}

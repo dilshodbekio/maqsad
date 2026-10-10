@@ -47,6 +47,10 @@ class MLBadInput(Exception):
     """ml rejected the input (ValueError)."""
 
 
+class MLInvalidRequest(Exception):
+    """ml rejected a request argument or scenario (InvalidRequestError / ScenarioError, Uzbek message) -> 400."""
+
+
 class MLInvalidImage(Exception):
     """check_photo rejected the image (InvalidImageError, a ValueError)."""
 
@@ -104,6 +108,9 @@ class MLAdapter:
         self._lock = threading.Lock()
         self._warmup_done = threading.Event()
         self.warmup_error: Optional[str] = None
+        self.clip_loaded = False  # from ml.api.warm_up(); False when CLIP is unavailable or warm_up() is missing
+        self.clip_error: Optional[str] = None
+        self._asset_files: Optional[frozenset] = None
         self._set_impl(impl, mode)
         if mode == "stub":
             self.warmup_state = "done"
@@ -145,6 +152,7 @@ class MLAdapter:
         return self._warmup_done.wait(timeout)
 
     def _warmup(self) -> None:
+        self._ml_warm_up()
         try:
             n = len(self.impl.get_queue())
             log.info("ML warm-up: get_queue() ok (%d loans)", n)
@@ -173,6 +181,35 @@ class MLAdapter:
         self.warmup_state = "done"
         self._warmup_done.set()
 
+    def _ml_warm_up(self) -> None:
+        """ml.api.warm_up() (contract v1.5): portfolio + face detector + CLIP. Optional: get_queue() below still decides
+        whether the real ML can serve; a failing warm_up() only leaves clip_loaded False."""
+        fn = getattr(self.impl, "warm_up", None)
+        if self.mode == "stub" or not callable(fn):
+            return
+        try:
+            info = fn() or {}
+            self.clip_loaded = bool(info.get("clip_loaded"))
+            self.clip_error = info.get("clip_error")
+            log.info("ML warm_up: %s", info)
+        except Exception as e:  # noqa: BLE001
+            self.clip_loaded, self.clip_error = False, f"{type(e).__name__}: {e}"
+            log.warning("ml.warm_up() failed (%s); continuing with get_queue()", self.clip_error)
+
+    def portfolio_asset_paths(self) -> frozenset:
+        """Paths (relative to ml/assets, e.g. 'photos/x.jpg') of the photos in ml's photo index: the only portfolio
+        images /api/asset serves. Empty in stub mode or if the index cannot be read."""
+        if self._asset_files is None:
+            files: frozenset = frozenset()
+            if self.mode == "real":
+                try:
+                    from ml.photo.index import get_index
+                    files = frozenset(f"photos/{im['file']}" for im in get_index().images)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("photo index unavailable, /api/asset serves nothing: %r", e)
+            self._asset_files = files
+        return self._asset_files
+
     # ---------- calls ----------
 
     def _fn(self, name: str) -> Callable:
@@ -191,6 +228,8 @@ class MLAdapter:
             raise MLNotFound(str(e)) from e
         except ValueError as e:
             log.warning("ml.%s rejected input: %s", name, e)
+            if type(e).__name__ in ("InvalidRequestError", "ScenarioError"):
+                raise MLInvalidRequest(str(e)) from e
             if name == "check_photo":
                 raise MLInvalidImage(str(e)) from e
             raise MLBadInput(str(e)) from e

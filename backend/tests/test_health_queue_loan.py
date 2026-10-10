@@ -5,6 +5,7 @@ def test_health_stub(client):
         "ml_mode": "stub", "model_version": "stub", "warmup": "done",
         "functions": {f: "stub" for f in ("get_queue", "get_loan", "score_loan", "check_photo", "reset_sandbox",
                                           "get_color_thresholds")},
+        "clip_loaded": False,
     }
     assert r.headers["X-ML-Mode"] == "stub"
     assert "sandbox_id" in r.cookies

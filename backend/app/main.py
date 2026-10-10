@@ -26,7 +26,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from . import llm
 from .config import Settings
 from .db import Database, canonical, sha256_hex, utc_now
-from .ml_adapter import (MLAdapter, MLBadInput, MLFailure, MLInvalidImage, MLNotFound, MLNotReady,
+from .ml_adapter import (MLAdapter, MLBadInput, MLFailure, MLInvalidImage, MLInvalidRequest, MLNotFound, MLNotReady,
                          load_adapter)
 from .ratelimit import RateLimiter
 from .schemas import (
@@ -185,6 +185,10 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
             return JSONResponse({"detail": _too_large_msg(settings)}, status_code=413)
         return JSONResponse({"detail": MSG_BAD_IMAGE}, status_code=400)
 
+    @app.exception_handler(MLInvalidRequest)
+    async def on_ml_invalid_request(_: Request, exc: MLInvalidRequest):
+        return JSONResponse({"detail": f"So'rov qabul qilinmadi: {exc}"}, status_code=400)
+
     @app.exception_handler(MLBadInput)
     async def on_ml_bad_input(_: Request, exc: MLBadInput):
         return JSONResponse({"detail": f"Model kiritilgan ma'lumotni qabul qilmadi: {exc}"}, status_code=422)
@@ -212,7 +216,8 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
     @api.get("/health", response_model=Health)
     def health():
         return {"ml_mode": adapter.mode, "model_version": adapter.model_version,
-                "warmup": adapter.warmup_state, "functions": dict(adapter.status)}
+                "warmup": adapter.warmup_state, "functions": dict(adapter.status),
+                "clip_loaded": adapter.clip_loaded}
 
     @api.get("/session", response_model=SessionInfo)
     def session(request: Request):
@@ -394,7 +399,9 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
 
     @api.get("/asset/{asset_path:path}", include_in_schema=False)
     def asset(asset_path: str):
-        """Portfolio photos from ml/assets/ only (photos[].url). Nothing outside that folder is served."""
+        """Only the portfolio photos listed in ml's photo index (photos[].url); everything else is 404."""
+        if asset_path not in adapter.portfolio_asset_paths():
+            raise HTTPException(404, "Fayl topilmadi.")
         root = settings.ml_assets_dir.resolve()
         try:
             target = (root / asset_path).resolve()

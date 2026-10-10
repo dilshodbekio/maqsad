@@ -1,0 +1,26 @@
+/* capture page (borrower, phone first) */
+.capture { display: grid; gap: 12px; }
+.capture-field { display: grid; gap: 4px; font-size: 0.85rem; color: var(--muted); }
+.capture-field select, .capture-field input {
+  min-height: 44px; padding: 0 8px; font: inherit; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; width: 100%;
+}
+.capture-loan { background: #f1f7f3; border-radius: 8px; padding: 8px 12px; margin: 0; }
+.cam-box { position: relative; background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 3 / 4; max-height: 70vh; }
+.cam-box video, .cam-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.shutter { width: 100%; min-height: 64px; font-size: 1.15rem; font-weight: 700; border-radius: 12px; }
+.capture-actions { display: grid; gap: 8px; }
+.capture-actions .secondary { width: 100%; }
+.cap-result { display: grid; gap: 8px; }
+.cap-row { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; display: grid; gap: 2px; }
+.cap-row strong { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.cap-row.warn { background: #fffaeb; border-color: #e0b100; color: #6b4e00; }
+.cap-row.ok { background: #ecfdf3; border-color: #12b76a; }
+.cap-warning { background: #fef3f2; border: 1px solid #d92d20; color: #912018; border-radius: 8px; padding: 10px 12px; font-weight: 600; margin: 0; }
+.cap-color { font-weight: 700; }
+.secondary-file { display: block; }
+.secondary-file input {
+  width: 100%; min-height: 44px; padding: 8px; font: inherit; border: 1px dashed var(--brand); border-radius: 8px;
+  background: var(--surface);
+}
+.secondary-file.disabled { opacity: 0.6; }

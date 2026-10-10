@@ -63,6 +63,7 @@ def _keys_declared(model, items):
 
 def test_health_all_real(client):
     h = client.get("/api/health").json()
+    assert isinstance(h.pop("clip_loaded"), bool)  # True where the CLIP weights are available
     assert h == {"ml_mode": "real", "model_version": ml_api.MODEL_VERSION, "warmup": "done",
                  "functions": {f: "real" for f in FUNCTIONS}}
 

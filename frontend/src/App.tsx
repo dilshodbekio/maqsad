@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import { HealthStatus, type HealthState } from "./components/HealthStatus";
 import { StubBanner } from "./components/StubBanner";
+import { CapturePage } from "./pages/CapturePage";
 import { LoanPage } from "./pages/loan/LoanPage";
 import { QueuePage } from "./pages/QueuePage";
 import { onLinkClick, useLocation } from "./router";
@@ -56,6 +57,8 @@ export default function App() {
           <LoanPage key={loanMatch[1]} loanId={safeDecode(loanMatch[1])} ready={ready} />
         ) : loc.path === "/" ? (
           <QueuePage search={loc.search} ready={ready} />
+        ) : loc.path === "/capture" || loc.path === "/capture/" ? (
+          <CapturePage search={loc.search} ready={ready} />
         ) : (
           <section className="card">
             <h2>Sahifa topilmadi</h2>

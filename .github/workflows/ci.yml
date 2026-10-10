@@ -51,7 +51,7 @@ jobs:
             sleep 2
           done
           echo "health: $H"
-          echo "$H" | jq -e '.ml_mode == "real" and .warmup == "done" and ([.functions[]] | all(. == "real"))'
+          echo "$H" | jq -e '.ml_mode == "real" and .warmup == "done" and ([.functions[]] | all(. == "real")) and (.clip_loaded | type) == "boolean"'
 
           # queue (contract v1.3): {items, total, counts}; no cookie -> fresh sandbox = default view
           curl -fsS "localhost:8000/api/queue?limit=50" -o queue.json
@@ -86,7 +86,10 @@ jobs:
 
           IMG=$(ls ml/assets/photos/*.jpg | head -n 1)
           curl -fsS -F "loan_id=$LOAN" -F "image=@$IMG;type=image/jpeg" localhost:8000/api/check_photo \
-            | jq -e 'has("duplicate_of") and has("faces_blurred")'
+            | jq -e 'has("duplicate_of") and has("faces_blurred") and has("asset_match")
+                   and (.asset_match == null or (.asset_match | has("matches_purpose") and has("label_uz")))'
+          # /api/asset serves only photos from ml's photo index
+          test "$(curl -s -o /dev/null -w '%{http_code}' 'localhost:8000/api/asset/photos/manifest.csv')" = 404
           curl -fsS localhost:8000/ | grep -q '<div id="root">'
 
       - name: Container logs

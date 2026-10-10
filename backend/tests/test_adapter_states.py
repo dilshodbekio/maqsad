@@ -186,7 +186,9 @@ def test_portfolio_photo_url_and_asset_serving(make_client, assets):
                                  "captured_at": "2026-08-01T10:00:00", "lat": 41.3, "lon": 69.2,
                                  "duplicate_of": [{"loan_id": "L0002", "similarity": 0.97}]}]}
 
-    c = make_client(adapter=MLAdapter(_fake_ml(get_loan=get_loan), "real"), ml_assets_dir=assets)
+    adapter = MLAdapter(_fake_ml(get_loan=get_loan), "real")
+    adapter._asset_files = frozenset({"photos/chorva_00.jpg"})  # what ml's photo index would list
+    c = make_client(adapter=adapter, ml_assets_dir=assets)
     lid = c.get("/api/queue").json()["items"][0]["loan_id"]
     ph = c.get(f"/api/loan/{lid}").json()["photos"][0]
     assert ph["url"] == "/api/asset/photos/chorva_00.jpg" and ph["source"] == "portfolio"
@@ -205,10 +207,33 @@ def test_portfolio_photo_url_and_asset_serving(make_client, assets):
     "/api/asset/C:%2FWindows%2Fwin.ini",                # absolute path
 ])
 def test_asset_path_traversal_is_404(make_client, assets, path):
-    c = make_client(ml_assets_dir=assets)
+    adapter = MLAdapter(_fake_ml(), "real")
+    adapter._asset_files = frozenset({"photos/chorva_00.jpg", "photos/manifest.csv"})
+    c = make_client(adapter=adapter, ml_assets_dir=assets)
     r = c.get(path)
     assert r.status_code == 404, (path, r.status_code)
     assert b"SECRET" not in r.content
+
+
+def test_asset_not_in_photo_index_is_404_even_if_file_exists(make_client, assets):
+    (assets / "photos" / "person.jpg").write_bytes(bytes([255, 216, 255]) + b"PERSON")  # on disk, not in ml's index
+    adapter = MLAdapter(_fake_ml(), "real")
+    adapter._asset_files = frozenset({"photos/chorva_00.jpg"})
+    c = make_client(adapter=adapter, ml_assets_dir=assets)
+    assert c.get("/api/asset/photos/chorva_00.jpg").status_code == 200
+    r = c.get("/api/asset/photos/person.jpg")
+    assert r.status_code == 404 and b"PERSON" not in r.content
+
+
+def test_asset_serves_nothing_in_stub_mode(client):
+    assert client.get("/api/asset/photos/chorva_00.jpg").status_code == 404
+
+
+def test_asset_index_files_from_real_ml_index():
+    pytest.importorskip("ml.photo.index")
+    from ml.photo.index import get_index
+    files = MLAdapter(_fake_ml(), "real").portfolio_asset_paths()
+    assert files == {f"photos/{im['file']}" for im in get_index().images} and files
 
 
 def test_asset_url_only_for_ml_assets_paths():
@@ -241,3 +266,82 @@ def test_llm_ref_must_be_an_evidence_ref(make_client, monkeypatch):
     assert r.status_code == 200, r.text
     assert [f["unverified"] for f in r.json()["facts"]] == [False, True, True]
     assert seen["user"]["allowed_refs"] == [e["ref"] for e in d["evidence"]]
+
+
+# ---------- warm_up (contract v1.5), clip_loaded in health ----------
+
+def test_warm_up_called_and_clip_loaded_in_health(make_client):
+    calls = []
+
+    def warm_up():
+        calls.append(1)
+        return {"portfolio_s": 1.0, "clip_loaded": True, "clip_error": None}
+
+    c = make_client(adapter=MLAdapter(_fake_ml(warm_up=warm_up), "real"))
+    assert calls == [1]
+    h = c.get("/api/health").json()
+    assert h["clip_loaded"] is True and h["warmup"] == "done"
+
+
+def test_clip_not_loaded_is_reported_and_service_keeps_working(make_client):
+    c = make_client(adapter=MLAdapter(_fake_ml(warm_up=lambda: {"clip_loaded": False, "clip_error": "no weights"}), "real"))
+    h = c.get("/api/health").json()
+    assert h["clip_loaded"] is False and h["warmup"] == "done"
+    assert c.app.state.ml.clip_error == "no weights"
+
+
+def test_warm_up_crash_does_not_break_service(make_client):
+    def warm_up():
+        raise RuntimeError("boom")
+
+    c = make_client(adapter=MLAdapter(_fake_ml(warm_up=warm_up), "real"))
+    h = c.get("/api/health").json()
+    assert h["clip_loaded"] is False and h["warmup"] == "done" and h["ml_mode"] == "real"
+
+
+def test_no_warm_up_function_means_clip_false(make_client):
+    c = make_client(adapter=MLAdapter(_fake_ml(), "real"))
+    assert c.get("/api/health").json()["clip_loaded"] is False
+
+
+# ---------- InvalidRequestError / ScenarioError -> 400 ----------
+
+class InvalidRequestError(ValueError):  # same class name as ml.errors.InvalidRequestError
+    pass
+
+
+class ScenarioError(ValueError):
+    pass
+
+
+@pytest.mark.parametrize("exc", [InvalidRequestError, ScenarioError])
+def test_invalid_request_and_scenario_errors_are_400_uzbek(make_client, exc):
+    def check_photo(loan_id, *a, **k):
+        if loan_id.startswith("__"):
+            return dict(RESULT)
+        raise exc("sandbox_id noto'g'ri")
+
+    c = make_client(adapter=MLAdapter(_fake_ml(check_photo=check_photo), "real"))
+    r = _upload(c, c.get("/api/queue").json()["items"][0]["loan_id"])
+    assert r.status_code == 400
+    assert "sandbox_id noto'g'ri" in r.json()["detail"]
+
+
+def test_check_photo_asset_match_shape(make_client):
+    am = {"label": "chorva", "score": 0.4, "matches_purpose": False, "label_uz": "avtomobil"}
+    c = make_client(adapter=MLAdapter(_fake_ml(check_photo=lambda *a, **k: {**RESULT, "asset_match": am}), "real"))
+    r = _upload(c, c.get("/api/queue").json()["items"][0]["loan_id"])
+    assert r.status_code == 200 and r.json()["asset_match"] == am
+    bad = {"label": "chorva", "score": 0.4}  # old shape: not valid any more -> ml contract error (502)
+    c = make_client(adapter=MLAdapter(_fake_ml(check_photo=lambda *a, **k: {**RESULT, "asset_match": bad}), "real"))
+    assert _upload(c, c.app.state.ml.get_queue()[0]["loan_id"]).status_code == 502
+
+
+def test_loan_photos_without_asset_match_is_valid(make_client):
+    def get_loan(loan_id, sandbox_id=None):
+        return {**ml_stub.get_loan(loan_id), "photos": [{"photo_id": "P1", "path": "ml/assets/photos/a.jpg",
+                                                         "purpose": "chorva", "duplicate_of": []}]}
+    c = make_client(adapter=MLAdapter(_fake_ml(get_loan=get_loan), "real"))
+    lid = c.get("/api/queue").json()["items"][0]["loan_id"]
+    ph = c.get(f"/api/loan/{lid}").json()["photos"][0]
+    assert ph["asset_match"] is None

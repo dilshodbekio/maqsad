@@ -21,7 +21,7 @@ def make_client(tmp_path, monkeypatch):
 
     def _make(adapter=None, **overrides) -> TestClient:
         base = dict(data_dir=tmp_path / "data", frontend_dist=tmp_path / "no_dist", admin_token="",
-                    llm_base_url="", llm_model="", llm_api_key="")
+                    llm_base_url="", llm_model="", llm_api_key="", llm_rpm=600)
         base.update(overrides)
         ml_stub.reset_sandbox(None)
         app = create_app(settings=replace(Settings.from_env(), **base), adapter=adapter)
@@ -48,3 +48,24 @@ def png_bytes(rgb=(200, 30, 30)) -> bytes:
     ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
     idat = zlib.compress(b"\x00" + bytes(rgb))
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", idat) + chunk(b"IEND", b"")
+
+
+def draft(c, loan_id, *, timeout=15.0, **body):
+    """POST /api/draft_report and, for a 202, poll the job until it is done. Returns the final DraftReport dict
+    (or the job dict when it ended in an error)."""
+    import time
+    r = c.post("/api/draft_report", json={"loan_id": loan_id, **body})
+    if r.status_code == 200:
+        return r.json()
+    assert r.status_code == 202, r.text
+    job_id, end = r.json()["job_id"], time.monotonic() + timeout
+    while time.monotonic() < end:
+        j = c.get(f"/api/draft_report/job/{job_id}")
+        assert j.status_code == 200, j.text
+        j = j.json()
+        if j["status"] == "done":
+            return j["result"]
+        if j["status"] == "error":
+            return j
+        time.sleep(0.02)
+    raise AssertionError("draft job did not finish")

@@ -286,6 +286,34 @@ build and runtime), `HF_HUB_OFFLINE=1`, `MAQSAD_ASSET_CHECK=off` (switch the ass
 3. Env: `LLM_REASONING_EFFORT` (default `minimal`, bo'sh = yuborilmaydi), narx `LLM_PRICE_IN_PER_1M` / `LLM_PRICE_OUT_PER_1M`
    (eski `..._PER_MTOK` nomlari ham o'qiladi). ml tomonda o'zgarish yo'q.
 
+## v1.8 o'zgarishlar (dalolatnoma navbati, umumiy kesh, pre-warm; backend + frontend)
+
+Maqsad: bir necha hakam bir vaqtda dalolatnoma so'rasa, hech kim xato ko'rmasin (bepul Gemini kaliti cheklangan). ml tomonda o'zgarish yo'q.
+
+1. `POST /api/draft_report` endi ikki xil javob beradi:
+   - **200** `DraftReport` — keshda bor (darhol; `cached: true`);
+   - **202** `{job_id, status: "queued"|"running", position, eta_s}` — navbatga qo'yildi.
+   `DraftReport` ga `generated_at` (UTC ISO) qo'shildi. Xatolar: 503 (`LLM ulanmagan` yoki "Dalolatnoma xizmati hozir band, birozdan keyin
+   qayta urinib ko'ring." — navbatda > 30 ta kutayotgan ish, yoki provayder kvotasi tugagan), 429 (`regenerate` daqiqada 1 marta, sandbox bo'yicha).
+2. `GET /api/draft_report/job/{job_id}` → `{job_id, status: queued|running|done|error, position, eta_s, result?, error?}`.
+   `position`: 1 = keyingi; ishlayotganda va tugaganda 0 (ishlayotgan chaqiruv kutayotganlar uchun 1 o'rin hisoblanadi). `eta_s` — taxmin
+   (oxirgi chaqiruvlarning o'rtacha davomiyligi va daqiqalik oyna bo'yicha), noma'lum bo'lsa `null`. Job faqat o'z sandbox'iga ko'rinadi, boshqasiga
+   va noma'lum id'ga **404** (mijoz qayta yuboradi: kesh yoki yangi job javob beradi). `status: "error"` — `error` o'zbekcha matn.
+   Job 120 s dan oshsa `error` = "band" xabari (task o'zi davom etib, keshni to'ldiradi). Joblar xotirada: restartdan keyin yo'qoladi.
+3. Navbat: barcha LLM chaqiruvlari bitta jarayon ichidagi navbatdan o'tadi; bir vaqtda bitta chaqiruv, har 60 s oynada `LLM_RPM` tadan ko'p emas
+   (default 4; sirpanuvchi oyna, token bucket'dan qat'iyroq). Bir xil kalit (kredit + dalillar + model + prompt) = bitta task, har so'rovchi o'z `job_id`'sini oladi.
+   Provayderdan 429 kelsa task navbat boshida qoladi, navbat provayder aytgan vaqtgacha (kamida 5 s, ko'pi bilan 30 s gacha o'sib) to'xtaydi;
+   provayder bir job umridan uzoqroq kutishni so'rasa (masalan kunlik kvota tugagan: "retry in 1h49m") kutayotgan joblar darhol "band" xabari bilan tugaydi va
+   yangilari shu vaqtgacha 503 oladi.
+4. Kesh `DATA_DIR` dagi SQLite'da (restart va redeploydan keyin saqlanadi). Kalit: dalillar + sabablar + model + prompt versiyasi. Kreditga shu sandbox'ning
+   qo'shimcha dalili (yuklangan rasm / eskalatsiya) bo'lmasa — **umumiy** kesh (hamma ko'radi); bo'lsa — shu sandbox'niki. `regenerate: true` keshni
+   chetlab o'tadi va natija keshni yangilaydi.
+5. `POST /api/admin/reset` sandbox keshini tozalaydi, umumiy keshni faqat `?clear_shared_cache=true` bilan.
+6. `POST /api/admin/prewarm?n=40` (header `X-Admin-Token`, 202) → `{total, done, skipped, failed, running}`: asosiy navbatning eng yuqori `n` ta krediti
+   (`priority` bo'yicha: qizil + eskalatsiyali) uchun umumiy keshga qoralama yaratadi, o'sha navbat orqali; keshda borini o'tkazib yuboradi. Foydalanuvchi
+   so'rovlari pre-warm'dan oldin turadi (ishlayotgan chaqiruv to'xtatilmaydi). `GET /api/admin/prewarm` — holat. Token'siz yoki noto'g'ri token → 403.
+7. Env: `LLM_RPM` (default 4). `llm.py`: 429 endi `LLMRateLimited` (Retry-After yoki "retry in ..." matni bo'yicha kutish vaqti bilan).
+
 ## Open points
 - Backend: call `ml.api.warm_up()` at start-up and show `clip_loaded` / `clip_error` in `/api/health`.
 - CLIP weights licence for production needs a legal review (see "Known failure cases" in `docs/metrics.md`).

@@ -13,7 +13,7 @@ from backend.app.config import Settings
 from backend.app.main import create_app
 from backend.app.ml_adapter import MLAdapter, load_adapter
 
-from .conftest import png_bytes
+from .conftest import draft, png_bytes
 
 RESULT = {"asset_match": None, "duplicate_of": [], "geo_ok": None, "time_ok": None,
           "faces_blurred": False, "faces_count": 0, "latency_ms": 1.0}
@@ -263,9 +263,8 @@ def test_llm_ref_must_be_an_evidence_ref(make_client, monkeypatch):
         ]}), 10, 5
 
     monkeypatch.setattr(llm, "_chat", chat)
-    r = c.post("/api/draft_report", json={"loan_id": lid})
-    assert r.status_code == 200, r.text
-    assert [f["unverified"] for f in r.json()["facts"]] == [False, True, True]
+    r = draft(c, lid)
+    assert [f["unverified"] for f in r["facts"]] == [False, True, True]
     assert seen["user"]["allowed_refs"] == [e["ref"] for e in d["evidence"]]
 
 

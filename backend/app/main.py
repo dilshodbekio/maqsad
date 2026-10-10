@@ -26,14 +26,15 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import llm
 from .config import Settings
+from .draft_queue import MSG_BUSY, PRIORITY_PREWARM, DraftQueue, Prewarm, QueueFull
 from .db import Database, canonical, sha256_hex, utc_now
 from .ml_adapter import (MLAdapter, MLBadInput, MLFailure, MLInvalidImage, MLInvalidRequest, MLNotFound, MLNotReady,
                          load_adapter)
 from .ratelimit import RateLimiter
 from .schemas import (
     LOAN_ID_PATTERN, AuditEntry, CheckPhotoFields, CheckPhotoJSON, CheckPhotoResponse, Color, ColorLegend,
-    DecisionRequest, DecisionResponse, DraftReport, DraftReportRequest, Health, LoanDetail, QueueFacets, QueueItem,
-    QueuePage, ResetResponse, ScenarioPreset, ScenarioRequest, ScenarioScore, ScoreRequest, ScoreResponse,
+    DecisionRequest, DecisionResponse, DraftJob, DraftReport, DraftReportRequest, Health, LoanDetail, QueueFacets, QueueItem,
+    PrewarmStatus, QueuePage, ResetResponse, ScenarioPreset, ScenarioRequest, ScenarioScore, ScoreRequest, ScoreResponse,
     SessionInfo,
 )
 
@@ -44,6 +45,7 @@ SANDBOX_MAX_AGE_S = 30 * 24 * 3600
 UPLOAD_PATHS = {"/api/check_photo"}
 QUEUE_DEFAULT_LIMIT = 50
 QUEUE_MAX_LIMIT = 200
+PREWARM_DEFAULT_N = 40
 
 MSG_TOO_MANY = "Juda ko'p so'rov. Bir daqiqadan keyin qayta urinib ko'ring."
 MSG_BAD_TYPE = "Faqat JPEG, PNG yoki WebP rasm qabul qilinadi."
@@ -125,9 +127,12 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
     adapter.start_warmup()  # background thread: /api/health answers while ml builds its portfolio
     db = Database(settings.data_dir)
     limiter = RateLimiter()
+    drafts = DraftQueue(settings, db, rpm=settings.llm_rpm)
+    prewarm = Prewarm()
 
     app = FastAPI(title="Maqsad API", version="0.1.0")
     app.state.settings, app.state.ml, app.state.db, app.state.limiter = settings, adapter, db, limiter
+    app.state.drafts, app.state.prewarm = drafts, prewarm
 
     # ---------- middleware: sandbox cookie, upload size, ML mode headers ----------
 
@@ -369,29 +374,62 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         return FileResponse(p, media_type=sniff_image(head) or "application/octet-stream",
                             headers={"Cache-Control": "private, no-store"})
 
-    @api.post("/draft_report", response_model=DraftReport)
+    def draft_inputs(loan_id: str, sandbox_id: Optional[str]):
+        """(cache scope, cache key, evidence, reasons). Scope is "shared" unless this sandbox added evidence to the loan
+        (an uploaded photo / escalation): then the draft depends on the sandbox and is cached under its id."""
+        view = adapter.get_loan(loan_id, sandbox_id)
+        evidence, reasons = view.get("evidence") or [], view.get("reasons") or []
+
+        def key_of(ev, rs):
+            return sha256_hex(canonical({"evidence": ev, "reasons": rs, "model": settings.llm_model,
+                                         "prompt": llm.PROMPT_VERSION}))
+
+        key, scope = key_of(evidence, reasons), Database.SHARED_SCOPE
+        if sandbox_id is not None and db.photo_list(sandbox_id, loan_id):
+            base = adapter.get_loan(loan_id, None)
+            if key_of(base.get("evidence") or [], base.get("reasons") or []) != key:
+                scope = sandbox_id
+        return scope, key, evidence, reasons
+
+    def cached_draft(scope: str, loan_id: str, key: str, lookup_started: float) -> Optional[dict]:
+        hit = db.draft_cache_get(scope, loan_id, key)
+        if hit is None:
+            return None
+        return {**hit, "cached": True, "cost_usd": 0.0, "input_tokens": None, "output_tokens": None,
+                "latency_ms": round((time.perf_counter() - lookup_started) * 1000, 1)}
+
+    @api.post("/draft_report", response_model=DraftReport,
+              responses={202: {"model": DraftJob, "description": "Not cached: queued, poll /draft_report/job/{job_id}"}})
     def draft_report(body: DraftReportRequest, request: Request):
         rate_check(request, "draft_report")
-        data = adapter.get_loan(body.loan_id, request.state.sandbox_id)
-        if not settings.llm_configured:
-            raise HTTPException(503, f"{MSG_REPORT_NOT_READY}: LLM ulanmagan. Kredit sahifasi undan mustaqil ishlaydi.")
-        evidence, reasons = data.get("evidence") or [], data.get("reasons") or []
         sid = request.state.sandbox_id
-        # the cache is valid only while the draft's inputs (evidence, reasons, model) are unchanged
-        key = sha256_hex(canonical({"evidence": evidence, "reasons": reasons, "model": settings.llm_model,
-                                    "prompt": llm.PROMPT_VERSION}))
+        t0 = time.perf_counter()
+        if not settings.llm_configured:
+            adapter.get_loan(body.loan_id, sid)  # 404 for an unknown loan first
+            raise HTTPException(503, f"{MSG_REPORT_NOT_READY}: LLM ulanmagan. Kredit sahifasi undan mustaqil ishlaydi.")
+        scope, key, evidence, reasons = draft_inputs(body.loan_id, sid)
         if not body.regenerate:
-            t = time.perf_counter()
-            hit = db.draft_cache_get(sid, body.loan_id, key)
+            hit = cached_draft(scope, body.loan_id, key, t0)
             if hit is not None:
-                return {**hit, "cached": True, "cost_usd": 0.0, "input_tokens": None, "output_tokens": None,
-                        "latency_ms": round((time.perf_counter() - t) * 1000, 1)}
+                return hit
+        elif not limiter.allow(f"regenerate:sb:{sid}", 1):
+            raise HTTPException(429, "Qayta yaratish daqiqada bir marta mumkin. Biroz kuting.")
         try:
-            result = llm.draft_report(settings, body.loan_id, evidence, reasons, db)
-            db.draft_cache_put(sid, body.loan_id, key, result)
-            return {**result, "cached": False}
-        except llm.LLMError as e:
-            raise HTTPException(502, f"{MSG_REPORT_NOT_READY}: LLM xatosi. Keyinroq qayta urinib ko'ring.") from e
+            ticket = drafts.submit(
+                sandbox_id=sid, scope=scope, loan_id=body.loan_id, key=key, evidence=evidence, reasons=reasons,
+                cache_lookup=None if body.regenerate else (lambda: db.draft_cache_get(scope, body.loan_id, key)))
+        except QueueFull:
+            raise HTTPException(503, MSG_BUSY) from None
+        if ticket is None:  # the draft appeared in the cache while we were deciding
+            return cached_draft(scope, body.loan_id, key, t0)
+        return JSONResponse(drafts.ticket_view(ticket), status_code=202)
+
+    @api.get("/draft_report/job/{job_id}", response_model=DraftJob)
+    def draft_job(job_id: Annotated[str, Path(pattern=r"^[0-9a-f]{32}$")], request: Request):
+        view = drafts.view(job_id, request.state.sandbox_id)
+        if view is None:  # unknown, expired, lost in a restart, or another sandbox's job: the client resubmits
+            raise HTTPException(404, "Ish topilmadi. Dalolatnomani qayta so'rang.")
+        return view
 
     @api.post("/decision", response_model=DecisionResponse)
     def decision(body: DecisionRequest, request: Request):
@@ -419,13 +457,44 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         adapter.get_loan(loan_id, request.state.sandbox_id)  # 404 for unknown loan
         return db.audit_list(request.state.sandbox_id, loan_id)
 
-    @api.post("/admin/reset", response_model=ResetResponse)
-    def admin_reset(x_admin_token: Annotated[Optional[str], Header()] = None):
-        if not settings.admin_token or not x_admin_token or not hmac.compare_digest(
-                x_admin_token.encode(), settings.admin_token.encode()):
+    def admin_check(token: Optional[str]) -> None:
+        if not settings.admin_token or not token or not hmac.compare_digest(
+                token.encode(), settings.admin_token.encode()):
             raise HTTPException(403, "Ruxsat yo'q: X-Admin-Token noto'g'ri yoki ADMIN_TOKEN sozlanmagan.")
+
+    @api.post("/admin/prewarm", response_model=PrewarmStatus, status_code=202)
+    def admin_prewarm(x_admin_token: Annotated[Optional[str], Header()] = None,
+                      n: Annotated[int, Query(ge=1, le=200)] = PREWARM_DEFAULT_N):
+        """Shared-cache drafts for the top-n loans of the default queue (red + escalated first), lowest queue priority."""
+        admin_check(x_admin_token)
+        if not settings.llm_configured:
+            raise HTTPException(503, f"{MSG_REPORT_NOT_READY}: LLM ulanmagan.")
+
+        def loan_ids() -> List[str]:
+            items = _validated(List[QueueItem], adapter.get_queue(None))
+            return [it.loan_id for it in sorted(items, key=lambda x: -x.priority)[:n]]
+
+        def handle(loan_id: str, on_finish) -> str:
+            scope, key, evidence, reasons = draft_inputs(loan_id, None)
+            ticket = drafts.submit(sandbox_id="prewarm", scope=scope, loan_id=loan_id, key=key, evidence=evidence,
+                                   reasons=reasons, priority=PRIORITY_PREWARM, on_finish=on_finish,
+                                   cache_lookup=lambda: db.draft_cache_get(scope, loan_id, key))
+            return "cached" if ticket is None else "queued"
+
+        prewarm.start(loan_ids, handle)  # already running: the status below shows that run
+        return prewarm.status()
+
+    @api.get("/admin/prewarm", response_model=PrewarmStatus)
+    def admin_prewarm_status(x_admin_token: Annotated[Optional[str], Header()] = None):
+        admin_check(x_admin_token)
+        return prewarm.status()
+
+    @api.post("/admin/reset", response_model=ResetResponse)
+    def admin_reset(x_admin_token: Annotated[Optional[str], Header()] = None, clear_shared_cache: bool = False):
+        admin_check(x_admin_token)
         adapter.reset_sandbox(None)  # ml: None = every sandbox (contract v1.2)
-        db.reset_sandbox_data()
+        db.reset_sandbox_data(clear_shared_cache=clear_shared_cache)  # shared (pre-warmed) drafts stay unless asked
+        drafts.forget_tickets()
         limiter.reset()
         log.warning("admin reset done")
         return {"ok": True}

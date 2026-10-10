@@ -181,7 +181,17 @@ export type DraftReport = {
   cost_usd: number | null;
   input_tokens?: number | null;
   output_tokens?: number | null;
+  generated_at?: string | null; // UTC ISO time the draft was generated
   cached?: boolean; // served from the cache: no LLM call, latency_ms is the lookup time
+};
+
+export type DraftJob = {
+  job_id: string;
+  status: "queued" | "running" | "done" | "error";
+  position: number; // 1 = next; 0 when running / finished
+  eta_s: number | null; // estimate, null when unknown
+  result?: DraftReport | null;
+  error?: string | null;
 };
 
 export type DecisionAction = "approve" | "reject" | "visit";
@@ -288,8 +298,10 @@ export const api = {
   scenarioPresets: () => getJson<ScenarioPreset[]>("/api/scenario_presets"),
   scoreScenario: (scenario: Scenario) => postJson<ScenarioScore>("/api/score_scenario", scenario),
   checkPhoto: (form: FormData) => postForm<CheckPhotoResult>("/api/check_photo", form),
+  // 200 = a cached DraftReport; 202 = a DraftJob to poll
   draftReport: (loanId: string, regenerate = false) =>
-    postJson<DraftReport>("/api/draft_report", { loan_id: loanId, regenerate }),
+    postJson<DraftReport | DraftJob>("/api/draft_report", { loan_id: loanId, regenerate }),
+  draftJob: (jobId: string) => getJson<DraftJob>(`/api/draft_report/job/${encodeURIComponent(jobId)}`),
   decision: (body: { loan_id: string; officer_id: string; action: DecisionAction; comment: string }) =>
     postJson<{ audit_id: number }>("/api/decision", body),
 };

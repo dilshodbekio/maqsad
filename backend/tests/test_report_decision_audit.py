@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 
 from backend.app import llm
 
+from .conftest import draft
+
 # ---------- /api/draft_report ----------
 
 
@@ -29,19 +31,19 @@ def test_draft_report_fact_check(make_client, monkeypatch, loan_id):
         ],
     }
     monkeypatch.setattr(llm, "_chat", lambda settings, messages: (json.dumps(llm_answer), 100, 50))
-    r = c.post("/api/draft_report", json={"loan_id": loan_id})
-    assert r.status_code == 200, r.text
-    d = r.json()
-    assert set(d) == {"text_uz", "facts", "model", "latency_ms", "cost_usd", "cached", "input_tokens", "output_tokens"}
+    d = draft(c, loan_id)
+    assert set(d) == {"text_uz", "facts", "model", "latency_ms", "cost_usd", "cached", "input_tokens", "output_tokens",
+                      "generated_at"}
     assert [f["unverified"] for f in d["facts"]] == [False, True, True]
     assert d["model"] == "test-model"
     assert d["cost_usd"] is None  # price not configured -> not guessed
 
 
-def test_draft_report_llm_error_is_502(make_client, monkeypatch, loan_id):
+def test_draft_report_llm_error_is_a_failed_job(make_client, monkeypatch, loan_id):
     c = make_client(llm_base_url="http://llm.invalid/v1", llm_model="test-model")
     monkeypatch.setattr(llm, "_chat", lambda settings, messages: ("not json", None, None))
-    assert c.post("/api/draft_report", json={"loan_id": loan_id}).status_code == 502
+    j = draft(c, loan_id)
+    assert j["status"] == "error" and "tayyor emas" in j["error"]
 
 
 def test_draft_report_bad_input(client):
@@ -139,30 +141,30 @@ def _counting_llm(monkeypatch):
     return calls
 
 
-def test_draft_is_cached_per_sandbox_and_regenerate_bypasses(make_client, monkeypatch, loan_id):
+def test_draft_is_cached_and_regenerate_bypasses(make_client, monkeypatch, loan_id):
     c = make_client(llm_base_url="http://llm.invalid/v1", llm_model="m",
                     llm_price_in_per_mtok=1.0, llm_price_out_per_mtok=2.0)
     calls = _counting_llm(monkeypatch)
-    first = c.post("/api/draft_report", json={"loan_id": loan_id}).json()
+    first = draft(c, loan_id)
     assert first["cached"] is False and first["cost_usd"] == pytest.approx(0.002)  # 1000/1e6*1 + 500/1e6*2
     assert (first["input_tokens"], first["output_tokens"]) == (1000, 500)
-    again = c.post("/api/draft_report", json={"loan_id": loan_id}).json()
+    again = draft(c, loan_id)
     assert again["cached"] is True and again["cost_usd"] == 0.0 and again["input_tokens"] is None and again["text_uz"] == first["text_uz"]
     assert len(calls) == 1
-    fresh = c.post("/api/draft_report", json={"loan_id": loan_id, "regenerate": True}).json()
+    fresh = draft(c, loan_id, regenerate=True)
     assert fresh["cached"] is False and len(calls) == 2
-    assert c.post("/api/draft_report", json={"loan_id": loan_id}).json()["cached"] is True  # new draft is cached
-    c.cookies.clear()  # another sandbox does not see it
-    assert c.post("/api/draft_report", json={"loan_id": loan_id}).json()["cached"] is False
-    assert len(calls) == 3
+    assert draft(c, loan_id)["cached"] is True  # the regenerated draft replaced the cached one
+    c.cookies.clear()  # another sandbox: the loan has no sandbox evidence, so the draft is SHARED
+    assert draft(c, loan_id)["cached"] is True
+    assert len(calls) == 2
 
 
 def test_failed_draft_is_not_cached(make_client, monkeypatch, loan_id):
     c = make_client(llm_base_url="http://llm.invalid/v1", llm_model="m")
     monkeypatch.setattr(llm, "_chat", lambda s, m: ("not json", None, None))
-    assert c.post("/api/draft_report", json={"loan_id": loan_id}).status_code == 502
+    assert draft(c, loan_id)["status"] == "error"
     calls = _counting_llm(monkeypatch)
-    assert c.post("/api/draft_report", json={"loan_id": loan_id}).json()["cached"] is False
+    assert draft(c, loan_id)["cached"] is False
     assert len(calls) == 1
 
 

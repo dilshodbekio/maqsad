@@ -239,7 +239,26 @@ class DraftReport(BaseModel):
     cost_usd: Optional[float] = None  # None = price unknown (never guessed); 0.0 on a cache hit (no LLM call made)
     input_tokens: Optional[int] = None  # as reported by the LLM API; None on a cache hit (no call made)
     output_tokens: Optional[int] = None  # includes thinking tokens for Gemini
+    generated_at: Optional[str] = None  # UTC ISO time the draft was generated (also on cache hits)
     cached: bool = False  # True: served from the cache, latency_ms is the lookup time
+
+
+class DraftJob(BaseModel):
+    """202 body of POST /draft_report and GET /draft_report/job/{job_id}."""
+    job_id: str
+    status: Literal["queued", "running", "done", "error"]
+    position: int = 0  # 1 = next to run; 0 when running / finished
+    eta_s: Optional[int] = None  # estimate in seconds, None when unknown
+    result: Optional[DraftReport] = None  # status == "done"
+    error: Optional[str] = None  # status == "error" (Uzbek)
+
+
+class PrewarmStatus(BaseModel):
+    total: int
+    done: int
+    skipped: int
+    failed: int
+    running: bool
 
 
 class DecisionRequest(BaseModel):

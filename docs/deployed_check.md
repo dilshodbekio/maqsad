@@ -30,3 +30,23 @@ Latency includes the first request after idle time (cold paths) and the network;
 ## Failures (exact details)
 
 - **CLIP asset check is ACTIVE on the deployed service: asset_match present, sewing machine matches the sewing-machine loan**: asset_match=None  (null = the CLIP weights are not in the image / CLIP failed to load; check_photo degrades safely as designed, /api/health does not show clip_loaded)
+
+---
+
+## CLIP re-check after the deploy with weights (2026-10-10 20:35 UTC, main at c141592)
+
+Read-only, new sandbox cookie `sandbox_id=fb5d56d1-33de-591e-b30c-df07079330f4`; no admin / reset call. One-off requests (not part of `ml.eval.check_deployed`).
+
+**GET /api/health** -> 200:
+`{"ml_mode": "real", "model_version": "money_trail_v2", "warmup": "done", "functions": {"get_queue": "real", "get_loan": "real", "score_loan": "real", "check_photo": "real", "reset_sandbox": "real", "get_color_thresholds": "real"}, "clip_loaded": true}`
+
+Loan: `L1501802` (tikuv_dastgohi, first of `/api/queue?purpose=tikuv_dastgohi`; already **red** by money-trail risk, no escalations before).
+
+| Upload for L1501802 | asset_match (label / label_uz / score / matches_purpose) | Escalation caused | duplicate_of | latency (server / client) |
+|---|---|---|---|---|
+| (a) `tikuv_dastgohi_03.jpg` (sewing machine) | tikuv_dastgohi / tikuv mashinasi / 0.9167 / **true** | `PHOTO_DUPLICATE` (min colour red; colour was already red) - NOT from CLIP | L1504610, similarity 1.0 | 132 ms / 940 ms (first call, cold path) |
+| (b) `other_05.jpg` (smartphones, no people) | other / telefon yoki noutbuk / 0.8649 / **false** | `PHOTO_ASSET_MISMATCH` (min colour yellow): "Rasmda kredit maqsadiga mos aktiv aniqlanmadi (aniqlangan: telefon yoki noutbuk)"; the loan stays red because it was already red | none | 124 ms / 571 ms |
+
+Note on (a): `tikuv_dastgohi_03.jpg` is one of the portfolio-index images (it belongs to L1504610), so the duplicate hit is expected, not an error. It was chosen as the committed sewing-machine image; a reserved image would not have produced a duplicate.
+
+**Verdict: CLIP live? YES** - `clip_loaded: true` in /api/health and `asset_match` is non-null on both uploads (match for the sewing machine, mismatch + `PHOTO_ASSET_MISMATCH` for the phone photo). Server-side `check_photo` latency 124-132 ms (client times include the network).

@@ -152,7 +152,7 @@ def render_asset() -> list[str]:
     z, p, h, fm = a["zero_shot"], a["probe_cv"], a["held_out"], a["false_match"]
     cls = list(a["counts"])
     w(f"Produced by `python -m ml.eval.eval_asset`. Library: {a['n']} images, " + ", ".join(f"{k} {v}" for k, v in a["counts"].items()) +
-      " (`other` = random things: rooms, vehicles, phones / laptops, food, landscapes, documents, animals, people; all openly licensed, "
+      " (`other` = random things: rooms, vehicles, phones / laptops, food, landscapes, documents, animals; all openly licensed, "
       "`ml/assets/photos/manifest.csv`). Zero-shot = cosine similarity to English prompts per class; probe = logistic regression on the CLIP image "
       "embeddings.")
     w("")
@@ -161,7 +161,7 @@ def render_asset() -> list[str]:
       f"{', '.join(map(str, a['seeds']))} (values below: mean, in brackets the range over seeds). The rule 'matches the loan purpose' is "
       "**(most likely class == the loan's purpose) and probability >= tau** (one rule for `label`, `matches_purpose` and the reason text); tau is chosen inside "
       "every training fold (inner grouped out-of-fold probabilities, best F1), never on the "
-      f"test fold. An earlier ungrouped run gave 98.6% accuracy; grouping lowers it, as expected. C = {a['c']:g} and the choice of the probe over zero-shot "
+      f"test fold. An earlier ungrouped run (commit 91244c9) gave 98.6% accuracy; grouping lowers it, as expected. C = {a['c']:g} and the choice of the probe over zero-shot "
       "were made on this same CV (there is no untouched test set), so the numbers are optimistic by that amount. These are tiny, hand-picked Wikimedia "
       "images: they say how the method behaves on this library, not on real borrower photos.")
     w("")
@@ -354,7 +354,7 @@ def render() -> str:
       "trained on the train split only (fixed seed and hyper-parameters, no search). Positives = all fraud loans.")
     if cv:
         w(f"- Cross-validation on train (5-fold, grouped by declared supplier, out-of-fold; `python -m ml.money_trail.train`): "
-          f"ROC-AUC {cv['roc_auc']:.3f}, PR-AUC {cv['pr_auc']:.3f} (random {cv['pr_auc_random']:.3f}), recall@20% {cv['recall_at_20']:.3f} (random 0.200).")
+          f"ROC-AUC {cv['roc_auc']:.4f}, PR-AUC {cv['pr_auc']:.4f} (random {cv['pr_auc_random']:.3f}), recall@20% {cv['recall_at_20']:.4f} (random 0.200).")
     w("")
     if hold:
         L += render_result(hold, "###")

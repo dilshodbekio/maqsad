@@ -233,3 +233,6 @@ frontend/dist/
 # Claude Code local settings
 .claude/*
 !.claude/agents/
+
+# faces of real people: never committed (local-only test images, see docs/metrics.md face-blur section)
+ml/assets/faces_test/

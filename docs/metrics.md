@@ -23,7 +23,7 @@ Holdout run: commit `b6afbb7c38dc67712f5f705a45cb20f2fd096474`, 2026-10-10T12:59
 ## 2. Money-trail v2 (holdout = headline)
 
 - Model `money_trail_v2`: LightGBM, 29 money-trail features (`ml/money_trail/features.py`; no photo / geo, no labels), trained on the train split only (fixed seed and hyper-parameters, no search). Positives = all fraud loans.
-- Cross-validation on train (5-fold, grouped by declared supplier, out-of-fold; `python -m ml.money_trail.train`): ROC-AUC 0.910, PR-AUC 0.726 (random 0.110), recall@20% 0.782 (random 0.200).
+- Cross-validation on train (5-fold, grouped by declared supplier, out-of-fold; `python -m ml.money_trail.train`): ROC-AUC 0.9100, PR-AUC 0.7264 (random 0.110), recall@20% 0.7818 (random 0.200).
 
 ### Recall@20% inspection budget
 
@@ -205,7 +205,7 @@ Reading the ablation: the age-aware encoding changes the honest false-positive r
 
 **All numbers are on a small library of openly licensed photos (CC / public domain) and are produced by `python -m ml.eval.eval_photo`. They say nothing about real borrower photos; real accuracy is measured in the pilot.**
 
-- Library: 100 asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) + 11 photos with people for the face-blur test; 6165 KB in the repo.
+- Library: 100 asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) (the CLIP `other` negatives are not counted here); 5674 KB for all committed JPEGs in `ml/assets/photos/` including the `other` negatives. No committed photo shows a recognisable person (checked with two face detectors and by eye; background figures in one image are pixelated).
 - Portfolio photo index (`ml/artifacts/photo_index_v1.json`): 90 images on 100 loans of the demo portfolio; 10 images are shared by 2-3 loans (the generator's photo-reuse groups). Photos are matched to the loan's purpose.
 
 | Purpose | library images | in index | loans with a photo |
@@ -223,7 +223,7 @@ Hashes: pHash + dHash (64 bit each) of the whole image and of its central 80% cr
 | Variant | max distance (tuned on half A) | recall (held-out) | precision (held-out) | false positives |
 |---|---|---|---|---|
 | p | 0.250 | 82.5% | 100.0% | 0 / 3840 |
-| pd | 0.297 | 87.8% | 98.3% | 6 / 3840 |
+| pd | 0.297 | 87.5% | 98.3% | 6 / 3840 |
 | pd_crop | 0.211 | 84.5% | 100.0% | 0 / 3840 |
 
 **Deployed: `pd_crop`, max distance 0.2109 (similarity >= 0.7891).** The deployed variant and threshold were re-tuned on all 100 images (stricter threshold, more hard negatives) after the held-out numbers were fixed; the table above shows how the tune-on-one-half procedure generalises. With the deployed setting no two single-loan images of the portfolio index match each other. Held-out per-transform numbers for the pd_crop variant (threshold tuned on half A):
@@ -242,7 +242,7 @@ Hashes: pHash + dHash (64 bit each) of the whole image and of its central 80% cr
 
 ### Face blur (YuNet, OpenCV zoo, MIT; Haar cascade as fallback)
 
-Counted by eye on the 11 `faces_test` images (`ml/assets/photos/faces_test_counts.csv`; faces that are very small, dark or out of focus are noted there and not counted).
+Measured on 11 CC-licensed images containing people, counted by eye (faces that are very small, dark or out of focus are not counted). **The images are not redistributed, for privacy reasons.** The script runs this part when such images are put in `ml/assets/faces_test/` (git-ignored) together with a `faces_test_counts.csv` (columns `file,faces_visible,note`); without them it keeps the numbers stored from the run on the author's machine (`ml/artifacts/eval_photo.json`).
 
 | Item | Value |
 |---|---|
@@ -258,8 +258,8 @@ Detection is count based (no box annotations), so a miss and a false alarm on th
 
 | Item | Value |
 |---|---|
-| `check_photo` p50 / p95 (500 calls, warm, 1600x1119 px, 164 KB JPEG; decode, hashing, duplicate search, face detection + blur, CLIP asset check, re-encode) | 406 ms / 460 ms |
-| same, wall clock | 407 ms / 461 ms |
+| `check_photo` p50 / p95 (500 calls, warm, 1600x1128 px, 187 KB JPEG; committed photo without people; decode, hashing, duplicate search, face detection, CLIP asset check, re-encode) | 287 ms / 380 ms |
+| same, wall clock | 287 ms / 381 ms |
 | Cost per check | 0 (local, no external API) |
 
 ### Known failure cases
@@ -274,9 +274,9 @@ Detection is count based (no box annotations), so a miss and a false alarm on th
 
 ### Asset check: is the thing in the photo what the loan was for? (OpenCLIP ViT-B-32, CPU)
 
-Produced by `python -m ml.eval.eval_asset`. Library: 143 images, tikuv_dastgohi 20, chorva 20, issiqxona 20, parranda 20, asalarichilik 20, other 43 (`other` = random things: rooms, vehicles, phones / laptops, food, landscapes, documents, animals, people; all openly licensed, `ml/assets/photos/manifest.csv`). Zero-shot = cosine similarity to English prompts per class; probe = logistic regression on the CLIP image embeddings.
+Produced by `python -m ml.eval.eval_asset`. Library: 139 images, tikuv_dastgohi 20, chorva 20, issiqxona 20, parranda 20, asalarichilik 20, other 39 (`other` = random things: rooms, vehicles, phones / laptops, food, landscapes, documents, animals; all openly licensed, `ml/assets/photos/manifest.csv`). Zero-shot = cosine similarity to English prompts per class; probe = logistic regression on the CLIP image embeddings.
 
-**Leakage control.** The library has series of photos of one object by the same author (near-duplicates for CLIP). Every split is therefore **grouped by author** (110 groups; `author` in the manifest): stratified-grouped 5-fold CV, repeated with seeds 0, 1, 2, 3, 4 (values below: mean, in brackets the range over seeds). The rule 'matches the loan purpose' is **(most likely class == the loan's purpose) and probability >= tau** (one rule for `label`, `matches_purpose` and the reason text); tau is chosen inside every training fold (inner grouped out-of-fold probabilities, best F1), never on the test fold. An earlier ungrouped run gave 98.6% accuracy; grouping lowers it, as expected. C = 10 and the choice of the probe over zero-shot were made on this same CV (there is no untouched test set), so the numbers are optimistic by that amount. These are tiny, hand-picked Wikimedia images: they say how the method behaves on this library, not on real borrower photos.
+**Leakage control.** The library has series of photos of one object by the same author (near-duplicates for CLIP). Every split is therefore **grouped by author** (108 groups; `author` in the manifest): stratified-grouped 5-fold CV, repeated with seeds 0, 1, 2, 3, 4 (values below: mean, in brackets the range over seeds). The rule 'matches the loan purpose' is **(most likely class == the loan's purpose) and probability >= tau** (one rule for `label`, `matches_purpose` and the reason text); tau is chosen inside every training fold (inner grouped out-of-fold probabilities, best F1), never on the test fold. An earlier ungrouped run (commit 91244c9) gave 98.6% accuracy; grouping lowers it, as expected. C = 10 and the choice of the probe over zero-shot were made on this same CV (there is no untouched test set), so the numbers are optimistic by that amount. These are tiny, hand-picked Wikimedia images: they say how the method behaves on this library, not on real borrower photos.
 
 **6-class accuracy (what is in the photo)**
 
@@ -284,45 +284,45 @@ Produced by `python -m ml.eval.eval_asset`. Library: 143 images, tikuv_dastgohi 
 |---|---|---|---|
 | tikuv_dastgohi | 20 | 100.0% | 100.0% |
 | chorva | 20 | 100.0% | 100.0% |
-| issiqxona | 20 | 95.0% | 79.0% |
-| parranda | 20 | 75.0% | 94.0% |
+| issiqxona | 20 | 95.0% | 82.0% |
+| parranda | 20 | 75.0% | 96.0% |
 | asalarichilik | 20 | 100.0% | 90.0% |
-| other | 43 | 74.4% | 98.1% |
-| **all** | 143 | **88.1%** | **94.3% (93.0% - 95.8%)** |
+| other | 39 | 79.5% | 97.9% |
+| **all** | 139 | **89.9%** | **94.8% (92.8% - 95.7%)** |
 
-**Binary task: the photo matches the loan purpose** (every image paired with each of the 5 purposes; positive = the image shows that purpose; 100 positive and 615 negative pairs per seed, pooled over the CV test folds)
+**Binary task: the photo matches the loan purpose** (every image paired with each of the 5 purposes; positive = the image shows that purpose; 100 positive and 595 negative pairs per seed, pooled over the CV test folds)
 
 | Method | precision | recall | F1 |
 |---|---|---|---|
-| zero-shot (tau chosen in the training folds) | 94.6% (94.6% - 94.7%) | 88.2% (87.0% - 90.0%) | 91.3% (90.6% - 92.3%) |
-| linear probe | 93.4% (91.8% - 94.9%) | 91.2% (89.0% - 94.0%) | 92.3% (90.8% - 94.5%) |
+| zero-shot (tau chosen in the training folds) | 94.9% (91.8% - 95.7%) | 89.6% (89.0% - 90.0%) | 92.2% (90.9% - 92.8%) |
+| linear probe | 94.9% (92.7% - 96.9%) | 92.4% (89.0% - 95.0%) | 93.6% (90.8% - 96.0%) |
 
 | Seed | probe 6-class accuracy | precision | recall | F1 | TP / FP / FN |
 |---|---|---|---|---|---|
-| 0 | 93.7% | 92.9% | 92.0% | 92.5% | 92 / 7 / 8 |
-| 1 | 95.1% | 94.8% | 91.0% | 92.9% | 91 / 5 / 9 |
-| 2 | 95.8% | 94.9% | 94.0% | 94.5% | 94 / 5 / 6 |
-| 3 | 93.0% | 92.7% | 89.0% | 90.8% | 89 / 7 / 11 |
-| 4 | 93.7% | 91.8% | 90.0% | 90.9% | 90 / 8 / 10 |
+| 0 | 95.7% | 95.9% | 94.0% | 94.9% | 94 / 4 / 6 |
+| 1 | 95.0% | 93.8% | 91.0% | 92.4% | 91 / 6 / 9 |
+| 2 | 95.0% | 94.9% | 93.0% | 93.9% | 93 / 5 / 7 |
+| 3 | 95.7% | 96.9% | 95.0% | 96.0% | 95 / 3 / 5 |
+| 4 | 92.8% | 92.7% | 89.0% | 90.8% | 89 / 7 / 11 |
 
-False matches (mean over seeds) on `other` images, which come from the same 20 search categories as the negatives the probe is trained on (so this is an in-distribution rate, not the rate for any random photo): out of 215 pairs (an `other` image x a purpose) the probe says 'matches' 0.2% of the time, zero-shot 1.9%; for assets of a different purpose (400 pairs) 1.5% (probe) and 0.2% (zero-shot).
+False matches (mean over seeds) on `other` images, which come from the same 20 search categories as the negatives the probe is trained on (so this is an in-distribution rate, not the rate for any random photo): out of 195 pairs (an `other` image x a purpose) the probe says 'matches' 0.2% of the time, zero-shot 1.8%; for assets of a different purpose (400 pairs) 1.1% (probe) and 0.3% (zero-shot).
 
-**The 10 images left out of the portfolio photo index.** The probe is trained on the other images without any photo of the same author (12 images dropped for that reason, 121 left) and tau is chosen on them: probe accuracy 90.0% (9/10), zero-shot 100.0% (10/10); binary task probe TP/FP/FN 9/1/1 (n_pos 10, n_neg 40), zero-shot 10/0/0. With 10 images these are counts, not rates to rely on.
+**The 10 images left out of the portfolio photo index.** The probe is trained on the other images without any photo of the same author (12 images dropped for that reason, 117 left) and tau is chosen on them: probe accuracy 90.0% (9/10), zero-shot 100.0% (10/10); binary task probe TP/FP/FN 9/1/1 (n_pos 10, n_neg 40), zero-shot 10/0/0. With 10 images these are counts, not rates to rely on.
 
-Deployed: the probe fitted on all 143 images, tau = 0.36 (all-data grouped out-of-fold probabilities); artifact `ml/artifacts/asset_probe_v1.npz` (+ `.json`). `check_photo().asset_match = {label, score, matches_purpose, label_uz}`; `matches_purpose = (label == loan purpose) and p >= tau`; `false` escalates the loan to at least yellow (`PHOTO_ASSET_MISMATCH`, section 5). The reason text follows the same rule: a different thing found -> 'Rasmda kredit maqsadiga mos aktiv aniqlanmadi (aniqlangan: ...)'; the right class with low confidence -> 'Rasmdagi aktiv ishonchli aniqlanmadi (eng ehtimoliy: ..., ishonch past)'; never 'no matching asset' when the label equals the purpose. The probe is trained on every library image, so the asset results of the **portfolio** photos (in the photo index) are in-sample (training images) and say nothing about accuracy.
+Deployed: the probe fitted on all 139 images, tau = 0.33 (all-data grouped out-of-fold probabilities); artifact `ml/artifacts/asset_probe_v1.npz` (+ `.json`). `check_photo().asset_match = {label, score, matches_purpose, label_uz}`; `matches_purpose = (label == loan purpose) and p >= tau`; `false` escalates the loan to at least yellow (`PHOTO_ASSET_MISMATCH`, section 5). The reason text follows the same rule: a different thing found -> 'Rasmda kredit maqsadiga mos aktiv aniqlanmadi (aniqlangan: ...)'; the right class with low confidence -> 'Rasmdagi aktiv ishonchli aniqlanmadi (eng ehtimoliy: ..., ishonch past)'; never 'no matching asset' when the label equals the purpose. The probe is trained on every library image, so the asset results of the **portfolio** photos (in the photo index) are in-sample (training images) and say nothing about accuracy.
 
 **Robustness** (seed 0 folds; each transformed copy is classified by the probe / zero-shot of its CV fold; 'label kept' = same predicted class as the untransformed image):
 
 | Transform | probe accuracy | probe label kept | zero-shot accuracy | zero-shot label kept |
 |---|---|---|---|---|
-| JPEG q=30 | 93.7% | 97.2% | 84.6% | 95.1% |
-| resize 50% | 93.7% | 98.6% | 88.8% | 97.9% |
-| screenshot | 90.2% | 94.4% | 88.1% | 93.0% |
-| rotate 5 deg | 93.0% | 96.5% | 88.8% | 95.8% |
+| JPEG q=30 | 95.7% | 98.6% | 86.3% | 95.0% |
+| resize 50% | 95.0% | 99.3% | 89.9% | 98.6% |
+| screenshot | 91.4% | 93.5% | 89.2% | 94.2% |
+| rotate 5 deg | 94.2% | 98.6% | 87.8% | 95.7% |
 
-**Warm-up and memory** (fresh processes, 3 runs; CLIP weights already in the cache directory; the one-off 354 MB weights download is not included; memory = process working set after loading, not the peak): loading CLIP (imports + model + prompts) 10.6 - 11.2 s, memory 1253 - 1275 MB; full `ml.api.warm_up()` (portfolio + face detector + CLIP) 15.8 - 15.9 s, memory 1425 - 1428 MB (within the limits we set: warm-up <= 30 s, memory <= 4 GB). `check_photo` latency with CLIP is in the photo latency table above; CPU time per component and cost per 1 000 checks: [`docs/cost.md`](cost.md). CLIP inference runs under one lock (about 200 ms of single-thread CPU per image), so concurrent uploads queue up.
+**Warm-up and memory** (fresh processes, 3 runs; CLIP weights already in the cache directory; the one-off 354 MB weights download is not included; memory = process working set after loading, not the peak): loading CLIP (imports + model + prompts) 10.7 - 12.0 s, memory 1268 - 1275 MB; full `ml.api.warm_up()` (portfolio + face detector + CLIP) 16.3 - 16.5 s, memory 1411 - 1427 MB (within the limits we set: warm-up <= 30 s, memory <= 4 GB). `check_photo` latency with CLIP is in the photo latency table above; CPU time per component and cost per 1 000 checks: [`docs/cost.md`](cost.md). CLIP inference runs under one lock (about 200 ms of single-thread CPU per image), so concurrent uploads queue up.
 
-**Failure cases measured on this library** (seed 0; 23 of 143 images are wrong for the probe (grouped CV) or for zero-shot):
+**Failure cases measured on this library** (seed 0; 19 of 139 images are wrong for the probe (grouped CV) or for zero-shot):
 
 | Image | true | probe (CV) | zero-shot |
 |---|---|---|---|
@@ -331,16 +331,16 @@ Deployed: the probe fitted on all 143 images, tau = 0.36 (all-data grouped out-o
 | `issiqxona_11.jpg` | issiqxona | parranda | parranda |
 | `issiqxona_12.jpg` | issiqxona | parranda | issiqxona |
 | `parranda_06.jpg` | parranda | parranda | asalarichilik |
-| `parranda_09.jpg` | parranda | issiqxona | issiqxona |
+| `parranda_09.jpg` | parranda | parranda | issiqxona |
 | `parranda_11.jpg` | parranda | parranda | asalarichilik |
 | `parranda_12.jpg` | parranda | parranda | chorva |
 | `parranda_14.jpg` | parranda | parranda | asalarichilik |
-| `parranda_15.jpg` | parranda | issiqxona | parranda |
 | `asalarichilik_09.jpg` | asalarichilik | other | asalarichilik |
 | `asalarichilik_10.jpg` | asalarichilik | parranda | asalarichilik |
 | `other_01.jpg` | other | other | tikuv_dastgohi |
 | `other_02.jpg` | other | other | asalarichilik |
-| ... | | | (9 more in `ml/artifacts/eval_asset.json`) |
+| `other_14.jpg` | other | other | asalarichilik |
+| ... | | | (5 more in `ml/artifacts/eval_asset.json`) |
 
 Known weak spots (some measured above, some only expected): the library contains a toy sewing machine and a model of a poultry pen labelled as assets, so the probe accepts such look-alikes; a picture or painting of a cow, a cluttered workshop with several objects, poultry vs wild birds and a screen showing a photo were not tested; the probe only knows 6 classes, so the name in `label_uz` for non-assets comes from a separate zero-shot list of 13 everyday categories and can be wrong. The check is a flag for the officer, not proof.
 

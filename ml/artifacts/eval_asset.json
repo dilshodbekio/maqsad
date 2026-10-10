@@ -1,12 +1,12 @@
 {
- "n": 143,
+ "n": 139,
  "counts": {
   "tikuv_dastgohi": 20,
   "chorva": 20,
   "issiqxona": 20,
   "parranda": 20,
   "asalarichilik": 20,
-  "other": 43
+  "other": 39
  },
  "c": 10.0,
  "folds": 5,
@@ -17,196 +17,196 @@
   3,
   4
  ],
- "n_groups": 110,
+ "n_groups": 108,
  "group_rule": "author in manifest.csv",
  "zero_shot": {
-  "acc": 0.8811188811188811,
+  "acc": 0.8992805755395683,
   "per_class": {
    "tikuv_dastgohi": 1.0,
    "chorva": 1.0,
    "issiqxona": 0.95,
    "parranda": 0.75,
    "asalarichilik": 1.0,
-   "other": 0.7441860465116279
+   "other": 0.7948717948717948
   },
   "binary": {
    "precision": {
-    "mean": 0.9463460544770059,
-    "min": 0.9456521739130435,
-    "max": 0.9473684210526315
+    "mean": 0.9494478917167417,
+    "min": 0.9183673469387755,
+    "max": 0.9574468085106383
    },
    "recall": {
-    "mean": 0.882,
-    "min": 0.87,
+    "mean": 0.8960000000000001,
+    "min": 0.89,
     "max": 0.9
    },
    "f1": {
-    "mean": 0.9130156436827421,
-    "min": 0.90625,
-    "max": 0.9230769230769231
+    "mean": 0.9218641195351841,
+    "min": 0.9090909090909091,
+    "max": 0.9278350515463918
    }
   },
   "binary_seed0": {
-   "tp": 88,
-   "fp": 5,
-   "fn": 12,
-   "precision": 0.946236559139785,
-   "recall": 0.88,
+   "tp": 89,
+   "fp": 4,
+   "fn": 11,
+   "precision": 0.956989247311828,
+   "recall": 0.89,
    "n_pos": 100,
-   "n_neg": 615,
-   "f1": 0.9119170984455959
+   "n_neg": 595,
+   "f1": 0.9222797927461139
   },
   "taus_seed0": [
    0.74,
    0.74,
    0.74,
-   0.78,
-   0.89
+   0.74,
+   0.79
   ]
  },
  "probe_cv": {
   "acc": {
-   "mean": 0.9426573426573427,
-   "min": 0.9300699300699301,
-   "max": 0.958041958041958
+   "mean": 0.9482014388489208,
+   "min": 0.9280575539568345,
+   "max": 0.9568345323741008
   },
   "per_class": {
    "tikuv_dastgohi": 1.0,
    "chorva": 1.0,
-   "issiqxona": 0.79,
-   "parranda": 0.9400000000000001,
+   "issiqxona": 0.8200000000000001,
+   "parranda": 0.9600000000000002,
    "asalarichilik": 0.9,
-   "other": 0.9813953488372092
+   "other": 0.9794871794871796
   },
   "binary": {
    "precision": {
-    "mean": 0.9344310451453308,
-    "min": 0.9183673469387755,
-    "max": 0.9494949494949495
+    "mean": 0.9485557367276807,
+    "min": 0.9270833333333334,
+    "max": 0.9693877551020408
    },
    "recall": {
-    "mean": 0.9120000000000001,
+    "mean": 0.924,
     "min": 0.89,
-    "max": 0.94
+    "max": 0.95
    },
    "f1": {
-    "mean": 0.9230344673273603,
+    "mean": 0.9361011963622552,
     "min": 0.9081632653061225,
-    "max": 0.9447236180904522
+    "max": 0.9595959595959596
    }
   },
   "binary_seed0": {
-   "tp": 92,
-   "fp": 7,
-   "fn": 8,
-   "precision": 0.9292929292929293,
-   "recall": 0.92,
+   "tp": 94,
+   "fp": 4,
+   "fn": 6,
+   "precision": 0.9591836734693877,
+   "recall": 0.94,
    "n_pos": 100,
-   "n_neg": 615,
-   "f1": 0.9246231155778895
+   "n_neg": 595,
+   "f1": 0.9494949494949495
   },
   "taus_seed0": [
+   0.32,
    0.35,
-   0.28,
-   0.33,
-   0.3,
-   0.36
+   0.39,
+   0.32,
+   0.28
   ],
   "per_seed": [
    {
     "seed": 0,
-    "acc": 0.9370629370629371,
-    "precision": 0.9292929292929293,
-    "recall": 0.92,
-    "f1": 0.9246231155778895,
-    "tp": 92,
-    "fp": 7,
-    "fn": 8
+    "acc": 0.9568345323741008,
+    "precision": 0.9591836734693877,
+    "recall": 0.94,
+    "f1": 0.9494949494949495,
+    "tp": 94,
+    "fp": 4,
+    "fn": 6
    },
    {
     "seed": 1,
-    "acc": 0.951048951048951,
-    "precision": 0.9479166666666666,
+    "acc": 0.9496402877697842,
+    "precision": 0.9381443298969072,
     "recall": 0.91,
-    "f1": 0.9285714285714286,
+    "f1": 0.9238578680203046,
     "tp": 91,
-    "fp": 5,
+    "fp": 6,
     "fn": 9
    },
    {
     "seed": 2,
-    "acc": 0.958041958041958,
-    "precision": 0.9494949494949495,
-    "recall": 0.94,
-    "f1": 0.9447236180904522,
-    "tp": 94,
+    "acc": 0.9496402877697842,
+    "precision": 0.9489795918367347,
+    "recall": 0.93,
+    "f1": 0.9393939393939394,
+    "tp": 93,
     "fp": 5,
-    "fn": 6
+    "fn": 7
    },
    {
     "seed": 3,
-    "acc": 0.9300699300699301,
+    "acc": 0.9568345323741008,
+    "precision": 0.9693877551020408,
+    "recall": 0.95,
+    "f1": 0.9595959595959596,
+    "tp": 95,
+    "fp": 3,
+    "fn": 5
+   },
+   {
+    "seed": 4,
+    "acc": 0.9280575539568345,
     "precision": 0.9270833333333334,
     "recall": 0.89,
     "f1": 0.9081632653061225,
     "tp": 89,
     "fp": 7,
     "fn": 11
-   },
-   {
-    "seed": 4,
-    "acc": 0.9370629370629371,
-    "precision": 0.9183673469387755,
-    "recall": 0.9,
-    "f1": 0.9090909090909091,
-    "tp": 90,
-    "fp": 8,
-    "fn": 10
    }
   ]
  },
  "false_match": {
   "probe": {
-   "other_rate": 0.0018604651162790697,
-   "wrong_asset_rate": 0.015000000000000003,
-   "other_pairs": 215,
+   "other_rate": 0.0020512820512820513,
+   "wrong_asset_rate": 0.0115,
+   "other_pairs": 195,
    "wrong_asset_pairs": 400
   },
   "zero_shot": {
-   "other_rate": 0.018604651162790697,
-   "wrong_asset_rate": 0.0025,
-   "other_pairs": 215,
+   "other_rate": 0.018461538461538463,
+   "wrong_asset_rate": 0.003,
+   "other_pairs": 195,
    "wrong_asset_pairs": 400
   }
  },
  "robustness": {
   "JPEG q=30": {
-   "n": 143,
-   "probe_correct": 0.9370629370629371,
-   "probe_same": 0.972027972027972,
-   "zs_correct": 0.8461538461538461,
-   "zs_same": 0.951048951048951
+   "n": 139,
+   "probe_correct": 0.9568345323741008,
+   "probe_same": 0.9856115107913669,
+   "zs_correct": 0.8633093525179856,
+   "zs_same": 0.9496402877697842
   },
   "resize 50%": {
-   "n": 143,
-   "probe_correct": 0.9370629370629371,
-   "probe_same": 0.986013986013986,
-   "zs_correct": 0.8881118881118881,
-   "zs_same": 0.9790209790209791
+   "n": 139,
+   "probe_correct": 0.9496402877697842,
+   "probe_same": 0.9928057553956835,
+   "zs_correct": 0.8992805755395683,
+   "zs_same": 0.9856115107913669
   },
   "screenshot": {
-   "n": 143,
-   "probe_correct": 0.9020979020979021,
-   "probe_same": 0.9440559440559441,
-   "zs_correct": 0.8811188811188811,
-   "zs_same": 0.9300699300699301
+   "n": 139,
+   "probe_correct": 0.9136690647482014,
+   "probe_same": 0.935251798561151,
+   "zs_correct": 0.8920863309352518,
+   "zs_same": 0.9424460431654677
   },
   "rotate 5 deg": {
-   "n": 143,
-   "probe_correct": 0.9300699300699301,
-   "probe_same": 0.965034965034965,
-   "zs_correct": 0.8881118881118881,
-   "zs_same": 0.958041958041958
+   "n": 139,
+   "probe_correct": 0.9424460431654677,
+   "probe_same": 0.9856115107913669,
+   "zs_correct": 0.8776978417266187,
+   "zs_same": 0.9568345323741008
   }
  },
  "misclassified": [
@@ -214,171 +214,143 @@
    "file": "issiqxona_08.jpg",
    "true": "issiqxona",
    "probe": "parranda",
-   "score": 0.532,
+   "score": 0.489,
    "zero_shot": "issiqxona"
   },
   {
    "file": "issiqxona_09.jpg",
    "true": "issiqxona",
    "probe": "parranda",
-   "score": 0.481,
+   "score": 0.468,
    "zero_shot": "issiqxona"
   },
   {
    "file": "issiqxona_11.jpg",
    "true": "issiqxona",
    "probe": "parranda",
-   "score": 0.52,
+   "score": 0.381,
    "zero_shot": "parranda"
   },
   {
    "file": "issiqxona_12.jpg",
    "true": "issiqxona",
    "probe": "parranda",
-   "score": 0.548,
+   "score": 0.42,
    "zero_shot": "issiqxona"
   },
   {
    "file": "parranda_06.jpg",
    "true": "parranda",
    "probe": "parranda",
-   "score": 0.54,
+   "score": 0.553,
    "zero_shot": "asalarichilik"
   },
   {
    "file": "parranda_09.jpg",
    "true": "parranda",
-   "probe": "issiqxona",
-   "score": 0.406,
+   "probe": "parranda",
+   "score": 0.443,
    "zero_shot": "issiqxona"
   },
   {
    "file": "parranda_11.jpg",
    "true": "parranda",
    "probe": "parranda",
-   "score": 0.777,
+   "score": 0.802,
    "zero_shot": "asalarichilik"
   },
   {
    "file": "parranda_12.jpg",
    "true": "parranda",
    "probe": "parranda",
-   "score": 0.635,
+   "score": 0.558,
    "zero_shot": "chorva"
   },
   {
    "file": "parranda_14.jpg",
    "true": "parranda",
    "probe": "parranda",
-   "score": 0.437,
+   "score": 0.528,
    "zero_shot": "asalarichilik"
-  },
-  {
-   "file": "parranda_15.jpg",
-   "true": "parranda",
-   "probe": "issiqxona",
-   "score": 0.486,
-   "zero_shot": "parranda"
   },
   {
    "file": "asalarichilik_09.jpg",
    "true": "asalarichilik",
    "probe": "other",
-   "score": 0.418,
+   "score": 0.468,
    "zero_shot": "asalarichilik"
   },
   {
    "file": "asalarichilik_10.jpg",
    "true": "asalarichilik",
    "probe": "parranda",
-   "score": 0.333,
+   "score": 0.298,
    "zero_shot": "asalarichilik"
   },
   {
    "file": "other_01.jpg",
    "true": "other",
    "probe": "other",
-   "score": 0.316,
+   "score": 0.392,
    "zero_shot": "tikuv_dastgohi"
   },
   {
    "file": "other_02.jpg",
    "true": "other",
    "probe": "other",
-   "score": 0.727,
+   "score": 0.8,
    "zero_shot": "asalarichilik"
   },
   {
    "file": "other_14.jpg",
    "true": "other",
    "probe": "other",
-   "score": 0.76,
+   "score": 0.696,
    "zero_shot": "asalarichilik"
   },
   {
    "file": "other_15.jpg",
    "true": "other",
    "probe": "other",
-   "score": 0.678,
-   "zero_shot": "asalarichilik"
-  },
-  {
-   "file": "other_19.jpg",
-   "true": "other",
-   "probe": "other",
-   "score": 0.582,
+   "score": 0.626,
    "zero_shot": "asalarichilik"
   },
   {
    "file": "other_21.jpg",
    "true": "other",
    "probe": "other",
-   "score": 0.493,
-   "zero_shot": "tikuv_dastgohi"
-  },
-  {
-   "file": "other_22.jpg",
-   "true": "other",
-   "probe": "other",
-   "score": 0.711,
+   "score": 0.592,
    "zero_shot": "tikuv_dastgohi"
   },
   {
    "file": "other_23.jpg",
    "true": "other",
    "probe": "other",
-   "score": 0.583,
+   "score": 0.61,
    "zero_shot": "asalarichilik"
   },
   {
    "file": "other_29.jpg",
    "true": "other",
    "probe": "other",
-   "score": 0.544,
+   "score": 0.645,
    "zero_shot": "asalarichilik"
   },
   {
    "file": "other_31.jpg",
    "true": "other",
    "probe": "other",
-   "score": 0.564,
+   "score": 0.636,
    "zero_shot": "asalarichilik"
-  },
-  {
-   "file": "other_33.jpg",
-   "true": "other",
-   "probe": "parranda",
-   "score": 0.323,
-   "zero_shot": "chorva"
   }
  ],
  "held_out": {
   "n": 10,
-  "n_train": 121,
+  "n_train": 117,
   "n_dropped_same_author": 12,
   "probe_acc": 0.9,
   "zero_shot_acc": 1.0,
-  "tau_probe": 0.29,
+  "tau_probe": 0.32,
   "tau_zero_shot": 0.74,
   "probe_binary": {
    "tp": 9,
@@ -409,33 +381,33 @@
    }
   ]
  },
- "tau_final": 0.36,
+ "tau_final": 0.33,
  "clip_load": [
   {
-   "seconds": 11.187144400028046,
-   "rss_mb": 1253.4375
+   "seconds": 11.975126100005582,
+   "rss_mb": 1270.83203125
   },
   {
-   "seconds": 10.824747000006028,
-   "rss_mb": 1273.11328125
+   "seconds": 11.093897200014908,
+   "rss_mb": 1268.140625
   },
   {
-   "seconds": 10.574692800000776,
-   "rss_mb": 1275.01953125
+   "seconds": 10.66615930001717,
+   "rss_mb": 1274.65234375
   }
  ],
  "warm_up_total": [
   {
-   "seconds": 15.903638599964324,
-   "rss_mb": 1425.38671875
+   "seconds": 16.3136194999679,
+   "rss_mb": 1424.79296875
   },
   {
-   "seconds": 15.812379400013015,
-   "rss_mb": 1426.140625
+   "seconds": 16.322788099991158,
+   "rss_mb": 1426.98046875
   },
   {
-   "seconds": 15.820838299987372,
-   "rss_mb": 1428.21875
+   "seconds": 16.463460599945392,
+   "rss_mb": 1411.171875
   }
  ]
 }

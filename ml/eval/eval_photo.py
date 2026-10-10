@@ -21,6 +21,7 @@ from ml.photo.transforms import TRANSFORMS
 
 SEED = 20260410
 MIN_PRECISION = 0.999
+LATENCY_IMAGE = "tikuv_dastgohi_12.jpg"
 GRID = [i / 128 for i in range(0, 65)]            # max normalised distance candidates
 
 
@@ -107,16 +108,19 @@ def choose_variant(res: dict) -> str:
     return max(d, key=lambda k: (d[k]["recall"], -d[k]["max_distance"]))
 
 
-def faces_eval() -> dict:
-    """Detected vs hand-counted faces on faces_test; then the detectors are re-run on the blurred output."""
+def faces_eval() -> dict | None:
+    """Detected vs hand-counted faces on the local-only faces_test images (ml/assets/faces_test/, git-ignored: images of real
+    people are not redistributed); then the detectors are re-run on the blurred output. None if the folder is not there."""
     import csv
     from ml.photo.faces import FaceDetector, blur_faces
+    counts = config.FACES / "faces_test_counts.csv"
+    if not counts.exists():
+        return None
     det = FaceDetector()
-    truth = {r["file"]: (int(r["faces_visible"]), r["note"])
-             for r in csv.DictReader(open(config.ASSETS / "faces_test_counts.csv", encoding="utf-8"))}
+    truth = {r["file"]: (int(r["faces_visible"]), r["note"]) for r in csv.DictReader(open(counts, encoding="utf-8"))}
     rows = []
     for f, (n_true, note) in truth.items():
-        rgb = imageio.decode((config.ASSETS / f).read_bytes())
+        rgb = imageio.decode((config.FACES / f).read_bytes())
         blurred, n_det = blur_faces(det, rgb)
         rows.append(dict(file=f, truth=n_true, detected=n_det, note=note,
                          left_yunet=len(det.detect(blurred)), left_haar=len(det.detect_haar(blurred)),
@@ -137,7 +141,7 @@ def latency_eval(n=500) -> dict:
 
     from ml import api
     api.get_queue()
-    rgb = imageio.decode((config.ASSETS / "faces_test_09.jpg").read_bytes())
+    rgb = imageio.decode((config.ASSETS / LATENCY_IMAGE).read_bytes())          # a committed photo without people
     h, w = rgb.shape[:2]
     f = config.MAX_SIDE / max(h, w)
     big = cv2.resize(rgb, None, fx=f, fy=f, interpolation=cv2.INTER_CUBIC)
@@ -163,9 +167,7 @@ def index_stats() -> dict:
     c = Counter(i["purpose"] for i in raw["images"])
     cl = Counter(i["purpose"] for i in raw["images"] for _ in i["loans"])
     lib = Counter(r["purpose"] for r in library())
-    rows = list(csv.DictReader(open(config.ASSETS / "manifest.csv", encoding="utf-8")))
-    faces = sum(1 for r in rows if r["purpose"] == "faces_test")
-    return dict(stats=raw["stats"], per_purpose={p: (lib[p], c[p], cl[p]) for p in lib}, faces=faces,
+    return dict(stats=raw["stats"], per_purpose={p: (lib[p], c[p], cl[p]) for p in lib},
                 size_kb=sum(p.stat().st_size for p in config.ASSETS.glob("*.jpg")) // 1024)
 
 
@@ -190,7 +192,8 @@ def render(dup, faces, lat, idx) -> str:
       f"{SCRIPT}. They say nothing about real borrower photos; real accuracy is measured in the pilot.**")
     w("")
     w(f"- Library: {dup['n_images']} asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) "
-      f"+ {idx['faces']} photos with people for the face-blur test; {idx['size_kb']} KB in the repo.")
+      f"(the CLIP `other` negatives are not counted here); {idx['size_kb']} KB for all committed JPEGs in `ml/assets/photos/` including the `other` negatives. "
+      "No committed photo shows a recognisable person (checked with two face detectors and by eye; background figures in one image are pixelated).")
     w("- Portfolio photo index (`ml/artifacts/photo_index_v1.json`): "
       f"{idx['stats']['images']} images on {idx['stats']['loans']} loans of the demo portfolio; "
       f"{idx['stats']['shared_images']} images are shared by 2-3 loans (the generator's photo-reuse groups). "
@@ -230,8 +233,10 @@ def render(dup, faces, lat, idx) -> str:
     w("")
     w("### Face blur (YuNet, OpenCV zoo, MIT; Haar cascade as fallback)")
     w("")
-    w(f"Counted by eye on the {len(faces['rows'])} `faces_test` images (`ml/assets/photos/faces_test_counts.csv`; "
-      "faces that are very small, dark or out of focus are noted there and not counted).")
+    w(f"Measured on {len(faces['rows'])} CC-licensed images containing people, counted by eye (faces that are very small, dark or out of focus are not counted). "
+      "**The images are not redistributed, for privacy reasons.** The script runs this part when such images are put in `ml/assets/faces_test/` "
+      "(git-ignored) together with a `faces_test_counts.csv` (columns `file,faces_visible,note`); without them it keeps the numbers stored from the run on the "
+      "author's machine (`ml/artifacts/eval_photo.json`).")
     w("")
     w("| Item | Value |")
     w("|---|---|")
@@ -248,7 +253,7 @@ def render(dup, faces, lat, idx) -> str:
     w("| Item | Value |")
     w("|---|---|")
     w(f"| `check_photo` p50 / p95 ({lat['n']} calls, warm, {lat['size'][1]}x{lat['size'][0]} px, {lat['kb']:.0f} KB JPEG; "
-      "decode, hashing, duplicate search, face detection + blur, CLIP asset check, re-encode) | "
+      "committed photo without people; decode, hashing, duplicate search, face detection, CLIP asset check, re-encode) | "
       f"{lat['p50']:.0f} ms / {lat['p95']:.0f} ms |")
     w(f"| same, wall clock | {lat['wall_p50']:.0f} ms / {lat['wall_p95']:.0f} ms |")
     w("| Cost per check | 0 (local, no external API) |")
@@ -289,7 +294,13 @@ def main():
     dup = dup_eval()
     cfg = json.loads(config.DUP_PATH.read_text(encoding="utf-8"))
     assert cfg["variant"] == choose_variant(dup) and abs(cfg["max_distance"] - dup["deploy"][cfg["variant"]]["max_distance"]) < 1e-9,         "ml/artifacts/photo_dup_v1.json is out of date - run `python -m ml.eval.eval_photo --write-config`"
-    out = dict(dup=dup, faces=faces_eval(), lat=latency_eval(), idx=index_stats())
+    faces = faces_eval()
+    if faces is None:
+        old = json.loads(RES_PHOTO.read_text(encoding="utf-8")) if RES_PHOTO.exists() else {}
+        faces = old.get("faces")
+        print("faces_test images not found in ml/assets/faces_test/: face-blur part skipped, stored numbers kept" if faces else
+              "faces_test images not found: face-blur part skipped (no stored numbers)")
+    out = dict(dup=dup, faces=faces, lat=latency_eval(), idx=index_stats())
     RES_PHOTO.write_text(json.dumps(out, indent=1), encoding="utf-8")
     from ml.eval.build_metrics import main as build_metrics
     build_metrics()

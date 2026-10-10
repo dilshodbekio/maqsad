@@ -126,7 +126,7 @@ def pairs():
 
 def test_label_matches_and_reason_text_never_contradict_over_all_eval_pairs(pairs):
     am, items = pairs
-    assert len(items) == 143 * 5
+    assert len(items) == len({f for f, _, _ in items}) * 5 and len(items) >= 130 * 5
     n_match = n_low = n_other = 0
     for f, emb, purpose in items:
         d = am.decide(emb, purpose)

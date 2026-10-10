@@ -1,113 +1,160 @@
 # Metrics
 
-Every number below is produced by a script in `ml/eval/` or `ml/money_trail/` (named next to it). All numbers are on synthetic data.
+**All numbers are on synthetic data; real accuracy is measured in a pilot on historical loans.** Every number is produced by a script (named next to it) and stored in `ml/artifacts/eval_*.json`; `python -m ml.eval.build_metrics` only formats them. Fraud rates, typology mix and all generator parameters are assumptions (`data/README.md`).
 
-<!-- money-trail:start -->
-## Money-trail model (synthetic data)
+## 1. Data & splits
 
-**Numbers are on synthetic data; real accuracy is measured in the pilot on historical loans.** Positives = all fraud loans of the generator (11-13% of loans, an assumption), including 28 T3 loans whose resale has not happened yet at the snapshot (they look honest by construction). Photo / geo signals are not used by this model and are evaluated separately.
+| Split | Role | Seed | Snapshot | Loans | Fraud rate (assumed) |
+|---|---|---|---|---|---|
+| train | training and cross-validation only | 42 | 2026-03-31 | 5000 | 11% |
+| dev | development: looked at while building features, reasons and the v1 -> v2 fixes, so NOT an unbiased test set; kept for comparison with v1 | 1337 | 2026-07-31 | 5000 | 13% |
+| holdout | evaluated **exactly once**, after the model was frozen; the headline numbers | 2026 | 2026-07-31 | 5000 | 13% |
+| demo | served by `ml.api` to the dashboard and used for the photo index and latency; never used for metrics | 7 | 2026-07-31 | 5000 | 13% |
 
-- Model `money_trail_v1`: LightGBM, 28 money-trail features, trained on the train split (seed 42, 5000 loans, 550 fraud). Test split: seed 1337, 5000 loans, 650 fraud (13.0%).
-- Test numbers: produced by `python -m ml.eval.eval_money_trail`; CV numbers and thresholds: `python -m ml.money_trail.train` (stored in `ml/artifacts/money_trail_v1.json`). 95% CIs: bootstrap over test loans (1000 resamples, seed 0).
+All splits have their own ID space, hence disjoint loans, borrowers, suppliers, employees, photos and transactions (tested in `ml/tests/test_generator.py`). Dev, holdout and demo share the same shifted generator parameters (more fraud, more stealth cases, slower cash-out, ... see `ml/generator/config.py`); only the seed differs.
 
-### Cross-validation on the train split (5-fold, grouped by supplier)
-
-| Metric | Out-of-fold value | Random |
-|---|---|---|
-| ROC-AUC | 0.902 | 0.500 |
-| PR-AUC | 0.718 | 0.110 |
-| recall@20% | 0.780 | 0.200 |
-
-### Test split: recall@20% inspection budget
-
-| Method | recall@20% [95% CI] |
+| Artifact | sha256 (LF-normalised file bytes) |
 |---|---|
-| Money-trail model (LightGBM) | 0.783 [0.754, 0.816] |
-| Graded rule: cash_share_d1 | 0.288 [0.265, 0.313] |
-| Best single feature (chosen on train): income_count | 0.411 [0.385, 0.440] |
-| 0/1 rule: cash_share_d1 >= 0.5 | 0.250 [0.236, 0.264] |
-| Random selection | 0.200 (expected value) |
+| `ml/artifacts/money_trail_v2.txt` | `8b4767b0ff1e1a4284cd792061eab0bfb1272c7e4f5bc336243bcbadf3c4f174` |
+| `ml/artifacts/money_trail_v1.txt` (kept for comparison) | `808def7894bb36a922c2073c736aa097df37cdaa8d86cd112d805eb1aefbae38` |
 
-The 0/1 rule flags only 1.4% of loans (precision 70.0%, recall 7.5% when flagged loans only are counted); the rest of its 20% budget is filled at random, which is why its recall@20% is not 'rule only'. The graded rule ranks all loans by the same cash_share_d1 and is the fairer baseline.
+## 2. Money-trail v2 (holdout = headline)
 
-### Test split: ranking quality of the model
+- Model `money_trail_v2`: LightGBM, 29 money-trail features (`ml/money_trail/features.py`; no photo / geo, no labels), trained on the train split only (fixed seed and hyper-parameters, no search). Positives = all fraud loans.
+- Cross-validation on train (5-fold, grouped by declared supplier, out-of-fold; `python -m ml.money_trail.train`): ROC-AUC 0.910, PR-AUC 0.726 (random 0.110), recall@20% 0.782 (random 0.200).
 
-| Metric | Value [95% CI] | Random |
-|---|---|---|
-| ROC-AUC | 0.914 [0.901, 0.927] | 0.500 |
-| PR-AUC | 0.756 [0.728, 0.786] | 0.130 |
-
-### Test split: recall@20% per typology
-
-| Typology | n | Money-trail model (LightGBM) | Graded rule: cash_share_d1 | Best single feature (chosen on train): income_count |
-|---|---|---|---|---|
-| T1 | 195 | 98.5% | 54.4% | 59.8% |
-| T2 | 195 | 85.6% | 19.3% | 41.0% |
-| T3 | 130 | 60.8% | 15.9% | 33.5% |
-| T4 | 130 | 54.6% | 17.3% | 20.9% |
-
-Model, harder subgroups (share of the group inside the 20% budget):
-
-| Group | n | in budget |
-|---|---|---|
-| T1 plain | 129 | 99.2% |
-| T1 stealth | 66 | 97.0% |
-| T2 plain | 160 | 88.1% |
-| T2 stealth | 35 | 74.3% |
-| T4 plain | 102 | 61.8% |
-| T4 stealth | 28 | 28.6% |
-| T3 resale visible at snapshot | 103 | 75.7% |
-| T3 resale not yet happened | 27 | 3.7% |
-
-### Test split: honest loans inside the 20% budget (false-positive rate)
-
-| Honest profile | n | Money-trail model (LightGBM) | Graded rule: cash_share_d1 | Best single feature (chosen on train): income_count |
-|---|---|---|---|---|
-| normal | 3446 | 7.7% | 16.3% | 17.9% |
-| cash_heavy | 259 | 6.6% | 56.4% | 4.2% |
-| livestock_seller | 259 | 19.7% | 15.2% | 11.4% |
-| oked_mismatch | 386 | 40.7% | 17.1% | 19.3% |
-| all honest | 4350 | 11.3% | 18.7% | 16.8% |
-
-### Colours (budget logic)
-
-Thresholds come from the train OOF score quantiles: red = score >= 0.5030 (top 10%), yellow = score >= 0.1674 (next 10%), green = rest. On the test split the model is applied with these fixed thresholds:
-
-| Colour | loans | share | fraud rate inside |
-|---|---|---|---|
-| red | 589 | 11.8% | 71.0% |
-| yellow | 723 | 14.5% | 19.4% |
-| green | 3688 | 73.8% | 2.5% |
-
-Red + yellow together are 26.2% of the test loans and contain 85.8% of all fraud loans. That is above the nominal 20% budget because the thresholds are fixed on train while the test split has more fraud (13% vs 11%) and more stealth cases; the exact share of each cause was not measured.
+_The holdout has not been evaluated yet: `python -m ml.eval.eval_money_trail --split holdout` (once)._
 
 ### Latency and size
 
-| Item | Value |
+Measured by `python -m ml.eval.eval_money_trail` `--latency` on the demo portfolio (not used for metrics), 3 runs x 500 warm single `score_loan` calls; range across the runs. Intel64 Family 6 Model 154 Stepping 3, GenuineIntel, Python 3.13.15, single thread.
+
+| Item | Value (range over runs) |
 |---|---|
-| `score_loan` latency (model inference + reasons, warm, 500 single calls), p50 / p95 | 6.64 ms / 7.76 ms |
-| same, wall clock including call overhead, p50 / p95 | 6.68 ms / 7.80 ms |
-| First call: demo portfolio generated + features + scores (once, in memory) | 3.3 s |
-| Model artifact `money_trail_v1.txt` | 512 KB |
+| `score_loan` p50 (model inference + reasons) | 6.7 - 6.8 ms |
+| `score_loan` p95 | 7.9 - 8.0 ms |
+| same, wall clock p50 / p95 | 6.7 - 6.8 ms / 8.0 - 8.1 ms |
+| Cold start: imports + demo portfolio generated, featured and scored once (3 fresh processes) | 6.4 - 7.3 s (of which portfolio build 3.4 - 4.3 s) |
+| Model artifact `money_trail_v2.txt` | 513 KB |
 | Cost per check | 0 (local model, no external API) |
 
-Measured on: Intel64 Family 6 Model 154 Stepping 3, GenuineIntel, Python 3.13.15, single thread. `score_loan` uses the cached feature row of the loan; building features for the whole portfolio is a one-time batch step.
-<!-- money-trail:end -->
+### Development split (dev) - same tables, for comparison with v1
 
-<!-- photo:start -->
-## Photo module (openly licensed images)
+#### Recall@20% inspection budget
+
+dev split: 5000 loans, 650 fraud (13.0%), 1053 declared suppliers. 95% CIs: *plain* = bootstrap over loans, *clustered* = bootstrap over suppliers (loans of one supplier resampled together); 1000 resamples each.
+
+| Method | recall@20% | 95% CI plain | 95% CI clustered by supplier |
+|---|---|---|---|
+| Money-trail model (LightGBM) | 0.795 | [0.767, 0.824] | [0.747, 0.842] |
+| Graded rule: cash_share_d1 | 0.288 | [0.265, 0.313] | [0.260, 0.318] |
+| Best single feature (chosen on train): income_gap_days | 0.425 | [0.389, 0.457] | [0.378, 0.472] |
+| 0/1 rule: cash_share_d1 >= 0.5 | 0.250 | [0.236, 0.264] | [0.235, 0.266] |
+| Random selection | 0.200 (expected value) | | |
+
+The 0/1 rule flags only 1.4% of loans (precision 70.0%, recall 7.5% counting flagged loans only); the rest of its 20% budget is filled at random, so its recall@20% is not 'rule only'. The graded rule ranks all loans by the same `cash_share_d1` and is the fairer baseline. The best single feature (`income_gap_days`) was chosen on the train split.
+
+#### Ranking quality of the model
+
+| Metric | value | 95% CI plain | 95% CI clustered by supplier | Random |
+|---|---|---|---|---|
+| ROC-AUC | 0.915 | [0.901, 0.928] | [0.888, 0.937] | 0.500 |
+| PR-AUC | 0.769 | [0.743, 0.797] | [0.725, 0.815] | 0.130 |
+
+#### Share of each group inside the 20% budget
+
+Fraud groups: recall@20% of the group. Honest groups: false-positive rate (share of the group inside the budget). CI (clustered by supplier) only for groups with n >= 50; smaller groups show counts only. Columns after the model: baselines (point estimates).
+
+| Group | n | model [95% CI] | Graded rule | Best single feature (chosen on train) | 0/1 rule |
+|---|---|---|---|---|---|
+| T1 | 195 | 97.9% [95.9, 99.5] | 54.4% | 50.8% | 39.3% |
+| T2 | 195 | 89.7% [83.0, 95.4] | 19.3% | 39.0% | 18.9% |
+| T3 | 130 | 59.2% [50.9, 68.8] | 15.9% | 61.5% | 18.9% |
+| T4 | 130 | 56.9% [39.1, 73.1] | 17.3% | 16.2% | 18.9% |
+| T1 plain | 129 | 98.4% [96.2, 100.0] | 69.0% | 43.4% | 49.7% |
+| T1 stealth | 66 | 97.0% [92.3, 100.0] | 25.9% | 65.2% | 18.9% |
+| T2 plain | 160 | 91.9% [84.9, 98.0] | 18.3% | 38.1% | 18.9% |
+| T2 stealth | 35 | 80.0% | 23.8% | 42.9% | 18.9% |
+| T4 plain | 102 | 64.7% [44.4, 83.1] | 19.0% | 15.7% | 18.9% |
+| T4 stealth | 28 | 28.6% | 11.1% | 17.9% | 18.9% |
+| T3 resale visible at snapshot | 103 | 69.9% [61.1, 79.4] | 15.4% | 76.7% | 18.9% |
+| T3 resale not yet happened | 27 | 18.5% | 17.7% | 3.7% | 18.9% |
+| honest/normal | 3446 | 7.7% [6.3, 9.1] | 16.3% | 16.7% | 19.1% |
+| honest/cash_heavy | 259 | 6.9% [4.2, 10.1] | 56.4% | 7.7% | 20.4% |
+| honest/livestock_seller | 259 | 17.4% [12.3, 22.6] | 15.2% | 26.3% | 19.8% |
+| honest/oked_mismatch | 386 | 40.4% [31.8, 48.4] | 17.1% | 15.5% | 19.5% |
+| honest/all | 4350 | 11.1% [9.8, 12.4] | 18.7% | 16.6% | 19.3% |
+
+Fraud positives not yet visible at the snapshot (counted as positives, they look honest): T1 1, T3 27 (total 28).
+
+#### Colours by queue rank
+
+Rule: red = top 10% of the portfolio by risk, yellow = next 10%, green = rest (red + yellow = 20% inspection budget). On this portfolio: red = risk >= 0.6249 (500 loans), yellow = risk >= 0.2521 (500 loans).
+
+| Colour | loans | fraud rate inside |
+|---|---|---|
+| red | 500 | 78.4% |
+| yellow | 500 | 25.0% |
+| green | 4000 | 3.3% |
+
+Red + yellow (the 20% budget) contain 79.5% of all fraud loans.
+
+## 3. v1 -> v2 change log
+
+An independent review of v1 found the problems below; each row says what changed. The dev numbers before / after come from `python -m ml.eval.eval_money_trail` `--split dev` (v1 = frozen `features_v1.py` + `money_trail_v1`; v2 = current).
+
+| Review finding | Change in v2 |
+|---|---|
+| Demo portfolio was the test split: looking at the dashboard meant looking at test loans; 'run once' not checkable | Splits renamed/added: `dev` (old test, seed 1337), `holdout` (seed 2026, evaluated once, run recorded with model sha256 + commit), `demo` (seed 7, served by `ml.api`, photo index). |
+| 'No regular income' was the biggest driver of the queue, but it is normal for young loans | Income features are age-aware: `income_rate_per_month`, `income_missing_flag` (only for loans older than 90 days; ASSUMPTION from the generator's income timing, U(20, 90) days), `income_gap_days`, `income_stopped_flag`. |
+| Reason texts: wrong facts, 'atigi' with large values, wrong sentinel meaning, duplicate facts, '78% i' | Texts rewritten (`ml/money_trail/reasons.py`); 'atigi' only below low thresholds; explicit sentinels ('no payment received yet', 'no activity yet', 'no invoice'); at most one reason per group of equivalent facts (income / cash share / supplier payment); '78 foizi' forms, values above 100% shown; `sup_in_degree` states what it counts (loans naming the supplier on the invoice). |
+| Colour explanation contradicted the measurement (fixed train thresholds drift on a shifted portfolio) | Colours by queue rank on the served portfolio (top 10% red, next 10% yellow); thresholds returned by `ml.api.get_color_thresholds()` and listed above; no causal claim is made. |
+| Not-visible positives were mis-counted (28 T3)  | Reported by typology (T3 and T1 differ). |
+| Bootstrap ignored supplier clustering; CI too narrow | Supplier-clustered bootstrap next to the plain one; groups with n < 50 get counts only. |
+| Latency varied between runs | Reported as a range over 3 runs. |
+| Unhashable `loan_id` raised TypeError; `invoice_gap` hid 'no invoice' | `LoanNotFoundError` for any invalid id; `invoice_gap = -1` means no invoice. |
+| API contract incomplete | `docs/api_contract.md` updated (sandbox_id, reset_sandbox, faces_count, blurred_image, photos[], evidence[], evidence_refs, colour rule). |
+
+Not changed: reasons do not yet say which direction is risky relative to a typical honest value (review minor 14); `income` rows still include one-off sales to businesses (generator), so the texts say 'tushum', not 'muntazam tushum'.
+
+### Dev: v1 vs v2
+
+| Metric (dev) | v1 | v2 |
+|---|---|---|
+| recall@20% (model) | 0.783 | 0.795 |
+| ROC-AUC | 0.914 | 0.915 |
+| PR-AUC | 0.756 | 0.769 |
+| recall@20% T1 | 98.5% | 97.9% |
+| recall@20% T2 | 85.6% | 89.7% |
+| recall@20% T3 | 60.8% | 59.2% |
+| recall@20% T4 | 54.6% | 56.9% |
+| honest false-positive rate in the budget | 11.3% | 11.1% |
+
+### Ablation by loan age at the snapshot (dev)
+
+Recall = share of the age group's fraud loans inside the 20% budget; FPR = share of its honest loans inside the budget (the budget is the top 20% of the whole portfolio by each model's own score).
+
+| Loan age | loans (fraud / honest) | v1 recall | v2 recall | v1 honest FPR | v2 honest FPR |
+|---|---|---|---|---|---|
+| < 60 days | 759 (87 / 672) | 67.8% | 69.0% | 21.1% | 20.2% |
+| 60-180 days | 1796 (264 / 1532) | 79.9% | 79.5% | 12.1% | 11.6% |
+| > 180 days | 2445 (299 / 2146) | 79.9% | 82.6% | 7.6% | 7.9% |
+
+Reading the ablation: the age-aware encoding changes the honest false-positive rate of loans younger than 60 days only from 21.1% to 20.2%; young loans stay clearly harder than old ones. The reason is in the data, not in a missed fix: among loans younger than 60 days 79.9% of the honest and 89.7% of the fraud loans have no income yet (our generator gives fraud typologies a lower income probability and a later start), so 'no income yet' keeps a small genuine likelihood ratio; the v2 encoding (`income_rate_per_month = -1` = income not due yet, never shown as a reason) only removes the age artefact. The generator's income timing is an assumption (`data/README.md`); real borrowers must be re-measured. The first v2 draft encoded 'not due yet' as 0; a dev diagnostic showed that this feature was still the top driver for most flagged young honest loans, so it was changed to -1 **before** the holdout was run (this did not change the dev numbers materially). The honest false-positive rate of young loans is therefore a known limitation.
+
+## 4. Photo module
 
 **All numbers are on a small library of openly licensed photos (CC / public domain) and are produced by `python -m ml.eval.eval_photo`. They say nothing about real borrower photos; real accuracy is measured in the pilot.**
 
 - Library: 100 asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) + 11 photos with people for the face-blur test; 4726 KB in the repo.
-- Portfolio photo index (`ml/artifacts/photo_index_v1.json`): 90 images on 101 loans of the demo portfolio; 10 images are shared by 2-3 loans (the generator's photo-reuse groups). Photos are matched to the loan's purpose.
+- Portfolio photo index (`ml/artifacts/photo_index_v1.json`): 90 images on 100 loans of the demo portfolio; 10 images are shared by 2-3 loans (the generator's photo-reuse groups). Photos are matched to the loan's purpose.
 
 | Purpose | library images | in index | loans with a photo |
 |---|---|---|---|
 | tikuv_dastgohi | 20 | 18 | 20 |
 | chorva | 20 | 18 | 20 |
 | issiqxona | 20 | 18 | 20 |
-| parranda | 20 | 18 | 21 |
+| parranda | 20 | 18 | 20 |
 | asalarichilik | 20 | 18 | 20 |
 
 ### Duplicate detection under transformations
@@ -152,8 +199,8 @@ Detection is count based (no box annotations), so a miss and a false alarm on th
 
 | Item | Value |
 |---|---|
-| `check_photo` p50 / p95 (500 calls, warm, 1600x1119 px, 164 KB JPEG; decode, hashing, duplicate search, face detection + blur, re-encode) | 312 ms / 379 ms |
-| same, wall clock | 313 ms / 380 ms |
+| `check_photo` p50 / p95 (500 calls, warm, 1600x1119 px, 164 KB JPEG; decode, hashing, duplicate search, face detection + blur, re-encode) | 304 ms / 596 ms |
+| same, wall clock | 304 ms / 598 ms |
 | Cost per check | 0 (local, no external API) |
 
 ### Known failure cases
@@ -165,4 +212,28 @@ Detection is count based (no box annotations), so a miss and a false alarm on th
 - **Faces:** a decorated bull head was detected as a face once (`faces_test_04`); a dark, out-of-focus face in the background (`faces_test_08`) is not counted and was not detected, so it is not blurred. Side and tiny faces are the weak spot of any detector; the 'faces left' numbers above only show that *detectable* faces are gone.
 - **Small library:** hard negatives come from ~10 images per purpose and half; with a real portfolio of thousands of photos the false-positive rate at this threshold must be re-measured.
 - The photo result does not change the money-trail risk; combining them is a later step.
-<!-- photo:end -->
+
+## 5. Known failure cases
+
+- **Weakest fraud groups (dev):** T3 resale not yet happened 18.5% in budget (n=27); T4 stealth 28.6% in budget (n=28); T4 56.9% in budget (n=130); T3 59.2% in budget (n=130).
+- **Honest look-alikes that get flagged most:** honest/oked_mismatch 40.4% (n=386); honest/livestock_seller 17.4% (n=259).
+- **Fraud that has not happened yet cannot be seen:** 28 positives (T1 1, T3 27) look honest at the snapshot by construction; they count against recall.
+- **'No income' and young loans:** v2 no longer penalises loans younger than 90 days, but the 90-day limit is an assumption about how our synthetic generator times income; real borrowers (seasonal income, grace periods) must be re-measured.
+- **Everything is synthetic:** fraud typologies, rates and the honest-but-suspicious profiles are assumptions; the generator's own structure (e.g. ring bursts, photo-reuse rates the same for all typologies) is what the model learns. See `ml/generator/README.md` (Known limitations: counterparty ID collisions, ring size up to ~12 vs. 71 in a real case).
+- **Photo module:** see the failure cases in section 4 (hash crop robustness, screen photos, side faces).
+- The photo result does not change the money-trail risk; combining them is a later step.
+
+## 6. Reproduce
+
+```
+.venv/Scripts/python -m pip install -r ml/requirements.txt
+.venv/Scripts/python -m ml.money_trail.train                      # model v2 (train split only)
+.venv/Scripts/python -m ml.eval.eval_money_trail --split dev     # dev tables + v1/v2 comparison + age ablation
+.venv/Scripts/python -m ml.eval.eval_money_trail --split holdout # EXACTLY ONCE (refuses to run twice; --force-holdout-rerun only reproduces)
+.venv/Scripts/python -m ml.eval.eval_money_trail --latency
+.venv/Scripts/python -m ml.eval.eval_photo --write-config        # photo duplicate variant + threshold
+.venv/Scripts/python -m ml.photo.index                           # photo index on the demo split
+.venv/Scripts/python -m ml.eval.eval_photo
+.venv/Scripts/python -m ml.eval.build_metrics                    # regenerate this file from the stored results
+.venv/Scripts/python -m pytest ml/tests -q
+```

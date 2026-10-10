@@ -67,6 +67,8 @@ def main():
         lightgbm_version=lgb.__version__,
     )
     META_PATH.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    for path in (MODEL_PATH, META_PATH):          # LF line endings: same bytes (and sha256) on Windows and Linux
+        path.write_bytes(path.read_bytes().replace(bytes([13, 10]), bytes([10])))
     print(f"CV ({N_FOLDS}-fold, grouped by supplier, train OOF): "
           + ", ".join(f"{k}={v:.3f}" for k, v in cv_metrics.items()))
     print(f"train OOF rank thresholds (informational): red>={oof_rank['red']:.4f} yellow>={oof_rank['yellow']:.4f}")

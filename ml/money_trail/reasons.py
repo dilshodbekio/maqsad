@@ -63,7 +63,8 @@ TEMPLATES = {
     "big_inbound_person": lambda v, c: ("Eng yirik kirim jismoniy shaxsdan kelgan" if v >= 0.5 else
                                         "Eng yirik kirim tashkilotdan kelgan"),
     "post_inbound_exit": lambda v, c: f"Yirik kirimdan keyingi 5 kunda uning {_pct(v, 'i')} hisobdan chiqarilgan",
-    "income_rate_per_month": lambda v, c: ("Kredit berilganidan beri tushum qayd etilmagan" if v <= 0 else
+    "income_rate_per_month": lambda v, c: ("Tushum hali kutilmagan (kredit yaqinda berilgan)" if v < 0 else
+                                           "Kredit berilganidan beri tushum qayd etilmagan" if v == 0 else
                                            f"Kredit davrida oyiga o'rtacha {v:.1f} ta tushum qayd etilgan"),
     "income_missing_flag": lambda v, c: "Kredit 90 kundan ko'proq oldin berilgan, lekin hali birorta tushum qayd etilmagan",
     "income_after_big_count": lambda v, c: ("Yirik kirimdan keyin tushum qayd etilmagan" if v <= 0 else
@@ -153,6 +154,8 @@ def build_reasons(model_features: list[str], x: np.ndarray, contrib: np.ndarray,
     out, used = [], set()
     for i in pos[np.argsort(-contrib[pos], kind="stable")]:
         code = model_features[i]
+        if code == "income_rate_per_month" and x[i] < 0:
+            continue                                  # 'income not due yet' is not a fact worth showing
         group = _GROUP_OF.get(code)
         if group is not None and group in used:
             continue                                  # same fact already shown by a stronger feature

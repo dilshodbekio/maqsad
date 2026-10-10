@@ -32,8 +32,8 @@
     "oked_mismatch"
   ],
   "train_oof_rank_thresholds": {
-    "red": 0.49539252745502727,
-    "yellow": 0.15958228586214981,
+    "red": 0.49284147462665173,
+    "yellow": 0.15412289488728953,
     "n_red": 500,
     "n_yellow": 500,
     "n_loans": 5000,
@@ -43,9 +43,9 @@
     "folds": 5,
     "grouped_by": "supplier_id",
     "split": "train",
-    "roc_auc": 0.9084890704800819,
-    "pr_auc": 0.7252940047880801,
-    "recall_at_20": 0.7854545454545454,
+    "roc_auc": 0.9099742594484167,
+    "pr_auc": 0.7263571408940699,
+    "recall_at_20": 0.7818181818181819,
     "random_recall_at_20": 0.2,
     "pr_auc_random": 0.11
   },

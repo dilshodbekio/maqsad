@@ -1,16 +1,23 @@
-"""Evaluate the money-trail model on the TEST split and write docs/metrics.md.
+"""Evaluate the money-trail model; results go to ml/artifacts/eval_*.json and docs/metrics.md (build_metrics.py).
 
-    .venv/Scripts/python -m ml.eval.eval_money_trail
+    .venv/Scripts/python -m ml.eval.eval_money_trail --split dev        # development split (may be run any time)
+    .venv/Scripts/python -m ml.eval.eval_money_trail --split holdout    # EXACTLY ONCE, after the model is frozen
+    .venv/Scripts/python -m ml.eval.eval_money_trail --latency          # 3 x 500 score_loan calls on the demo portfolio
 
-Run ONCE after training is final (the test split is never used for tuning; the "best single feature"
-baseline is chosen on the TRAIN split). Positives = ALL fraud loans (generator convention), including T3
-loans whose resale has not happened yet at the snapshot; their number is reported. Everything printed here
-is computed by this script; docs/metrics.md is regenerated between the money-trail markers.
+Positives = ALL fraud loans (generator convention), including T3 loans whose resale has not happened yet at the
+snapshot; their number is reported by typology. The best-single-feature baseline is chosen on the TRAIN split.
+Colours are assigned by queue rank on the evaluated portfolio (top 10% red, next 10% yellow). Confidence intervals:
+bootstrap over loans ("plain") and bootstrap over declared suppliers ("clustered": loans of one supplier are
+resampled together), 1000 resamples each; groups with n < 50 get counts only.
 """
 from __future__ import annotations
 
+import argparse
+import datetime as dt
+import hashlib
 import json
-import platform
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -18,19 +25,26 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import average_precision_score, roc_auc_score
 
-from ml.money_trail.features import FEATURE_COLUMNS
+from ml.generator.build import build
+from ml.generator.config import SPLITS
+from ml.money_trail import features as feat_v2
+from ml.money_trail import features_v1 as feat_v1
+from ml.money_trail.colors import color_of, rank_thresholds
 from ml.money_trail.metrics import BUDGET, recall_at_budget
-from ml.money_trail.model import META_PATH, MODEL_PATH, load_model
-from ml.money_trail.train import load_split
+from ml.money_trail.model import ARTIFACTS, artifact_paths, load_model
 
-DOCS = Path(__file__).resolve().parents[2] / "docs" / "metrics.md"
-START, END = "<!-- money-trail:start -->", "<!-- money-trail:end -->"
-SCRIPT = "`python -m ml.eval.eval_money_trail`"
-N_BOOT, BOOT_SEED, N_LAT = 1000, 0, 500
+RES_DEV = ARTIFACTS / "eval_money_trail_dev.json"
+RES_HOLDOUT = ARTIFACTS / "eval_money_trail_holdout.json"
+RES_LATENCY = ARTIFACTS / "eval_latency.json"
+N_BOOT, BOOT_SEED, MIN_CI_N = 1000, 0, 50
 TYPOLOGIES = ("T1", "T2", "T3", "T4")
 PROFILES = ("normal", "cash_heavy", "livestock_seller", "oked_mismatch")
+AGE_BUCKETS = (("< 60 days", 0, 60), ("60-180 days", 60, 180), ("> 180 days", 180, 10_000))
+FEATURES = {"v1": feat_v1, "v2": feat_v2}
+MODEL_NAME = {"v1": "money_trail_v1", "v2": "money_trail_v2"}
 
 
+# ------------------------------------------------------------------ helpers
 def inclusion(score: np.ndarray, budget: float = BUDGET) -> np.ndarray:
     """Probability that each loan is inside the top `budget` share (ties at the cut-off filled at random)."""
     n = len(score)
@@ -43,242 +57,221 @@ def inclusion(score: np.ndarray, budget: float = BUDGET) -> np.ndarray:
     return w
 
 
-def ci(values) -> tuple[float, float]:
-    return float(np.nanpercentile(values, 2.5)), float(np.nanpercentile(values, 97.5))
+def ci(values) -> list[float] | None:
+    v = np.asarray(values, dtype=float)
+    v = v[~np.isnan(v)]
+    return None if len(v) == 0 else [float(np.percentile(v, 2.5)), float(np.percentile(v, 97.5))]
 
 
-def pct(x, d=1) -> str:
-    return f"{100 * x:.{d}f}%"
+def sha256_lf(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
-def fmt_ci(point, lohi, d=3) -> str:
-    return f"{point:.{d}f} [{lohi[0]:.{d}f}, {lohi[1]:.{d}f}]"
+def git(*args) -> str:
+    return subprocess.run(["git", *args], capture_output=True, text=True, cwd=ARTIFACTS.parents[1]).stdout.strip()
 
 
-def best_single_feature(Xtr: pd.DataFrame, ytr: np.ndarray) -> tuple[str, int]:
-    """Single money-trail feature (and direction) with the best recall@20% on the TRAIN split."""
-    best = max(((recall_at_budget(sign * Xtr[c].to_numpy(float), ytr), c, sign)
-                for c in FEATURE_COLUMNS for sign in (1, -1) if Xtr[c].nunique() > 1))
+def load_tables(split: str) -> dict:
+    return build(SPLITS[split])
+
+
+def features_of(version: str, t: dict) -> pd.DataFrame:
+    return FEATURES[version].build_features(t["loans"], t["transactions"], t["suppliers"], t["employees"])
+
+
+def best_single_feature(version: str) -> tuple[str, int]:
+    """Single money-trail feature (and sign) with the best recall@20% on the TRAIN split."""
+    t = load_tables("train")
+    X = features_of(version, t)
+    y = t["labels"].set_index("loan_id").reindex(X.index)["is_fraud"].to_numpy().astype(int)
+    best = max(((recall_at_budget(sg * X[c].to_numpy(float), y), c, sg)
+                for c in FEATURES[version].FEATURE_COLUMNS for sg in (1, -1) if X[c].nunique() > 1))
     return best[1], best[2]
 
 
-def latency(n=N_LAT) -> dict:
-    from ml import api
-    api.get_queue()                                           # warm: portfolio generated + scored
-    from ml.money_trail.service import get_portfolio
-    P = get_portfolio()
-    ids = np.random.default_rng(1).choice(list(P.loans.index), n, replace=False)
-    for lid in ids[:20]:
-        api.score_loan(lid)                                   # warm-up calls, not counted
-    inner, wall = [], []
-    for lid in ids:
-        t0 = time.perf_counter()
-        r = api.score_loan(lid)
-        wall.append((time.perf_counter() - t0) * 1000)
-        inner.append(r["latency_ms"])
-    q = lambda a, p: float(np.percentile(a, p))
-    return dict(n=n, p50=q(inner, 50), p95=q(inner, 95), wall_p50=q(wall, 50), wall_p95=q(wall, 95),
-                init_s=P.init_s)
-
-
-def evaluate() -> dict:
-    meta = json.loads(META_PATH.read_text(encoding="utf-8"))
-    model = load_model()
-    Xtr, ytr, _, _ = load_split("train")
-    Xte, y, _, tables = load_split("test")
-    lab = tables["labels"].set_index("loan_id").reindex(Xte.index)
+def group_masks(lab: pd.DataFrame) -> dict[str, np.ndarray]:
     typ = lab["typology"].fillna("honest").to_numpy()
+    st, vis = lab["stealth"].to_numpy(), lab["fraud_visible"].to_numpy()
+    prof, honest = lab["profile"].to_numpy(), ~lab["is_fraud"].to_numpy()
+    m = {t: typ == t for t in TYPOLOGIES}
+    for t in ("T1", "T2", "T4"):
+        m[f"{t} plain"], m[f"{t} stealth"] = (typ == t) & ~st, (typ == t) & st
+    m["T3 resale visible at snapshot"] = (typ == "T3") & vis
+    m["T3 resale not yet happened"] = (typ == "T3") & ~vis
+    for p in PROFILES:
+        m[f"honest/{p}"] = honest & (prof == p)
+    m["honest/all"] = honest
+    return m
+
+
+def cluster_indices(groups: np.ndarray, n_boot: int, rng):
+    _, inv = np.unique(groups, return_inverse=True)
+    order = np.argsort(inv, kind="stable")
+    cuts = np.flatnonzero(np.diff(inv[order])) + 1
+    members = np.split(order, cuts)
+    for _ in range(n_boot):
+        picks = rng.integers(0, len(members), len(members))
+        yield np.concatenate([members[k] for k in picks])
+
+
+def resample_metrics(scorers: dict, y, masks, idx_iter, model_name) -> dict:
+    """Bootstrap distributions: recall@20% of every scorer; ROC / PR of the model; group shares of the model."""
+    out = {"recall": {k: [] for k in scorers}, "roc": [], "pr": [], "groups": {k: [] for k in masks}}
+    for i in idx_iter:
+        yi = y[i]
+        if yi.sum() == 0 or yi.sum() == len(yi):
+            continue
+        for k, s in scorers.items():
+            out["recall"][k].append(recall_at_budget(s[i], yi))
+        ms = scorers[model_name][i]
+        out["roc"].append(roc_auc_score(yi, ms))
+        out["pr"].append(average_precision_score(yi, ms))
+        w = inclusion(ms)
+        for k, m in masks.items():
+            mi = m[i]
+            out["groups"][k].append(float(w[mi].mean()) if mi.any() else np.nan)
+    return out
+
+
+# ------------------------------------------------------------------ main evaluation of one split / version
+def evaluate_split(split: str, version: str = "v2", boot: bool = True) -> dict:
+    t = load_tables(split)
+    X = features_of(version, t)
+    lab = t["labels"].set_index("loan_id").reindex(X.index)
+    loans = t["loans"].set_index("loan_id").reindex(X.index)
+    y = lab["is_fraud"].to_numpy().astype(int)
     n, n_pos = len(y), int(y.sum())
-
-    score = model.score(Xte)
-    bf_name, bf_sign = best_single_feature(Xtr, ytr)
+    model = load_model(MODEL_NAME[version])
+    score = model.score(X)
+    bf_name, bf_sign = best_single_feature(version)
+    M = "Money-trail model (LightGBM)"
     scorers = {
-        "Money-trail model (LightGBM)": score,
-        "Graded rule: cash_share_d1": Xte["cash_share_d1"].to_numpy(float),
-        f"Best single feature (chosen on train): {bf_name}": bf_sign * Xte[bf_name].to_numpy(float),
+        M: score,
+        "Graded rule: cash_share_d1": X["cash_share_d1"].to_numpy(float),
+        f"Best single feature (chosen on train): {bf_name}": bf_sign * X[bf_name].to_numpy(float),
+        "0/1 rule: cash_share_d1 >= 0.5": (X["cash_share_d1"].to_numpy(float) >= 0.5).astype(float),
     }
-    rule01 = (Xte["cash_share_d1"].to_numpy(float) >= 0.5).astype(float)
-    res = dict(meta=meta, n=n, n_pos=n_pos, fraud_rate=float(y.mean()),
-               not_visible=int((lab["is_fraud"] & ~lab["fraud_visible"]).sum()), bf=(bf_name, bf_sign))
-
-    # ---- headline metrics + bootstrap CIs
-    rng = np.random.default_rng(BOOT_SEED)
-    idx = [rng.integers(0, n, n) for _ in range(N_BOOT)]
-    rows = {}
-    for name, s in scorers.items():
-        boots = [recall_at_budget(s[i], y[i]) for i in idx]
-        rows[name] = dict(recall=recall_at_budget(s, y), recall_ci=ci(boots))
-    ms = scorers["Money-trail model (LightGBM)"]
-    rows["Money-trail model (LightGBM)"].update(
-        roc=float(roc_auc_score(y, ms)), roc_ci=ci([roc_auc_score(y[i], ms[i]) for i in idx]),
-        pr=float(average_precision_score(y, ms)), pr_ci=ci([average_precision_score(y[i], ms[i]) for i in idx]))
-    res["rows"] = rows
-    boots01 = [recall_at_budget(rule01[i], y[i]) for i in idx]
-    res["rule01"] = dict(flagged=float(rule01.mean()), precision=float(y[rule01 > 0].mean()),
-                         flag_recall=float(y[rule01 > 0].sum() / n_pos), recall20=recall_at_budget(rule01, y),
-                         recall20_ci=ci(boots01))
-    res["random_recall20"] = BUDGET
-
-    # ---- per typology (recall inside the 20% budget), stealth split
-    per_t = {}
-    for name, s in scorers.items():
-        w = inclusion(s)
-        per_t[name] = {t: float(w[typ == t].sum() / (typ == t).sum()) for t in TYPOLOGIES}
-    res["per_typology"] = per_t
-    res["n_typology"] = {t: int((typ == t).sum()) for t in TYPOLOGIES}
-    w = inclusion(ms)
-    st = lab["stealth"].to_numpy()
-    res["stealth"] = {f"{t} {'stealth' if s else 'plain'}": (int(((typ == t) & (st == s)).sum()),
-                                                            float(w[(typ == t) & (st == s)].mean()))
-                      for t in ("T1", "T2", "T4") for s in (False, True) if ((typ == t) & (st == s)).any()}
-    vis = lab["fraud_visible"].to_numpy()
-    res["t3_visibility"] = {k: (int(m.sum()), float(w[m].mean())) for k, m in
-                            (("T3 resale visible at snapshot", (typ == "T3") & vis),
-                             ("T3 resale not yet happened", (typ == "T3") & ~vis))}
-
-    # ---- honest-but-suspicious profiles inside the budget
-    prof = lab["profile"].to_numpy()
-    honest = ~lab["is_fraud"].to_numpy()
-    res["profiles"] = {name: {p: (int((honest & (prof == p)).sum()), float(inclusion(s)[honest & (prof == p)].mean()))
-                              for p in PROFILES} for name, s in scorers.items()}
-    res["honest_fpr"] = {name: float(inclusion(s)[honest].mean()) for name, s in scorers.items()}
-
-    # ---- colours
-    colors = np.array([model.color(v) for v in ms])
-    res["colors"] = {c: (int((colors == c).sum()), float(y[colors == c].mean())) for c in ("red", "yellow", "green")}
+    masks = group_masks(lab)
+    groups = loans["supplier_id"].to_numpy()
+    res = dict(split=split, version=version, n=n, n_pos=n_pos, fraud_rate=float(y.mean()),
+               n_suppliers=int(len(np.unique(groups))), baseline_feature=[bf_name, bf_sign],
+               not_visible_by_typology={t_: int(((lab["typology"] == t_) & ~lab["fraud_visible"]).sum()) for t_ in TYPOLOGIES},
+               group_n={k: int(m.sum()) for k, m in masks.items()})
+    # point estimates
+    res["recall"] = {k: recall_at_budget(s, y) for k, s in scorers.items()}
+    res["roc"], res["pr"] = float(roc_auc_score(y, score)), float(average_precision_score(y, score))
+    r01 = scorers["0/1 rule: cash_share_d1 >= 0.5"] > 0
+    res["rule01"] = dict(flagged=float(r01.mean()), precision=float(y[r01].mean()), flag_recall=float(y[r01].sum() / n_pos))
+    res["groups"] = {k: {nm: float(inclusion(s)[m].mean()) if m.any() else None for nm, s in scorers.items()}
+                     for k, m in masks.items()}
+    # colours by queue rank on this portfolio
+    thr = rank_thresholds(score)
+    colors = np.array([color_of(v, thr) for v in score])
+    res["thresholds"] = thr
+    res["colors"] = {c: dict(n=int((colors == c).sum()), fraud_rate=float(y[colors == c].mean())) for c in ("red", "yellow", "green")}
     res["red_yellow_recall"] = float(y[colors != "green"].sum() / n_pos)
-    res["thresholds"] = (model.red, model.yellow)
-
-    res["latency"] = latency()
-    res["sizes"] = dict(model=MODEL_PATH.stat().st_size, meta=META_PATH.stat().st_size)
+    # age ablation material
+    age = ((loans["snapshot_date"] - loans["disbursed_at"]) / pd.Timedelta(days=1)).to_numpy()
+    w = inclusion(score)
+    honest = y == 0
+    res["age"] = [dict(bucket=name, n=int(((age >= lo) & (age < hi)).sum()),
+                       n_fraud=int((((age >= lo) & (age < hi)) & ~honest).sum()),
+                       recall=float(w[((age >= lo) & (age < hi)) & ~honest].mean()),
+                       honest_fpr=float(w[((age >= lo) & (age < hi)) & honest].mean()),
+                       n_honest=int((((age >= lo) & (age < hi)) & honest).sum()))
+                  for name, lo, hi in AGE_BUCKETS]
+    # how many young loans (< 60 days) have no income yet: honest vs fraud (explains what the age ablation can and cannot fix)
+    no_income = (X["income_rate_per_month"] < 0) if "income_rate_per_month" in X else (X["income_count"] == 0)
+    young = age < 60
+    res["young_no_income"] = dict(honest=float(no_income.to_numpy()[young & honest].mean()),
+                                  fraud=float(no_income.to_numpy()[young & ~honest].mean()))
+    if boot:
+        rng = np.random.default_rng(BOOT_SEED)
+        plain = resample_metrics(scorers, y, masks, (rng.integers(0, n, n) for _ in range(N_BOOT)), M)
+        rng = np.random.default_rng(BOOT_SEED)
+        clus = resample_metrics(scorers, y, masks, cluster_indices(groups, N_BOOT, rng), M)
+        res["ci"] = dict(
+            recall={k: dict(plain=ci(plain["recall"][k]), clustered=ci(clus["recall"][k])) for k in scorers},
+            roc=dict(plain=ci(plain["roc"]), clustered=ci(clus["roc"])),
+            pr=dict(plain=ci(plain["pr"]), clustered=ci(clus["pr"])),
+            groups={k: (ci(clus["groups"][k]) if res["group_n"][k] >= MIN_CI_N else None) for k in masks})
     return res
 
 
-def render(r: dict) -> str:
-    m, rows = r["meta"], r["rows"]
-    cv = m["cv"]
-    mt = rows["Money-trail model (LightGBM)"]
-    L = []
-    w = L.append
-    w(START)
-    w("## Money-trail model (synthetic data)")
-    w("")
-    w("**Numbers are on synthetic data; real accuracy is measured in the pilot on historical loans.** "
-      "Positives = all fraud loans of the generator (11-13% of loans, an assumption), including "
-      f"{r['not_visible']} T3 loans whose resale has not happened yet at the snapshot (they look honest by construction). "
-      "Photo / geo signals are not used by this model and are evaluated separately.")
-    w("")
-    w(f"- Model `{m['model_version']}`: LightGBM, {len(m['features'])} money-trail features, trained on the train split "
-      f"(seed {m['train']['seed']}, {m['train']['rows']} loans, {m['train']['fraud']} fraud). "
-      f"Test split: seed 1337, {r['n']} loans, {r['n_pos']} fraud ({pct(r['fraud_rate'])}).")
-    w("- Test numbers: produced by " + SCRIPT + f"; CV numbers and thresholds: `python -m ml.money_trail.train` "
-      "(stored in `ml/artifacts/money_trail_v1.json`). 95% CIs: bootstrap over test loans "
-      f"({N_BOOT} resamples, seed {BOOT_SEED}).")
-    w("")
-    w("### Cross-validation on the train split (5-fold, grouped by supplier)")
-    w("")
-    w("| Metric | Out-of-fold value | Random |")
-    w("|---|---|---|")
-    w(f"| ROC-AUC | {cv['roc_auc']:.3f} | 0.500 |")
-    w(f"| PR-AUC | {cv['pr_auc']:.3f} | {cv['pr_auc_random']:.3f} |")
-    w(f"| recall@20% | {cv['recall_at_20']:.3f} | {cv['random_recall_at_20']:.3f} |")
-    w("")
-    w("### Test split: recall@20% inspection budget")
-    w("")
-    w("| Method | recall@20% [95% CI] |")
-    w("|---|---|")
-    for name, v in rows.items():
-        w(f"| {name} | {fmt_ci(v['recall'], v['recall_ci'])} |")
-    r01 = r["rule01"]
-    w(f"| 0/1 rule: cash_share_d1 >= 0.5 | {fmt_ci(r01['recall20'], r01['recall20_ci'])} |")
-    w(f"| Random selection | {r['random_recall20']:.3f} (expected value) |")
-    w("")
-    w(f"The 0/1 rule flags only {pct(r01['flagged'])} of loans (precision {pct(r01['precision'])}, recall {pct(r01['flag_recall'])} "
-      "when flagged loans only are counted); the rest of its 20% budget is filled at random, which is why its recall@20% "
-      "is not 'rule only'. The graded rule ranks all loans by the same cash_share_d1 and is the fairer baseline.")
-    w("")
-    w("### Test split: ranking quality of the model")
-    w("")
-    w("| Metric | Value [95% CI] | Random |")
-    w("|---|---|---|")
-    w(f"| ROC-AUC | {fmt_ci(mt['roc'], mt['roc_ci'])} | 0.500 |")
-    w(f"| PR-AUC | {fmt_ci(mt['pr'], mt['pr_ci'])} | {r['fraud_rate']:.3f} |")
-    w("")
-    w("### Test split: recall@20% per typology")
-    w("")
-    names = list(r["per_typology"])
-    w("| Typology | n | " + " | ".join(names) + " |")
-    w("|---|---|" + "---|" * len(names))
-    for t in TYPOLOGIES:
-        w(f"| {t} | {r['n_typology'][t]} | " + " | ".join(pct(r["per_typology"][nm][t]) for nm in names) + " |")
-    w("")
-    w("Model, harder subgroups (share of the group inside the 20% budget):")
-    w("")
-    w("| Group | n | in budget |")
-    w("|---|---|---|")
-    for k, (cnt, share) in {**r["stealth"], **r["t3_visibility"]}.items():
-        w(f"| {k} | {cnt} | {pct(share)} |")
-    w("")
-    w("### Test split: honest loans inside the 20% budget (false-positive rate)")
-    w("")
-    w("| Honest profile | n | " + " | ".join(names) + " |")
-    w("|---|---|" + "---|" * len(names))
-    for p in PROFILES:
-        cnt = r["profiles"][names[0]][p][0]
-        w(f"| {p} | {cnt} | " + " | ".join(pct(r["profiles"][nm][p][1]) for nm in names) + " |")
-    w("| all honest | " + str(r["n"] - r["n_pos"]) + " | " + " | ".join(pct(r["honest_fpr"][nm]) for nm in names) + " |")
-    w("")
-    w("### Colours (budget logic)")
-    w("")
-    red, yellow = r["thresholds"]
-    w(f"Thresholds come from the train OOF score quantiles: red = score >= {red:.4f} (top 10%), yellow = score >= "
-      f"{yellow:.4f} (next 10%), green = rest. On the test split the model is applied with these fixed thresholds:")
-    w("")
-    w("| Colour | loans | share | fraud rate inside |")
-    w("|---|---|---|---|")
-    for c, (cnt, fr) in r["colors"].items():
-        w(f"| {c} | {cnt} | {pct(cnt / r['n'])} | {pct(fr)} |")
-    w("")
-    ry = (r["colors"]["red"][0] + r["colors"]["yellow"][0]) / r["n"]
-    w(f"Red + yellow together are {pct(ry)} of the test loans and contain {pct(r['red_yellow_recall'])} of all fraud loans. "
-      "That is above the nominal 20% budget because the thresholds are fixed on train while the test split has more fraud "
-      "(13% vs 11%) and more stealth cases; the exact share of each cause was not measured.")
-    w("")
-    lt = r["latency"]
-    w("### Latency and size")
-    w("")
-    w(f"| Item | Value |")
-    w("|---|---|")
-    w(f"| `score_loan` latency (model inference + reasons, warm, {lt['n']} single calls), p50 / p95 | "
-      f"{lt['p50']:.2f} ms / {lt['p95']:.2f} ms |")
-    w(f"| same, wall clock including call overhead, p50 / p95 | {lt['wall_p50']:.2f} ms / {lt['wall_p95']:.2f} ms |")
-    w(f"| First call: demo portfolio generated + features + scores (once, in memory) | {lt['init_s']:.1f} s |")
-    w(f"| Model artifact `money_trail_v1.txt` | {r['sizes']['model'] / 1024:.0f} KB |")
-    w(f"| Cost per check | 0 (local model, no external API) |")
-    w("")
-    w(f"Measured on: {platform.processor() or platform.machine()}, Python {platform.python_version()}, single thread. "
-      "`score_loan` uses the cached feature row of the loan; building features for the whole portfolio is a one-time batch step.")
-    w(END)
-    return "\n".join(L) + "\n"
+# ------------------------------------------------------------------ runs
+def run_dev():
+    v2, v1 = evaluate_split("dev", "v2"), evaluate_split("dev", "v1")
+    RES_DEV.write_text(json.dumps(dict(v2=v2, v1=v1), indent=1), encoding="utf-8", newline="\n")
+    return v2, v1
 
 
-def write_docs(section: str):
-    head = ("# Metrics\n\nEvery number below is produced by a script in `ml/eval/` or `ml/money_trail/` "
-            "(named next to it). All numbers are on synthetic data.\n\n")
-    text = DOCS.read_text(encoding="utf-8") if DOCS.exists() else head
-    if START in text and END in text:
-        a, b = text.index(START), text.index(END) + len(END)
-        text = text[:a] + section.rstrip("\n") + text[b:]
-    else:
-        text = text.rstrip("\n") + "\n\n" + section
-    DOCS.write_text(text, encoding="utf-8", newline="\n")
+def run_holdout(force: bool = False, allow_dirty: bool = False):
+    prev = json.loads(RES_HOLDOUT.read_text(encoding="utf-8")) if RES_HOLDOUT.exists() else None
+    if prev and not force:
+        sys.exit(f"The holdout was already evaluated ({RES_HOLDOUT.name}, commit {prev['run']['commit'][:10]}). "
+                 "It is evaluated exactly once; use --force-holdout-rerun only to REPRODUCE it (a re-run is recorded).")
+    dirty = git("status", "--porcelain", "--", "ml")
+    if dirty and not allow_dirty:
+        sys.exit("Refusing to run the holdout with uncommitted changes under ml/ (commit the frozen model first):\n" + dirty)
+    model_path, meta_path = artifact_paths("money_trail_v2")
+    res = evaluate_split("holdout", "v2")
+    res["run"] = dict(commit=git("rev-parse", "HEAD"), dirty=bool(dirty), run_at=dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+                      model_version="money_trail_v2", model_sha256=sha256_lf(model_path), meta_sha256=sha256_lf(meta_path),
+                      reruns=(prev["run"].get("reruns", 0) + 1) if prev else 0,
+                      first_run=(prev["run"] if prev else None))
+    if prev:
+        res["rerun_identical_numbers"] = prev["recall"] == res["recall"] and prev["roc"] == res["roc"]
+    RES_HOLDOUT.write_text(json.dumps(res, indent=1), encoding="utf-8", newline="\n")
+    return res
+
+
+def run_latency(n=500, runs=3):
+    from ml import api
+    from ml.money_trail.service import get_portfolio
+    api.get_queue()
+    P = get_portfolio()
+    all_runs = []
+    for r in range(runs):
+        ids = np.random.default_rng(100 + r).choice(list(P.loans.index), n, replace=False)
+        for lid in ids[:20]:
+            api.score_loan(lid)                                  # warm-up, not counted
+        inner, wall = [], []
+        for lid in ids:
+            t0 = time.perf_counter()
+            out = api.score_loan(lid)
+            wall.append((time.perf_counter() - t0) * 1000)
+            inner.append(out["latency_ms"])
+        all_runs.append(dict(p50=float(np.percentile(inner, 50)), p95=float(np.percentile(inner, 95)),
+                             wall_p50=float(np.percentile(wall, 50)), wall_p95=float(np.percentile(wall, 95))))
+    cold = []
+    code = ("import time;t=time.perf_counter();from ml import api;api.get_queue();"
+            "from ml.money_trail.service import get_portfolio as g;print(time.perf_counter()-t, g().init_s)")
+    for _ in range(runs):
+        o = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=ARTIFACTS.parents[1]).stdout.split()
+        cold.append(dict(total_s=float(o[0]), init_s=float(o[1])))
+    out = dict(n=n, runs=all_runs, cold=cold, portfolio="demo (seed 7)", python=sys.version.split()[0],
+               cpu=__import__("platform").processor())
+    RES_LATENCY.write_text(json.dumps(out, indent=1), encoding="utf-8", newline="\n")
+    return out
 
 
 def main():
-    r = evaluate()
-    section = render(r)
-    write_docs(section)
-    print(section)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--split", choices=["dev", "holdout"])
+    ap.add_argument("--latency", action="store_true")
+    ap.add_argument("--force-holdout-rerun", action="store_true")
+    ap.add_argument("--allow-dirty", action="store_true")
+    a = ap.parse_args()
+    if a.split == "dev":
+        run_dev()
+    elif a.split == "holdout":
+        run_holdout(a.force_holdout_rerun, a.allow_dirty)
+    elif a.latency:
+        run_latency()
+    else:
+        ap.error("choose --split dev | --split holdout | --latency")
+    from ml.eval.build_metrics import main as build_metrics
+    build_metrics()
 
 
 if __name__ == "__main__":

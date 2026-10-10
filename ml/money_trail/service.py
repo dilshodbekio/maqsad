@@ -101,7 +101,14 @@ class Portfolio:
         out = []
         for i, lid in enumerate(order):
             j = top[i]
-            text = TEMPLATES[feats[j]](X[i, j], {"supplier_oked": oked[i]}) if C[i, j] > 1e-9 else NO_REASON_UZ
+            ctx = {"supplier_oked": oked[i]}
+            if C[i, j] <= 1e-9:
+                text = NO_REASON_UZ
+            elif feats[j] == "income_rate_per_month" and X[i, j] < 0:      # not a shown fact: take the full path
+                rs = build_reasons(feats, X[i], C[i], ctx, with_refs=False)
+                text = rs[0]["text_uz"] if rs else NO_REASON_UZ
+            else:
+                text = TEMPLATES[feats[j]](X[i, j], ctx)
             out.append(dict(
                 loan_id=lid, borrower_name_masked=cols["borrower_name_masked"][i], purpose=purpose[i],
                 amount_uzs=int(cols["amount_uzs"][i]), region=region[i], risk=float(risk[i]),

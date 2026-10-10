@@ -88,7 +88,8 @@ def build_features(loans: pd.DataFrame, transactions: pd.DataFrame, suppliers: p
     inc = bt[bt["type"] == "income"]
     n_inc = inc.groupby("loan_id").size().reindex(ix).fillna(0)
     # age-aware income features: young loans are not penalised for having no income yet
-    F["income_rate_per_month"] = n_inc / ((age - 30) / 30.4375).clip(lower=1)
+    rate = n_inc / ((age - 30) / 30.4375).clip(lower=1)
+    F["income_rate_per_month"] = rate.where((n_inc > 0) | (age > INCOME_DUE_DAYS), -1.0)   # -1 = income not due yet
     F["income_missing_flag"] = ((n_inc == 0) & (age > INCOME_DUE_DAYS)).astype(float)
     after = inc.join(big[["day"]].add_prefix("b_"), on="loan_id")
     F["income_after_big_count"] = (after["day"] > after["b_day"]).groupby(after["loan_id"]).sum().reindex(ix).fillna(0)

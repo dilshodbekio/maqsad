@@ -47,6 +47,7 @@ class Portfolio:
         self.loans = tables["loans"].set_index("loan_id")
         self.suppliers = tables["suppliers"].set_index("supplier_id")
         self.tx = tables["transactions"]
+        self.employees = tables["employees"]
         self.model: MoneyTrailModel = load_model()
         self.features = build_features(tables["loans"], self.tx, tables["suppliers"], tables["employees"])
         self.risk = pd.Series(self.model.score(self.features), index=self.features.index)
@@ -54,6 +55,7 @@ class Portfolio:
                                columns=self.model.features)
         self._contrib = contrib
         self.thresholds = rank_thresholds(self.risk.to_numpy())      # colours by queue rank on THIS portfolio
+        self.sorted_risk = np.sort(self.risk.to_numpy())
         self.init_s = time.perf_counter() - t0
         self._bt = self.tx[self.tx.loan_id.notna()]
         self._queue = self._make_queue()

@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from ml.errors import InvalidImageError, LoanNotFoundError  # noqa: F401  (re-exported for the backend)
+from ml.errors import InvalidImageError, LoanNotFoundError, ScenarioError  # noqa: F401  (re-exported for the backend)
 from ml.money_trail.model import MODEL_VERSION
 from ml.money_trail.service import get_portfolio
 
@@ -38,6 +38,25 @@ def get_loan(loan_id: str) -> dict:
     for the subset of loans that have a photo, [] otherwise. Raises: LoanNotFoundError
     """
     return get_portfolio().loan(loan_id)
+
+
+def score_scenario(scenario: dict) -> dict:
+    """Score a loan + transactions built by the user (a judge), live, with the same model and reasons as `score_loan`.
+
+    Input: {purpose, amount_uzs, region?, snapshot_day,
+            supplier: {mode: "existing", supplier_id} | {mode: "new", oked, registered_days_before},
+            transactions: [{day, type, amount_uzs, counterparty_kind?}]}   (schema: docs/api_contract.md)
+    Returns: the `score_loan` shape + `percentile` (0-100 within the demo portfolio) + `features` (computed values).
+    The cached portfolio is never modified. Raises: ScenarioError (Uzbek message; backend -> HTTP 400)
+    """
+    from ml.money_trail.scenario import score_scenario as _score
+    return _score(scenario)
+
+
+def get_scenario_presets() -> list[dict]:
+    """4 editable starting scenarios [{id, title_uz, description_uz, scenario}]. Inputs only: scores are computed live."""
+    from ml.money_trail.scenario import get_scenario_presets as _presets
+    return _presets()
 
 
 def get_color_thresholds() -> dict:

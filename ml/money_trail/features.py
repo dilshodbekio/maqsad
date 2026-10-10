@@ -114,12 +114,13 @@ def build_features(loans: pd.DataFrame, transactions: pd.DataFrame, suppliers: p
     s_cash = sa[sa["type"] == "cash_withdrawal"].groupby("supplier_id")["amount_uzs"].sum()
     s_exit = sa.groupby("supplier_id")["amount_uzs"].sum()
     first_cash = sa[sa["type"] == "cash_withdrawal"].groupby("supplier_id")["ts"].min()
-    rec = sid.map(received)
-    F["sup_cash_share"] = (sid.map(s_cash).fillna(0) / rec).fillna(0).clip(upper=1.5)
-    F["sup_exit_share"] = (sid.map(s_exit).fillna(0) / rec).fillna(0).clip(upper=1.5)
-    F["sup_cash_lag_days"] = ((sid.map(first_cash) - sid.map(first_rec)) / DAY).fillna(NEVER)
-    F["sup_active_span_days"] = sid.map(span).fillna(-1)       # -1 = supplier account has no activity yet
-    F["sup_age_at_first_payment_days"] = ((sid.map(first_rec) - sid.map(sup["registered_at"])) / DAY).fillna(-1)
+    look = lambda ser: pd.Series(ser.reindex(sid.to_numpy()).to_numpy(), index=sid.index)   # safe for empty / datetime series
+    rec = look(received)
+    F["sup_cash_share"] = (look(s_cash).fillna(0) / rec).fillna(0).clip(upper=1.5)
+    F["sup_exit_share"] = (look(s_exit).fillna(0) / rec).fillna(0).clip(upper=1.5)
+    F["sup_cash_lag_days"] = ((look(first_cash) - look(first_rec)) / DAY).fillna(NEVER)
+    F["sup_active_span_days"] = look(span).fillna(-1)          # -1 = supplier account has no activity yet
+    F["sup_age_at_first_payment_days"] = ((look(first_rec) - sid.map(sup["registered_at"])) / DAY).fillna(-1)
 
     # ---- bank-employee link, OKED vs purpose
     linked = sid.map(sup["linked_employee_id"])

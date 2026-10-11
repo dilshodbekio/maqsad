@@ -104,3 +104,59 @@ which is why the generator reproduces the schemes from the prosecuted cases in `
 | timm 1.0.30 | dependency of open_clip | Apache-2.0 |
 | psutil 7.2.2, openpyxl 3.1.5 | memory measurement (`ml/eval`), `docs/sample_loans.xlsx` | BSD-3-Clause, MIT |
 | Asset probe `ml/artifacts/asset_probe_v1.npz` | logistic regression on CLIP embeddings of our library (11 KB, committed) | project artifact (derived from the openly licensed library above) |
+
+## 4. Application libraries and services (backend, frontend, deployment)
+
+Direct dependencies of `backend/requirements.txt`, `backend/requirements-dev.txt` and `frontend/package.json`. Versions are the pinned ones; licences were read from the installed package metadata (Python: `importlib.metadata` in the Python 3.13 environment of the project, npm: `package.json` in `frontend/node_modules`). Libraries of `ml/` are in section 3.
+
+### Python (backend)
+
+| Package | Version | Use | License |
+|---|---|---|---|
+| fastapi | 0.115.6 | HTTP API | MIT |
+| starlette | 0.41.3 | ASGI toolkit under FastAPI (routing, middleware, multipart) | BSD-3-Clause |
+| uvicorn | 0.32.1 | ASGI server | BSD-3-Clause |
+| &nbsp;&nbsp;uvicorn extra `httptools` | 0.9.0 | HTTP parser (via `uvicorn[standard]`) | MIT |
+| &nbsp;&nbsp;uvicorn extra `watchfiles` | 1.3.0 | reload helper (via `uvicorn[standard]`) | MIT |
+| &nbsp;&nbsp;uvicorn extra `websockets` | 17.2 | WebSocket support (via `uvicorn[standard]`) | BSD-3-Clause |
+| &nbsp;&nbsp;uvicorn extra `python-dotenv` | 1.2.4 | `.env` reading (via `uvicorn[standard]`) | BSD-3-Clause |
+| &nbsp;&nbsp;uvicorn extra `PyYAML` | 6.0.3 | log config (via `uvicorn[standard]`) | MIT |
+| &nbsp;&nbsp;uvicorn extra `uvloop` | not recorded | event loop on Linux (via `uvicorn[standard]`, installed only on Linux, so not in the Windows environment where licences were read) | needs checking (not read from metadata) |
+| pydantic | 2.10.6 | request / response schemas | MIT |
+| python-multipart | 0.0.20 | multipart form parsing (photo upload) | Apache-2.0 |
+| httpx | 0.28.1 | HTTP client for the LLM call (and test client) | BSD-3-Clause |
+| pytest | 9.1.1 | tests (`requirements-dev.txt`) | MIT |
+
+### JavaScript (frontend)
+
+| Package | Version | Use | License |
+|---|---|---|---|
+| react | 18.3.1 | UI | MIT |
+| react-dom | 18.3.1 | UI | MIT |
+| @types/react | 18.3.12 | types (build time) | MIT |
+| @types/react-dom | 18.3.1 | types (build time) | MIT |
+| @vitejs/plugin-react | 4.3.4 | build plugin | MIT |
+| typescript | 5.6.3 | type check (`tsc --noEmit`) | Apache-2.0 |
+| vite | 5.4.11 | bundler | MIT |
+
+### QA tooling (`qa/`, not part of the deployed service)
+
+| Item | Version | Use | License |
+|---|---|---|---|
+| playwright (Python) | not recorded: not installed in the environment where this table was written, so the version and licence were not read from metadata | headless browser screenshots and E2E checks (`qa/e2e_screens.py`) | Apache-2.0 according to the project's public repository (not checked against installed metadata) |
+
+### Container images (`Dockerfile`)
+
+| Image | Use | License |
+|---|---|---|
+| `node:22-slim` | build stage only: `npm ci` and `npm run build`; not in the final image | Node.js: MIT; the image also contains Debian packages under their own licences |
+| `python:3.13-slim` | runtime image (also used to read `ml/requirements.txt`); the runtime stage installs `libgomp1` (needed by LightGBM) | CPython: PSF License; Debian packages under their own licences (libgomp is part of GCC, GPL-3.0 with the GCC Runtime Library Exception) |
+
+### External services
+
+| Service | Use | Data sent | Terms |
+|---|---|---|---|
+| Google Gemini API (model `gemini-3.6-flash`, OpenAI-compatible endpoint, **prototype only**) | draft report text in `/api/draft_report` (`backend/app/llm.py`) | only the evidence and reasons of one **synthetic** loan; no real personal or bank data exists in the project. The key is on the **free tier** (quota and rate limits: `docs/known_issues_app.md`) | Google's Gemini API terms for the free tier; cost per report: `docs/metrics_api.md` |
+| Railway | hosting of the prototype (Docker build from the repository, a volume for `DATA_DIR`) | the synthetic demo data and visitors' demo uploads | usage-based pricing: `docs/cost.md` |
+
+Production does not use these services: the report is written by a local LLM (vLLM / Ollama) behind the same code, only `LLM_BASE_URL` changes (`docs/deployment.md`).

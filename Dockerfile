@@ -22,7 +22,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PORT=8000 \
-    DATA_DIR=/data
+    DATA_DIR=/data \
+    REQUIRE_REAL_ML=1
 WORKDIR /app
 
 # libgomp1: OpenMP runtime needed by LightGBM wheels (not in -slim; without it `import lightgbm` raises OSError)

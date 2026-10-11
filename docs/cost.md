@@ -49,7 +49,7 @@ Formulas: Railway = CPU seconds x 1 000 x $0.000463 / 60. Dedicated = CPU second
 
 ## 5. LLM report (`/draft_report`)
 
-- Prototype: an external LLM is called only in `/draft_report`; the cost per report is **`LLM_COST_USD_PER_REPORT` = (parameter)** - take it from the backend's logged `cost_usd` (Oybek logs it); it is not estimated here.
+- Prototype: an external LLM is called only in `/draft_report`. Measured on production (Gemini `gemini-3.6-flash`, reasoning `minimal`), from the backend's logged `cost_usd` (official price per token): **0.002494 / 0.003622 / 0.004185 USD per report** in three Railway log lines (n = 3; 835–1635 input and 498–789 output tokens), and 0.003571 / 0.003654 / 0.003704 USD in the three-language live check (n = 3, one loan). Both samples are small, so no average is claimed; `LLM_COST_USD_PER_REPORT` is therefore a range of about 0.0025–0.0042 USD in these 6 samples. The key is on the free tier, so the **actual charge was $0**. A cache hit costs 0 (no call). Sources and per-call values: `docs/metrics_api.md`.
 - Production design: a local LLM (vLLM / Ollama) on the bank's own server, so cost = server time: **`LLM_SECONDS_PER_REPORT` = (parameter, to be measured with the chosen model)** x the core-second price above (Railway $7.717e-06 per vCPU-second; dedicated 3.288e-06 EUR per core-second; a GPU server needs its own price).
 
 ## 6. Assumptions (for the ROI model)

@@ -62,7 +62,7 @@ def test_decision_and_audit(client, loan_id):
     assert len(rows) == 1
     row = rows[0]
     assert set(row) == {"ts", "actor", "action", "ai_recommendation", "model_version", "inputs_hash"}
-    assert row["actor"] == "xodim-1" and row["action"] == "visit"
+    assert row["actor"] == client.get("/api/session").json()["officer_id"] and row["action"] == "visit"  # the body officer_id is ignored
     assert row["ai_recommendation"].split(" ")[0] in ("green", "yellow", "red")
     assert row["model_version"] == "stub"
 

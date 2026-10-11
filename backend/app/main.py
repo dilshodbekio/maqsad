@@ -23,6 +23,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import TypeAdapter, ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.formparsers import MultiPartParser
 
 from . import i18n, llm
 from .config import Settings
@@ -31,6 +32,7 @@ from .draft_queue import MSG_BUSY, PRIORITY_PREWARM, DraftQueue, Prewarm, QueueF
 from .db import Database, canonical, sha256_hex, utc_now
 from .ml_adapter import (MLAdapter, MLBadInput, MLFailure, MLInvalidImage, MLInvalidRequest, MLNotFound, MLNotReady,
                          load_adapter)
+from .limits import MSG_BODY_TOO_LARGE, OTHER_BODY_LIMIT, BodyLimitMiddleware
 from .ratelimit import RateLimiter
 from .schemas import (
     LOAN_ID_PATTERN, AuditEntry, CheckPhotoFields, CheckPhotoJSON, CheckPhotoResponse, Color, ColorLegend,
@@ -44,6 +46,7 @@ log = logging.getLogger("maqsad.api")
 SANDBOX_COOKIE = "sandbox_id"
 SANDBOX_MAX_AGE_S = 30 * 24 * 3600
 UPLOAD_PATHS = {"/api/check_photo"}
+REGEN_IP_PER_MIN = 3  # regenerate: global per-IP cap (each one is a paid LLM call)
 QUEUE_DEFAULT_LIMIT = 50
 QUEUE_MAX_LIMIT = 200
 PREWARM_DEFAULT_N = 40
@@ -71,9 +74,13 @@ def sniff_image(data: bytes) -> Optional[str]:
 
 
 def _client_ip(request: Request) -> str:
+    """The rightmost X-Forwarded-For entry (appended by our own proxy; the left ones are client-supplied and can be forged),
+    else the socket peer."""
     fwd = request.headers.get("x-forwarded-for")
     if fwd:
-        return fwd.split(",")[0].strip()
+        last = fwd.rsplit(",", 1)[-1].strip()
+        if last:
+            return last
     return request.client.host if request.client else "unknown"
 
 
@@ -139,12 +146,6 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         request.state.sandbox_id = sid
         request.state.lang = i18n.parse_lang(request.headers.get("accept-language"))
 
-        if request.url.path in UPLOAD_PATHS:
-            cl = request.headers.get("content-length", "")
-            # base64 is ~4/3 of the file; +64 KB for form fields / JSON overhead
-            if cl.isdigit() and int(cl) > settings.max_upload_bytes * 4 // 3 + 65536:
-                return JSONResponse({"detail": i18n.render(_too_large_msg(settings), request.state.lang)}, status_code=413)
-
         response = await call_next(request)
         if new_cookie:
             response.set_cookie(SANDBOX_COOKIE, sid, max_age=SANDBOX_MAX_AGE_S, httponly=True,
@@ -152,6 +153,20 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         response.headers["X-ML-Mode"] = adapter.mode
         response.headers["X-Model-Version"] = adapter.model_version
         return response
+
+    # Outermost middleware: counts the bytes actually received. base64 is ~4/3 of the file; +64 KB for form fields / JSON overhead.
+    photo_body_limit = settings.max_upload_bytes * 4 // 3 + 65536
+
+    def body_limit_for(path: str):
+        if path in UPLOAD_PATHS:
+            return photo_body_limit, _too_large_msg(settings)
+        return OTHER_BODY_LIMIT, MSG_BODY_TOO_LARGE
+
+    app.add_middleware(BodyLimitMiddleware, limit_for=body_limit_for)
+    # The original photo must never reach the disk: Starlette spools an uploaded part to a temp file above this size.
+    for attr in ("max_file_size", "spool_max_size"):
+        if hasattr(MultiPartParser, attr):
+            setattr(MultiPartParser, attr, max(getattr(MultiPartParser, attr), photo_body_limit + 1))
 
     # ---------- errors: always {detail: "<message in the caller's language (Accept-Language, default uz)>"} ----------
 
@@ -424,20 +439,28 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
             raise HTTPException(503, Msg("report_no_llm"))
         lang = request.state.lang
         scope, key, evidence, reasons = draft_inputs(body.loan_id, sid, lang)
-        if not body.regenerate:
-            hit = cached_draft(scope, body.loan_id, key, t0, lang)
-            if hit is not None:
-                return hit
-        elif not limiter.allow(f"regenerate:sb:{sid}", 1):
-            raise HTTPException(429, Msg("regen_limit"))
+        if body.regenerate:
+            if not (limiter.allow(f"regenerate:sb:{sid}", 1)
+                    and limiter.allow(f"regenerate:ip:{_client_ip(request)}", REGEN_IP_PER_MIN)):
+                raise HTTPException(429, Msg("regen_limit"))
+            scope = sid  # a regenerated draft goes to this sandbox's cache only; the shared (pre-warmed) cache is never overwritten
+        else:
+            for lookup_scope in dict.fromkeys((sid, scope)):  # this sandbox's own regenerated draft wins over the shared one
+                hit = cached_draft(lookup_scope, body.loan_id, key, t0, lang)
+                if hit is not None:
+                    return hit
+
+        def lookup():
+            return db.draft_cache_get(sid, body.loan_id, key, lang) or db.draft_cache_get(scope, body.loan_id, key, lang)
+
         try:
             ticket = drafts.submit(
                 sandbox_id=sid, scope=scope, loan_id=body.loan_id, key=key, evidence=evidence, reasons=reasons, lang=lang,
-                cache_lookup=None if body.regenerate else (lambda: db.draft_cache_get(scope, body.loan_id, key, lang)))
+                cache_lookup=None if body.regenerate else lookup)
         except QueueFull:
             raise HTTPException(503, MSG_BUSY) from None
         if ticket is None:  # the draft appeared in the cache while we were deciding
-            return cached_draft(scope, body.loan_id, key, t0, lang)
+            return cached_draft(sid, body.loan_id, key, t0, lang) or cached_draft(scope, body.loan_id, key, t0, lang)
         return JSONResponse(drafts.ticket_view(ticket), status_code=202)
 
     @api.get("/draft_report/job/{job_id}", response_model=DraftJob)
@@ -462,10 +485,12 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
             model_version = str(score.get("model_version") or adapter.model_version)
         except MLFailure:
             score, ai_rec, model_version = None, None, adapter.model_version
+        # the actor is the officer of this sandbox, set on the server; a client-supplied officer_id is ignored
+        actor = demo_officer_id(request.state.sandbox_id)
         audit_id = db.audit_append(
-            sandbox_id=request.state.sandbox_id, loan_id=body.loan_id, actor=body.officer_id,
+            sandbox_id=request.state.sandbox_id, loan_id=body.loan_id, actor=actor,
             action=body.action, ai_recommendation=ai_rec, model_version=model_version,
-            inputs_hash=sha256_hex(canonical({"request": body.model_dump(), "ai": score})),
+            inputs_hash=sha256_hex(canonical({"request": body.model_dump(exclude={"officer_id"}), "actor": actor, "ai": score})),
             comment=body.comment,
         )
         return {"audit_id": audit_id}

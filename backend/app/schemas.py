@@ -273,7 +273,7 @@ class PrewarmStatus(BaseModel):
 
 class DecisionRequest(BaseModel):
     loan_id: LoanId
-    officer_id: str = Field(min_length=1, max_length=64)
+    officer_id: Optional[str] = Field(default=None, max_length=64)  # ignored: the actor is set on the server (sandbox officer)
     action: Literal["approve", "reject", "visit"]
     comment: str = Field(default="", max_length=2000)
 

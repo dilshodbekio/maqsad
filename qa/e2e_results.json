@@ -1,0 +1,545 @@
+{
+ "rows": [
+  {
+   "section": "1 Health",
+   "check": "GET /api/health: ml_mode real, warmup done, clip_loaded true, all functions real",
+   "ok": true,
+   "evidence": "{\"ml_mode\": \"real\", \"model_version\": \"money_trail_v2\", \"warmup\": \"done\", \"functions\": {\"get_queue\": \"real\", \"get_loan\": \"real\", \"score_loan\": \"real\", \"check_photo\": \"real\", \"reset_sandbox\": \"real\", \"get_color_thresholds\": \"real\", \"score_scenario\": \"real\", \"get_scenario_presets\": \"real\"}, \"clip_loaded\": true}",
+   "ms": 2044
+  },
+  {
+   "section": "1 Health",
+   "check": "headers X-ML-Mode / X-Model-Version match body",
+   "ok": true,
+   "evidence": "X-ML-Mode=real X-Model-Version=money_trail_v2",
+   "ms": null
+  },
+  {
+   "section": "2 Queue",
+   "check": "page 1: 50 items, total 5000, counts sum to total",
+   "ok": true,
+   "evidence": "total 5000 counts {'red': 513, 'yellow': 501, 'green': 3986}",
+   "ms": 92
+  },
+  {
+   "section": "2 Queue",
+   "check": "page 2: no overlap with page 1, priority non-increasing across pages",
+   "ok": true,
+   "evidence": "p1 last 2.991 p2 first 2.991",
+   "ms": 102
+  },
+  {
+   "section": "2 Queue",
+   "check": "top_reason present, Uzbek, no None/nan/{/English (100 items)",
+   "ok": true,
+   "evidence": "e.g. 'Kredit berilganidan beri tushum qayd etilmagan'",
+   "ms": null
+  },
+  {
+   "section": "2 Queue",
+   "check": "top_reason_text[uz] present and clean (100 items)",
+   "ok": true,
+   "evidence": "e.g. 'Kredit berilganidan beri tushum qayd etilmagan'",
+   "ms": null
+  },
+  {
+   "section": "2 Queue",
+   "check": "colour >= base_color, colours valid",
+   "ok": true,
+   "evidence": "counts {'red': 513, 'yellow': 501, 'green': 3986}",
+   "ms": null
+  },
+  {
+   "section": "2 Queue",
+   "check": "filter region=Andijon",
+   "ok": true,
+   "evidence": "total 370",
+   "ms": 131
+  },
+  {
+   "section": "2 Queue",
+   "check": "filter purpose=tikuv_dastgohi",
+   "ok": true,
+   "evidence": "total 1022",
+   "ms": 333
+  },
+  {
+   "section": "2 Queue",
+   "check": "unknown region -> 200 empty page",
+   "ok": true,
+   "evidence": "total 0",
+   "ms": null
+  },
+  {
+   "section": "2 Queue",
+   "check": "bad color -> 422",
+   "ok": true,
+   "evidence": "HTTP 422 {'detail': \"So'rov ma'lumotlari noto'g'ri — color: ruxsat etilgan qiymatlardan biri bo'lishi kerak ('green', 'yellow', '",
+   "ms": null
+  },
+  {
+   "section": "2 Queue",
+   "check": "legend: 500 red / 500 yellow budget + escalation counts",
+   "ok": true,
+   "evidence": "n_red 500 n_yellow 500 escalated_to_red 13",
+   "ms": null
+  },
+  {
+   "section": "2 Loan",
+   "check": "GET /api/loan/L1504044 (red): colour = queue, top_reason == reasons[0], Uzbek reasons",
+   "ok": true,
+   "evidence": "3 reasons, 6 evidence, 8 tx, invoice=yes, photos=0; reason0='Kredit berilganidan beri tushum qayd etilmagan'",
+   "ms": 26
+  },
+  {
+   "section": "2 Loan",
+   "check": "L1504044 (red): reasons[].text and evidence[].summary in uz, top_reason_text == reasons[0].text",
+   "ok": true,
+   "evidence": "reason0 'Kredit berilganidan beri tushum qayd etilmagan'",
+   "ms": null
+  },
+  {
+   "section": "2 Loan",
+   "check": "red loan: every reason has evidence_refs that resolve to evidence[]",
+   "ok": true,
+   "evidence": "refs ['period:L1504044:income', 'T150016477', 'invoice:L1504044', 'T150015906'] evidence keys ['ref', 'kind', 'summary_uz', 'summary', 'data']",
+   "ms": null
+  },
+  {
+   "section": "2 Loan",
+   "check": "GET /api/loan/L1503806 (yellow): colour = queue, top_reason == reasons[0], Uzbek reasons",
+   "ok": true,
+   "evidence": "3 reasons, 3 evidence, 8 tx, invoice=yes, photos=0; reason0=\"Kredit davrida oyiga o'rtacha 0.1 ta tushum qayd etilgan\"",
+   "ms": 25
+  },
+  {
+   "section": "2 Loan",
+   "check": "L1503806 (yellow): reasons[].text and evidence[].summary in uz, top_reason_text == reasons[0].text",
+   "ok": true,
+   "evidence": "reason0 \"Kredit davrida oyiga o'rtacha 0.1 ta tushum qayd etilgan\"",
+   "ms": null
+  },
+  {
+   "section": "2 Loan",
+   "check": "GET /api/loan/L1504711 (green): colour = queue, top_reason == reasons[0], Uzbek reasons",
+   "ok": true,
+   "evidence": "3 reasons, 2 evidence, 2 tx, invoice=yes, photos=0; reason0='Yirik kirim qayd etilmagan'",
+   "ms": 23
+  },
+  {
+   "section": "2 Loan",
+   "check": "L1504711 (green): reasons[].text and evidence[].summary in uz, top_reason_text == reasons[0].text",
+   "ok": true,
+   "evidence": "reason0 'Yirik kirim qayd etilmagan'",
+   "ms": null
+  },
+  {
+   "section": "2 Loan",
+   "check": "photos[] of a portfolio loan (L1500951): asset route returns 200 image/jpeg",
+   "ok": true,
+   "evidence": "/api/asset/photos/tikuv_dastgohi_02.jpg -> 200 image/jpeg 27314 B",
+   "ms": 10
+  },
+  {
+   "section": "2 Loan",
+   "check": "unknown loan id -> 404 with Uzbek detail",
+   "ok": true,
+   "evidence": "HTTP 404 detail='Kredit topilmadi: L9999999'",
+   "ms": 3
+  },
+  {
+   "section": "3 Photo",
+   "check": "A: other image (phones) for green L1504130: asset_match not null, matches_purpose false, label_uz present",
+   "ok": true,
+   "evidence": "{\"label\": \"other\", \"score\": 0.8649, \"matches_purpose\": false, \"label_uz\": \"telefon yoki noutbuk\", \"label_i18n\": {\"uz\": \"telefon yoki noutbuk\", \"en\": \"phone or laptop\", \"ru\": \"телефон или ноутбук\"}} server 101.78 ms",
+   "ms": 2165
+  },
+  {
+   "section": "3 Photo",
+   "check": "A: asset_match.label_i18n and escalation text in uz",
+   "ok": true,
+   "evidence": "label 'telefon yoki noutbuk'; text 'Rasmda kredit maqsadiga mos aktiv aniqlanmadi (aniqlangan: telefon yoki noutbuk)'",
+   "ms": null
+  },
+  {
+   "section": "3 Photo",
+   "check": "A: L1504130 colour in sandbox A >= yellow with PHOTO_ASSET_MISMATCH",
+   "ok": true,
+   "evidence": "colour yellow escalations ['PHOTO_ASSET_MISMATCH']; text: ['Rasmda kredit maqsadiga mos aktiv aniqlanmadi (aniqlangan: telefon yoki noutbuk)']",
+   "ms": null
+  },
+  {
+   "section": "3 Photo",
+   "check": "B (new cookie): L1504130 is still green, no escalation (isolation)",
+   "ok": true,
+   "evidence": "colour green escalations []",
+   "ms": null
+  },
+  {
+   "section": "3 Photo",
+   "check": "A queue counts differ from B (A has the escalation)",
+   "ok": true,
+   "evidence": "A {'red': 513, 'yellow': 502, 'green': 3985} B {'red': 513, 'yellow': 501, 'green': 3986}",
+   "ms": null
+  },
+  {
+   "section": "3 Photo",
+   "check": "A: sewing machine NOT in the index (tikuv_dastgohi_16.jpg) for green L1503050: matches_purpose true, no escalation",
+   "ok": true,
+   "evidence": "{\"label\": \"tikuv_dastgohi\", \"score\": 0.77, \"matches_purpose\": true, \"label_uz\": \"tikuv mashinasi\", \"label_i18n\": {\"uz\": \"tikuv mashinasi\", \"en\": \"sewing machine\", \"ru\": \"швейная машина\"}} duplicate_of [] colour green server 92.12 ms",
+   "ms": 114
+  },
+  {
+   "section": "3 Photo",
+   "check": "A: portfolio image of ANOTHER loan (tikuv_dastgohi_15.jpg = L1503448) for L1500270: duplicate_of lists it, colour red, PHOTO_DUPLICATE",
+   "ok": true,
+   "evidence": "duplicate_of [{'loan_id': 'L1503448', 'similarity': 1.0}] colour red codes ['PHOTO_DUPLICATE'] server 115.17 ms",
+   "ms": 136
+  },
+  {
+   "section": "3 Photo",
+   "check": "B: L1500270 still green",
+   "ok": true,
+   "evidence": "colour green",
+   "ms": null
+  },
+  {
+   "section": "3 Photo",
+   "check": "uploaded (blurred) photo: owner gets 200 image, other sandbox does not",
+   "ok": true,
+   "evidence": "owner 200, other 404",
+   "ms": null
+  },
+  {
+   "section": "3 Errors",
+   "check": "empty file -> 4xx Uzbek detail",
+   "ok": true,
+   "evidence": "HTTP 400 detail=\"Rasm fayli bo'sh.\"",
+   "ms": null
+  },
+  {
+   "section": "3 Errors",
+   "check": ".txt renamed to .jpg -> 4xx",
+   "ok": true,
+   "evidence": "HTTP 400 detail='Faqat JPEG, PNG yoki WebP rasm qabul qilinadi.'",
+   "ms": null
+  },
+  {
+   "section": "3 Errors",
+   "check": "9 MB file (limit 8 MB) -> 413",
+   "ok": true,
+   "evidence": "HTTP 413 detail='Rasm hajmi 8 MB dan oshmasligi kerak.'",
+   "ms": null
+  },
+  {
+   "section": "3 Errors",
+   "check": "unknown loan id -> 404",
+   "ok": true,
+   "evidence": "HTTP 404 detail='Kredit topilmadi: L0000000'",
+   "ms": null
+  },
+  {
+   "section": "3 Errors",
+   "check": "empty loan id -> 4xx",
+   "ok": true,
+   "evidence": "HTTP 422 detail=\"So'rov ma'lumotlari noto'g'ri — loan_id: majburiy maydon yetishmaydi\"",
+   "ms": null
+  },
+  {
+   "section": "3 Errors",
+   "check": "no image part -> 4xx",
+   "ok": true,
+   "evidence": "HTTP 400 detail=\"So'rov multipart/form-data (asosiy) yoki application/json bo'lishi kerak.\"",
+   "ms": null
+  },
+  {
+   "section": "3 Errors",
+   "check": "invalid lat/lon -> 4xx",
+   "ok": true,
+   "evidence": "HTTP 422 detail=\"So'rov ma'lumotlari noto'g'ri — lat: qiymat ruxsat etilgan oralig'dan tashqarida; lon: son bo'lishi kerak\"",
+   "ms": null
+  },
+  {
+   "section": "3 Errors",
+   "check": "invalid captured_at -> 4xx",
+   "ok": true,
+   "evidence": "HTTP 422 detail=\"So'rov ma'lumotlari noto'g'ri — captured_at: sana va vaqt noto'g'ri formatda (masalan 2026-05-01T10:30:00Z)\"",
+   "ms": null
+  },
+  {
+   "section": "3 Errors",
+   "check": "malformed sandbox cookie -> no 500 (server replaces it with a fresh sandbox)",
+   "ok": true,
+   "evidence": "HTTP 200 {\"asset_match\":{\"label\":\"other\",\"score\":0.8649,\"matches_purpose\":false,\"label_uz\":\"telefon yoki nout",
+   "ms": null
+  },
+  {
+   "section": "3 Photo",
+   "check": "5 parallel uploads from 5 sandboxes (other_00..04 for the same loan): all 200, each sees only its own escalation, no cross-duplicates",
+   "ok": true,
+   "evidence": "other_00.jpg: HTTP 200, server 218.58 ms, client 2372 ms, esc ['PHOTO_ASSET_MISMATCH']; other_01.jpg: HTTP 200, server 318.51 ms, client 2495 ms, esc ['PHOTO_ASSET_MISMATCH']; other_02.jpg: HTTP 200, server 111.84 ms, client 2251 ms, esc ['PHOTO_ASSET_MISMATCH']; other_03.jpg: HTTP 200, server 576.58 ms, client 2758 ms, esc ['PHOTO_ASSET_MISMATCH']; other_04.jpg: HTTP 200, server 434.57 ms, client 2625 ms, esc ['PHOT",
+   "ms": 2758
+  },
+  {
+   "section": "4 Scenario",
+   "check": "presets load (4)",
+   "ok": true,
+   "evidence": "['honest_purchase', 'fast_cash_out', 'supplier_ring', 'asset_resale']",
+   "ms": 2067
+  },
+  {
+   "section": "4 Scenario",
+   "check": "preset titles / descriptions in uz",
+   "ok": true,
+   "evidence": "Kredit tushishi bilan tez naqdlashtirish",
+   "ms": null
+  },
+  {
+   "section": "4 Scenario",
+   "check": "score preset honest_purchase",
+   "ok": true,
+   "evidence": "risk 0.014 colour green percentile 33.9 reason0 \"Ta'minotchiga kredit summasining 98 foizi o'tkazilgan\"",
+   "ms": 75
+  },
+  {
+   "section": "4 Scenario",
+   "check": "score preset fast_cash_out",
+   "ok": true,
+   "evidence": "risk 0.993 colour red percentile 99.3 reason0 \"Kredit tushgandan keyingi 24 soat ichida mablag'ning 84 foizi naqd yechilgan\"",
+   "ms": 93
+  },
+  {
+   "section": "4 Scenario",
+   "check": "score preset supplier_ring",
+   "ok": true,
+   "evidence": "risk 0.481 colour yellow percentile 86.2 reason0 \"Ta'minotchi olgan mablag'ning 69 foizini naqd yechgan\"",
+   "ms": 120
+  },
+  {
+   "section": "4 Scenario",
+   "check": "score preset asset_resale",
+   "ok": true,
+   "evidence": "risk 0.506 colour yellow percentile 86.8 reason0 'Kredit berilganidan beri tushum qayd etilmagan'",
+   "ms": 124
+  },
+  {
+   "section": "4 Scenario",
+   "check": "cash withdrawal day 30 -> lower risk than day 1",
+   "ok": true,
+   "evidence": "day1: risk 0.993, colour red, percentile 99.3, first reason: Kredit tushgandan keyingi 24 soat ichida mablag'ning 84 foizi naqd yechilgan || day30: risk 0.598, colour yellow, percentile 88.8, first reason: Hisob-fakturadagi summaning 90 foizi ta'minotchiga to'lanmagan",
+   "ms": null
+  },
+  {
+   "section": "4 Scenario",
+   "check": "all paid to supplier -> lower risk than cash-out",
+   "ok": true,
+   "evidence": "paid: risk 0.130, colour green, percentile 72.2, first reason: Yirik kirim qayd etilmagan",
+   "ms": null
+  },
+  {
+   "section": "4 Scenario",
+   "check": "invalid: negative amount -> 400/422 with Uzbek message",
+   "ok": true,
+   "evidence": "HTTP 400 detail=\"Ssenariy noto'g'ri: amount_uzs: qiymat ruxsat etilgan oralig'dan tashqarida.\"",
+   "ms": null
+  },
+  {
+   "section": "4 Scenario",
+   "check": "invalid: unknown tx type -> 400/422 with Uzbek message",
+   "ok": true,
+   "evidence": "HTTP 400 detail=\"Ssenariy noto'g'ri: transactions.0.type: ruxsat etilgan qiymatlardan biri bo'lishi kerak ('cash_withdrawal', 'supplier_payment', 'p2p_out', 'p2p_in', 'external_transfer', 'income').\"",
+   "ms": null
+  },
+  {
+   "section": "4 Scenario",
+   "check": "invalid: snapshot_day 1000 -> 400/422 with Uzbek message",
+   "ok": true,
+   "evidence": "HTTP 400 detail=\"Ssenariy noto'g'ri: snapshot_day: qiymat ruxsat etilgan oralig'dan tashqarida.\"",
+   "ms": null
+  },
+  {
+   "section": "4 Scenario",
+   "check": "invalid: snapshot_day 1 -> 400/422 with Uzbek message",
+   "ok": true,
+   "evidence": "HTTP 400 detail=\"Ssenariy noto'g'ri: snapshot_day: qiymat ruxsat etilgan oralig'dan tashqarida.\"",
+   "ms": null
+  },
+  {
+   "section": "4 Scenario",
+   "check": "invalid: unknown extra field -> 400/422 with Uzbek message",
+   "ok": true,
+   "evidence": "HTTP 400 detail=\"Ssenariy noto'g'ri: hacker: noma'lum kalit.\"",
+   "ms": null
+  },
+  {
+   "section": "4 Scenario",
+   "check": "invalid: unknown purpose -> 400/422 with Uzbek message",
+   "ok": true,
+   "evidence": "HTTP 400 detail=\"Ssenariy noto'g'ri: purpose: ruxsat etilgan qiymatlardan biri bo'lishi kerak ('tikuv_dastgohi', 'chorva', 'issiqxona', 'parranda', 'asalarichilik').\"",
+   "ms": null
+  },
+  {
+   "section": "4 Scenario",
+   "check": "invalid: negative tx amount -> 400/422 with Uzbek message",
+   "ok": true,
+   "evidence": "HTTP 400 detail=\"Ssenariy noto'g'ri: transactions.0.amount_uzs: qiymat ruxsat etilgan oralig'dan tashqarida.\"",
+   "ms": null
+  },
+  {
+   "section": "4 Scenario",
+   "check": "invalid: tx day beyond snapshot -> 400/422 with Uzbek message",
+   "ok": true,
+   "evidence": "HTTP 400 detail=\"Ssenariy noto'g'ri: transactions.0.day: qiymat ruxsat etilgan oralig'dan tashqarida.\"",
+   "ms": null
+  },
+  {
+   "section": "5 Decision",
+   "check": "POST /api/decision on L1504044 (officer e2e-test, visit)",
+   "ok": true,
+   "evidence": "HTTP 200 {'audit_id': 13}",
+   "ms": 47
+  },
+  {
+   "section": "5 Decision",
+   "check": "GET /api/audit shows the row with ai_recommendation and model_version",
+   "ok": true,
+   "evidence": "{\"ts\": \"2026-10-11T00:55:44.558+00:00\", \"actor\": \"e2e-test\", \"action\": \"visit\", \"ai_recommendation\": \"red (risk=0.998)\", \"model_version\": \"money_trail_v2\", \"inputs_hash\": \"5bbb67cf6c77487116b4bf26ba2ad4f2839ae1f6b53051953e7b7b921012edd9\"}",
+   "ms": 37
+  },
+  {
+   "section": "5 Decision",
+   "check": "invalid action -> 4xx with Uzbek message",
+   "ok": true,
+   "evidence": "HTTP 422 \"So'rov ma'lumotlari noto'g'ri — action: ruxsat etilgan qiymatlardan biri bo'lishi kerak ('approve', 'reject', 'visit')\"",
+   "ms": null
+  },
+  {
+   "section": "5 Report",
+   "check": "POST /api/draft_report on L1504044: text_uz + facts each with evidence_ref (or flagged unverified)",
+   "ok": false,
+   "evidence": "HTTP 503 cached=None model=None facts=0 unverified=0 latency_ms=None cost_usd=None",
+   "ms": 29
+  },
+  {
+   "section": "6 Frontend",
+   "check": "GET /: 200 HTML referencing built JS (JS loads)",
+   "ok": true,
+   "evidence": "HTTP 200 js=['/assets/index-BPFJzFhb.js']",
+   "ms": 83
+  },
+  {
+   "section": "6 Frontend",
+   "check": "GET /loan/L1504044: 200 HTML referencing built JS (JS loads)",
+   "ok": true,
+   "evidence": "HTTP 200 js=['/assets/index-BPFJzFhb.js']",
+   "ms": 4
+  },
+  {
+   "section": "6 Frontend",
+   "check": "GET /capture?loan=L1504130: 200 HTML referencing built JS (JS loads)",
+   "ok": true,
+   "evidence": "HTTP 200 js=['/assets/index-BPFJzFhb.js']",
+   "ms": 4
+  },
+  {
+   "section": "6 Frontend",
+   "check": "GET /scenario: 200 HTML referencing built JS (JS loads)",
+   "ok": true,
+   "evidence": "HTTP 200 js=['/assets/index-BPFJzFhb.js']",
+   "ms": 4
+  },
+  {
+   "section": "6 Frontend",
+   "check": "GET /capture: 200 HTML referencing built JS (JS loads)",
+   "ok": true,
+   "evidence": "HTTP 200 js=['/assets/index-BPFJzFhb.js']",
+   "ms": 4
+  },
+  {
+   "section": "6 Frontend",
+   "check": "GET /nonexistent-page: 200 HTML referencing built JS (JS loads)",
+   "ok": true,
+   "evidence": "HTTP 200 js=['/assets/index-BPFJzFhb.js']",
+   "ms": 4
+  }
+ ],
+ "created": {
+  "audit_ids": [
+   13
+  ],
+  "sandboxes": [
+   "d45192c6-e1cd-4b2b-89de-e12ff5a7b158",
+   "dce98d3e-2d1c-4e52-8c9a-dd6dd5f39d94",
+   "187644d1-0032-47a1-bc18-c422ea957b9a",
+   "3ed5cce0-e2f0-4fd4-a15a-847a26797eea",
+   "f56fc8a3-2f79-4e55-8d63-90efeebfd8a3",
+   "1bdd70f7-d1a4-4597-8cba-f2a7536922a8",
+   "2b2ef2c2-fe72-473e-adc0-ae3d7ae5f3c3",
+   "7f70c9a6-db5a-4bdc-adef-9b6119fbffb9",
+   "8c801ea1-60cf-492e-b348-32ed760031ed",
+   "17d8e01e-20f9-43eb-abda-ab1b373248c8"
+  ],
+  "loans_written": [
+   "L1504044"
+  ]
+ },
+ "data": {
+  "started": "2026-10-11 00:55:20 UTC",
+  "lang": "uz",
+  "model_version": "money_trail_v2",
+  "red_loan": "L1504044",
+  "red_reasons": [
+   "Kredit berilganidan beri tushum qayd etilmagan",
+   "Hisob-fakturadagi summaning 94 foizi ta'minotchiga to'lanmagan",
+   "Kredit tushgandan keyin 7 kun ichida mablag'ning 67 foizi naqd yechilgan"
+  ],
+  "green_tikuv": [
+   "L1504130",
+   "L1503050",
+   "L1500270",
+   "L1500938",
+   "L1501566",
+   "L1503621"
+  ],
+  "B_counts": {
+   "red": 513,
+   "yellow": 501,
+   "green": 3986
+  },
+  "photo_latency": [
+   [
+    "other_06.jpg",
+    80.51,
+    2145.658999972511
+   ],
+   [
+    "tikuv_dastgohi_16.jpg",
+    90.82,
+    114.08760002814233
+   ],
+   [
+    "chorva_09.jpg",
+    109.3,
+    135.11279999511316
+   ]
+  ],
+  "scenario_cmp": {
+   "cash-out day 1": "risk 0.993, colour red, percentile 99.3, first reason: Kredit tushgandan keyingi 24 soat ichida mablag'ning 84 foizi naqd yechilgan",
+   "cash-out day 30": "risk 0.598, colour yellow, percentile 88.8, first reason: Hisob-fakturadagi summaning 90 foizi ta'minotchiga to'lanmagan",
+   "all paid to supplier": "risk 0.130, colour green, percentile 72.2, first reason: Yirik kirim qayd etilmagan"
+  },
+  "demo_loans": {
+   "tikuv": [
+    "L1504130",
+    "L1503050",
+    "L1500270"
+   ],
+   "red": "L1504044"
+  },
+  "green_chorva": [
+   "L1503497",
+   "L1500884"
+  ],
+  "finished": "2026-10-11 00:55:44 UTC"
+ }
+}

@@ -19,8 +19,11 @@ Build-time weight download and the `MAQSAD_*` environment variables: `ml/README.
 ```
 GET  /api/health
   → {ml_mode: "real|stub", model_version, warmup: "pending|running|done|failed",
-     functions: {get_queue|get_loan|score_loan|check_photo|reset_sandbox|get_color_thresholds:
-                 "real|stub|not_ready|missing"}}
+     functions: {get_queue|get_loan|score_loan|check_photo|reset_sandbox|get_color_thresholds|
+                 score_scenario|get_scenario_presets: "real|stub|not_ready|missing"},
+     clip_loaded: bool}              from ml.api.warm_up(): false = the CLIP asset check is unavailable
+                                      (check_photo then returns asset_match: null). In stub mode the two scenario
+                                      functions are "missing" (503).
 
 GET  /api/queue?limit=50&offset=0&color=&region=&purpose=
                                       (view of the caller's sandbox: sandbox_id comes from the cookie)
@@ -51,11 +54,26 @@ POST /api/check_photo       multipart: image (file) + loan_id, lat?, lon?, captu
   → {asset_match: {label, score, matches_purpose, label_uz, label_i18n} | null, duplicate_of: [{loan_id, similarity}],
      geo_ok: bool|null, time_ok: bool|null, faces_blurred: bool, faces_count?: int, latency_ms}
 
-POST /api/draft_report      {loan_id}
-  → {text_uz, facts:[{claim, evidence_ref, unverified: bool}], model, latency_ms, cost_usd|null}
+POST /api/draft_report      {loan_id, regenerate?: bool = false}     header Accept-Language: uz|en|ru
+  → 200 DraftReport (cache hit): {text_uz, lang, facts:[{claim, evidence_ref, unverified: bool}], model, latency_ms,
+                                  cost_usd|null, input_tokens|null, output_tokens|null, generated_at, cached: bool}
+  → 202 DraftJob (not cached, queued): {job_id, status: "queued|running", position, eta_s|null}
+    `text_uz` holds the draft in the language of the request (the field name is kept for compatibility).
+    Cache hit: cached = true, cost_usd = 0.0, tokens null, latency_ms = lookup time.
+    regenerate = true skips the cache and always queues a new LLM call; its result is stored in the CALLER'S SANDBOX
+    cache only (never in the shared pre-warmed cache). Limits: 1 per minute per sandbox and 3 per minute per client IP
+    (429). Other errors: 404 unknown loan, 503 LLM not configured / service busy (queue full or provider quota exhausted).
 
-POST /api/decision          {loan_id, officer_id, action: "approve|reject|visit", comment}
+GET  /api/draft_report/job/{job_id}
+  → {job_id, status: "queued|running|done|error", position, eta_s|null, result?: DraftReport, error?: string}
+    Poll until done / error. `position`: 1 = next to run, 0 while running or finished. Only the sandbox that created the
+    job can read it; an unknown, expired, restarted-away or foreign job id is 404 (the client submits again: the cache or
+    a new job answers). A job older than 120 s reports `error` (service busy). Jobs live in memory.
+
+POST /api/decision          {loan_id, action: "approve|reject|visit", comment, officer_id?}
   → {audit_id}
+    The actor in the audit log is set on the SERVER (the sandbox's officer id, the same as GET /api/session).
+    `officer_id` in the body is accepted for compatibility and ignored.
 
 GET  /api/audit?loan_id=...
   → [{ts, actor, action, ai_recommendation, model_version, inputs_hash}]
@@ -64,7 +82,13 @@ GET  /api/audit?loan_id=...
 GET  /api/session                     → {officer_id}   demo: "Xodim-XXXX", stable per sandbox cookie
                                       (hash of sandbox_id, never the id itself); production: from the bank's SSO
 
-POST /api/admin/reset       header X-Admin-Token  → {ok: true}
+POST /api/admin/reset       header X-Admin-Token  → {ok: true}   (?clear_shared_cache=true also clears the shared drafts)
+POST /api/admin/prewarm     header X-Admin-Token, ?n=40 (1..200)  → 202 {total, done, skipped, failed, running}
+                            fills the SHARED draft cache (language uz) for the top-n loans of the default queue
+                            (priority order) through the draft queue at the lowest priority; loans already cached are skipped;
+                            a run in progress is not restarted. No LLM configured → 503.
+GET  /api/admin/prewarm     header X-Admin-Token  → {total, done, skipped, failed, running}
+                            (missing or wrong token on any /api/admin/* call → 403)
 GET  /api/photo/{photo_id}  → blurred JPEG of a borrower upload (owner sandbox only)
 GET  /api/asset/{path}      → portfolio photo from ml/assets/ (photos[].url)
 
@@ -121,10 +145,18 @@ priority and never changes `risk`:
   other sandboxes and the default view are unaffected; `reset_sandbox` removes the effect.
 
 ### Errors
-Every error → `{detail: "<Uzbek message>"}`:
-`400` bad file/input (incl. `InvalidImageError`, `InvalidRequestError`, `ScenarioError`) · `404` unknown `loan_id` · `413` file too large (> 8 MB) ·
+Every error → `{detail: "<message>"}` in the language of `Accept-Language` (uz default, en, ru):
+`400` bad file/input (incl. `InvalidImageError`, `InvalidRequestError`, `ScenarioError`) · `404` unknown `loan_id` / job · `413` body too large ·
 `422` validation · `429` rate limit · `502` ML/LLM failure ·
-`503` function not connected yet (`NotImplementedError`: "Bu funksiya hali ulanmagan") or LLM not configured.
+`503` function not connected yet (`NotImplementedError`) or LLM not configured / draft service busy.
+
+Request size (`backend/app/limits.py`, counted on the bytes actually received, so chunked bodies are limited too): `POST /api/check_photo`
+about 10.7 MB (an 8 MB image as base64 plus form overhead; the image itself must be ≤ 8 MB), every other `POST` ≤ 64 KB. The original
+upload is held in memory only; it is never spooled to a temporary file.
+
+Rate limits (`backend/app/ratelimit.py`, in memory, one replica): `check_photo` and `draft_report` per sandbox (`RATE_LIMIT_PER_MIN`, default 20)
+and per client IP (`RATE_LIMIT_IP_PER_MIN`, default 120). The client IP is the rightmost `X-Forwarded-For` entry (the one our proxy added),
+else the socket peer; the left entries are client-controlled and ignored.
 
 ## Python interface (backend imports `ml/` directly, only via `backend/app/ml_adapter.py`)
 
@@ -334,5 +366,4 @@ Maqsad: bir necha hakam bir vaqtda dalolatnoma so'rasa, hech kim xato ko'rmasin 
    `PROMPT_VERSION = "3"`. Pre-warm faqat `uz` uchun.
 
 ## Open points
-- Backend: call `ml.api.warm_up()` at start-up and show `clip_loaded` / `clip_error` in `/api/health`.
 - CLIP weights licence for production needs a legal review (see "Known failure cases" in `docs/metrics.md`).

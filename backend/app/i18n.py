@@ -49,6 +49,8 @@ MESSAGES: dict[str, dict[str, str]] = {
                          ru="Эта функция ещё не подключена ({name})."),
     "too_large": dict(uz="Rasm hajmi {mb} MB dan oshmasligi kerak.", en="The image must not be larger than {mb} MB.",
                       ru="Размер изображения не должен превышать {mb} МБ."),
+    "body_too_large": dict(uz="So'rov hajmi {kb} KB dan oshmasligi kerak.", en="The request must not be larger than {kb} KB.",
+                           ru="Размер запроса не должен превышать {kb} КБ."),
     "request_rejected": dict(uz="So'rov qabul qilinmadi: {detail}", en="The request was rejected: {detail}",
                              ru="Запрос не принят: {detail}"),
     "model_rejected": dict(uz="Model kiritilgan ma'lumotni qabul qilmadi: {detail}", en="The model did not accept the input: {detail}",

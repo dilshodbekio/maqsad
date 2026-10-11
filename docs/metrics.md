@@ -205,7 +205,7 @@ Reading the ablation: the age-aware encoding changes the honest false-positive r
 
 **All numbers are on a small library of openly licensed photos (CC / public domain) and are produced by `python -m ml.eval.eval_photo`. They say nothing about real borrower photos; real accuracy is measured in the pilot.**
 
-- Library: 100 asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) (the CLIP `other` negatives are not counted here); 5674 KB for all committed JPEGs in `ml/assets/photos/` including the `other` negatives. No committed photo shows a recognisable person (checked with two face detectors and by eye; background figures in one image are pixelated).
+- Library: 100 asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) (the CLIP `other` negatives are not counted here); 5674 KB for all committed JPEGs in `ml/assets/photos/` including the `other` negatives. No committed image contains a recognisable face (faces were removed or pixelated); a few images show people from behind, far away or partially (`asalarichilik_03`, `asalarichilik_13`, `chorva_14`, `parranda_17`).
 - Portfolio photo index (`ml/artifacts/photo_index_v1.json`): 90 images on 100 loans of the demo portfolio; 10 images are shared by 2-3 loans (the generator's photo-reuse groups). Photos are matched to the loan's purpose.
 
 | Purpose | library images | in index | loans with a photo |
@@ -242,7 +242,7 @@ Hashes: pHash + dHash (64 bit each) of the whole image and of its central 80% cr
 
 ### Face blur (YuNet, OpenCV zoo, MIT; Haar cascade as fallback)
 
-Measured on 11 CC-licensed images containing people, counted by eye (faces that are very small, dark or out of focus are not counted). **The images are not redistributed, for privacy reasons.** The script runs this part when such images are put in `ml/assets/faces_test/` (git-ignored) together with a `faces_test_counts.csv` (columns `file,faces_visible,note`); without them it keeps the numbers stored from the run on the author's machine (`ml/artifacts/eval_photo.json`).
+Measured on 11 CC-licensed images containing people, counted by eye (faces that are very small, dark or out of focus are not counted). **The images are not redistributed, for privacy reasons.** To reproduce, download them from the URLs in `ml/assets/faces_test_manifest.csv` (title, author, licence, source URL and the hand count per image) into `ml/assets/faces_test/` (git-ignored) and run `ml/eval/eval_photo.py`; without the images the script keeps the numbers stored in `ml/artifacts/eval_photo.json` (measured once from these images).
 
 | Item | Value |
 |---|---|

@@ -100,3 +100,41 @@ def test_default_http_errors_localized(client, lang):
 def test_draft_report_without_llm_503_localized(client, loan_id, lang):
     r = client.post("/api/draft_report", json={"loan_id": loan_id}, headers=H(lang))
     assert r.status_code == 503 and r.json()["detail"] == i18n.MESSAGES["report_no_llm"][lang]
+
+
+def test_draft_report_is_written_and_cached_per_language(make_client, monkeypatch):
+    import json
+
+    from backend.app import llm
+    from backend.tests.conftest import draft
+
+    c = make_client(llm_base_url="http://llm.invalid/v1", llm_model="test-model")
+    loan_id = c.get("/api/queue").json()["items"][0]["loan_id"]
+    calls = []
+
+    def fake_chat(settings, messages):
+        calls.append(messages)
+        return json.dumps({"text": "Draft text.", "facts": []}), 10, 5
+
+    monkeypatch.setattr(llm, "_chat", fake_chat)
+    out = {}
+    for lang in ("en", "ru", "uz", "en"):
+        r = c.post("/api/draft_report", json={"loan_id": loan_id}, headers=H(lang))
+        assert r.status_code in (200, 202), r.text
+        if r.status_code == 202:
+            import time
+            job = r.json()["job_id"]
+            for _ in range(100):
+                j = c.get(f"/api/draft_report/job/{job}").json()
+                if j["status"] == "done":
+                    out[lang] = j["result"]
+                    break
+                time.sleep(0.1)
+        else:
+            out[lang] = r.json()
+    assert [out[l]["lang"] for l in ("en", "ru", "uz")] == ["en", "ru", "uz"]
+    assert len(calls) == 3, [m[0]["content"][:30] for m in calls]                                   # the 2nd English request came from the cache
+    sys_prompts = [m[0]["content"] for m in calls]
+    assert "Write the text in English" in sys_prompts[0] and "на русском языке" in sys_prompts[1] and "o'zbek tilida" in sys_prompts[2]
+    payload = json.loads(calls[0][1]["content"])
+    assert all("text_uz" not in r and isinstance(r["text"], str) for r in payload["reasons"])

@@ -31,7 +31,7 @@ class FakeLLM:
             self.gate.set()
         monkeypatch.setattr(llm, "draft_report", self)
 
-    def __call__(self, settings, loan_id, evidence, reasons, db=None):
+    def __call__(self, settings, loan_id, evidence, reasons, db=None, lang="uz"):
         self.calls.append(loan_id)
         if len(self.calls) == 1:
             self.first_started.set()

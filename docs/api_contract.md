@@ -1,4 +1,4 @@
-# API contract (Dilshodbek ↔ Oybek) — v1.5
+# API contract (Dilshodbek ↔ Oybek) — v1.9
 
 Source: `docs/brief.md` §5. Any change requires agreement from both sides (via PR).
 During development the backend may fall back to a visible STUB; **in the demo only the real model runs**.
@@ -48,7 +48,7 @@ POST /api/score_loan        {loan_id}
 
 POST /api/check_photo       multipart: image (file) + loan_id, lat?, lon?, captured_at?
                             (fallback JSON: {loan_id, image_base64, lat?, lon?, captured_at?})
-  → {asset_match: {label, score, matches_purpose, label_uz} | null, duplicate_of: [{loan_id, similarity}],
+  → {asset_match: {label, score, matches_purpose, label_uz, label_i18n} | null, duplicate_of: [{loan_id, similarity}],
      geo_ok: bool|null, time_ok: bool|null, faces_blurred: bool, faces_count?: int, latency_ms}
 
 POST /api/draft_report      {loan_id}
@@ -313,6 +313,25 @@ Maqsad: bir necha hakam bir vaqtda dalolatnoma so'rasa, hech kim xato ko'rmasin 
    (`priority` bo'yicha: qizil + eskalatsiyali) uchun umumiy keshga qoralama yaratadi, o'sha navbat orqali; keshda borini o'tkazib yuboradi. Foydalanuvchi
    so'rovlari pre-warm'dan oldin turadi (ishlayotgan chaqiruv to'xtatilmaydi). `GET /api/admin/prewarm` — holat. Token'siz yoki noto'g'ri token → 403.
 7. Env: `LLM_RPM` (default 4). `llm.py`: 429 endi `LLMRateLimited` (Retry-After yoki "retry in ..." matni bo'yicha kutish vaqti bilan).
+
+## v1.9 o'zgarishlar (uz / en / ru tili; ml + backend + frontend)
+
+1. **Til.** Frontend har so'rovda `Accept-Language: uz|en|ru` yuboradi (default `uz`; boshqa til → `uz`). Barcha xato `detail` xabarlari
+   (400/404/413/422/429/502/503) shu tilda qaytadi; 422 xabarlari maydon nomini ko'rsatadi, inglizcha pydantic matni chiqmaydi.
+2. **ml matnlari uch tilda.** `text_uz` / `summary_uz` / `label_uz` / `title_uz` / `description_uz` o'zgarmadi; yoniga qo'shildi
+   (bir xil faktlar va raqamlar, faqat jumla boshqa):
+   - `reasons[].text`, `escalations[].text`, `score_scenario().reasons[].text` = `{uz, en, ru}`;
+   - `queue[].top_reason_text` = `{uz, en, ru}` (== `get_loan().reasons[0].text`);
+   - `evidence[].summary` = `{uz, en, ru}`;
+   - `asset_match.label_i18n` = `{uz, en, ru}` (`label` o'zgarmadi: u sinf kodi, masalan `chorva`);
+   - `scenario_presets[].title` / `.description` = `{uz, en, ru}`;
+   - `ScenarioError` / `InvalidRequestError` ml'da `e.messages = {uz, en, ru}`; backend `Accept-Language` bo'yicha tanlaydi.
+3. **Yangi dalil turi** `evidence[].kind = "period"`: "kirim yo'q" kabi yo'qlik sabablari tekshirilgan davrga ishora qiladi
+   (`evidence_refs`: `period:<loan_id>:<income|cash|inflow|other>`; `data = {start, end, days, what}`). Endi har bir sababda kamida bitta
+   `evidence_refs` bor (test: butun demo navbat).
+4. **Dalolatnoma tilda.** `POST /api/draft_report` qoralamani `Accept-Language` tilida yozadi; javobda `lang`; `text_uz` maydoni shu tildagi
+   matnni saqlaydi (nomi shartnoma uchun o'zgarmadi). Kesh kaliti tilni o'z ichiga oladi (kredit + til uchun bitta qoralama);
+   `PROMPT_VERSION = "3"`. Pre-warm faqat `uz` uchun.
 
 ## Open points
 - Backend: call `ml.api.warm_up()` at start-up and show `clip_loaded` / `clip_error` in `/api/health`.

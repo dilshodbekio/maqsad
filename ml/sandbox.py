@@ -15,11 +15,15 @@ def validate_sandbox_id(sandbox_id):
     if sandbox_id is None:
         return None
     if not isinstance(sandbox_id, str):
-        raise InvalidRequestError("sandbox_id matn (str) bo'lishi kerak")
+        raise InvalidRequestError("sandbox_id matn (str) bo'lishi kerak", "sandbox_id must be a string (str)", "sandbox_id должен быть строкой (str)")
     if not sandbox_id:
-        raise InvalidRequestError("sandbox_id bo'sh bo'lishi mumkin emas")
+        raise InvalidRequestError("sandbox_id bo'sh bo'lishi mumkin emas", "sandbox_id must not be empty", "sandbox_id не должен быть пустым")
     if len(sandbox_id) > MAX_LEN:
-        raise InvalidRequestError(f"sandbox_id {MAX_LEN} belgidan uzun bo'lishi mumkin emas (kiritildi: {len(sandbox_id)})")
+        raise InvalidRequestError(f"sandbox_id {MAX_LEN} belgidan uzun bo'lishi mumkin emas (kiritildi: {len(sandbox_id)})",
+                                  f"sandbox_id must not be longer than {MAX_LEN} characters (entered: {len(sandbox_id)})",
+                                  f"sandbox_id не должен быть длиннее {MAX_LEN} символов (введено: {len(sandbox_id)})")
     if not _OK.fullmatch(sandbox_id):
-        raise InvalidRequestError("sandbox_id faqat lotin harflari, raqamlar va _ . : - belgilaridan iborat bo'lishi kerak")
+        raise InvalidRequestError("sandbox_id faqat lotin harflari, raqamlar va _ . : - belgilaridan iborat bo'lishi kerak",
+                                  "sandbox_id may only contain Latin letters, digits and the characters _ . : -",
+                                  "sandbox_id может содержать только латинские буквы, цифры и символы _ . : -")
     return sandbox_id

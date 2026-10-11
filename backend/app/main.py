@@ -370,25 +370,44 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         return FileResponse(p, media_type=sniff_image(head) or "application/octet-stream",
                             headers={"Cache-Control": "private, no-store"})
 
-    def draft_inputs(loan_id: str, sandbox_id: Optional[str]):
-        """(cache scope, cache key, evidence, reasons). Scope is "shared" unless this sandbox added evidence to the loan
-        (an uploaded photo / escalation): then the draft depends on the sandbox and is cached under its id."""
+    def localized_view(view: dict, lang: str):
+        """(evidence, reasons) of a loan with every text in `lang` only: this is what the LLM sees (and what the cache key covers)."""
+        evidence = []
+        for e in view.get("evidence") or []:
+            e = dict(e)
+            summary = e.pop("summary", None) or {}
+            e["summary"] = summary.get(lang) or summary.get("uz") or e.get("summary_uz")
+            e.pop("summary_uz", None)
+            evidence.append(e)
+        reasons = []
+        for r in view.get("reasons") or []:
+            r = dict(r)
+            text = r.pop("text", None) or {}
+            r["text"] = text.get(lang) or text.get("uz") or r.get("text_uz")
+            r.pop("text_uz", None)
+            reasons.append(r)
+        return evidence, reasons
+
+    def draft_inputs(loan_id: str, sandbox_id: Optional[str], lang: str = i18n.DEFAULT_LANG):
+        """(cache scope, cache key, evidence, reasons) in `lang`. Scope is "shared" unless this sandbox added evidence to the loan
+        (an uploaded photo / escalation): then the draft depends on the sandbox and is cached under its id.
+        The key covers the language, so each language has its own cached draft."""
         view = adapter.get_loan(loan_id, sandbox_id)
-        evidence, reasons = view.get("evidence") or [], view.get("reasons") or []
+        evidence, reasons = localized_view(view, lang)
 
         def key_of(ev, rs):
             return sha256_hex(canonical({"evidence": ev, "reasons": rs, "model": settings.llm_model,
-                                         "prompt": llm.PROMPT_VERSION}))
+                                         "prompt": llm.PROMPT_VERSION, "lang": lang}))
 
         key, scope = key_of(evidence, reasons), Database.SHARED_SCOPE
         if sandbox_id is not None and db.photo_list(sandbox_id, loan_id):
-            base = adapter.get_loan(loan_id, None)
-            if key_of(base.get("evidence") or [], base.get("reasons") or []) != key:
+            base = localized_view(adapter.get_loan(loan_id, None), lang)
+            if key_of(*base) != key:
                 scope = sandbox_id
         return scope, key, evidence, reasons
 
-    def cached_draft(scope: str, loan_id: str, key: str, lookup_started: float) -> Optional[dict]:
-        hit = db.draft_cache_get(scope, loan_id, key)
+    def cached_draft(scope: str, loan_id: str, key: str, lookup_started: float, lang: str = i18n.DEFAULT_LANG) -> Optional[dict]:
+        hit = db.draft_cache_get(scope, loan_id, key, lang)
         if hit is None:
             return None
         return {**hit, "cached": True, "cost_usd": 0.0, "input_tokens": None, "output_tokens": None,
@@ -403,21 +422,22 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         if not settings.llm_configured:
             adapter.get_loan(body.loan_id, sid)  # 404 for an unknown loan first
             raise HTTPException(503, Msg("report_no_llm"))
-        scope, key, evidence, reasons = draft_inputs(body.loan_id, sid)
+        lang = request.state.lang
+        scope, key, evidence, reasons = draft_inputs(body.loan_id, sid, lang)
         if not body.regenerate:
-            hit = cached_draft(scope, body.loan_id, key, t0)
+            hit = cached_draft(scope, body.loan_id, key, t0, lang)
             if hit is not None:
                 return hit
         elif not limiter.allow(f"regenerate:sb:{sid}", 1):
             raise HTTPException(429, Msg("regen_limit"))
         try:
             ticket = drafts.submit(
-                sandbox_id=sid, scope=scope, loan_id=body.loan_id, key=key, evidence=evidence, reasons=reasons,
-                cache_lookup=None if body.regenerate else (lambda: db.draft_cache_get(scope, body.loan_id, key)))
+                sandbox_id=sid, scope=scope, loan_id=body.loan_id, key=key, evidence=evidence, reasons=reasons, lang=lang,
+                cache_lookup=None if body.regenerate else (lambda: db.draft_cache_get(scope, body.loan_id, key, lang)))
         except QueueFull:
             raise HTTPException(503, MSG_BUSY) from None
         if ticket is None:  # the draft appeared in the cache while we were deciding
-            return cached_draft(scope, body.loan_id, key, t0)
+            return cached_draft(scope, body.loan_id, key, t0, lang)
         return JSONResponse(drafts.ticket_view(ticket), status_code=202)
 
     @api.get("/draft_report/job/{job_id}", response_model=DraftJob)

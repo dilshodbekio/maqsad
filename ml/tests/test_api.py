@@ -10,7 +10,7 @@ from ml.money_trail.features import FEATURE_COLUMNS
 from ml.money_trail.model import META_PATH
 
 META = json.loads(META_PATH.read_text(encoding="utf-8"))
-QUEUE_KEYS = {"loan_id", "borrower_name_masked", "purpose", "amount_uzs", "region", "risk", "color", "top_reason",
+QUEUE_KEYS = {"loan_id", "borrower_name_masked", "purpose", "amount_uzs", "region", "risk", "color", "top_reason", "top_reason_text",
               "base_color", "priority", "escalations"}
 RANK = {"green": 0, "yellow": 1, "red": 2}
 FORBIDDEN = {"is_fraud", "typology", "profile", "stealth", "ring_id", "fraud_visible"}
@@ -79,7 +79,7 @@ def test_score_loan_contract_and_consistency(queue):
         assert set(s) == {"risk", "color", "reasons", "model_version", "latency_ms"}
         assert s["risk"] == pytest.approx(item["risk"], abs=1e-9) and s["color"] == item["base_color"]  # money-trail only
         assert s["latency_ms"] > 0 and s["model_version"] == "money_trail_v2"
-        assert all(set(r) == {"code", "text_uz", "weight"} for r in s["reasons"])
+        assert all(set(r) == {"code", "text_uz", "text", "weight"} for r in s["reasons"])
 
 
 def test_unknown_loan():

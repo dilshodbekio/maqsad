@@ -25,7 +25,7 @@ from ml.generator.config import MATCHING_OKED, SPLITS
 from .features import build_features
 from .colors import color_of, rank_thresholds
 from .model import MODEL_VERSION, MoneyTrailModel, load_model
-from .reasons import NO_REASON_UZ, TEMPLATES, build_evidence, build_reasons, is_skipped
+from .reasons import NO_REASON, NO_REASON_UZ, build_evidence, build_reasons, is_skipped, render
 
 DEMO_SPLIT = "demo"
 LOAN_FIELDS = ["loan_id", "borrower_id", "borrower_name_masked", "purpose", "amount_uzs", "term_months",
@@ -112,17 +112,17 @@ class Portfolio:
             j = top[i]
             ctx = {"supplier_oked": oked[i]}
             if C[i, j] <= 1e-9:
-                text = NO_REASON_UZ
+                text = dict(NO_REASON)
             elif is_skipped(feats[j], float(X[i, j])):                     # not a shown fact: take the full path
                 rs = build_reasons(feats, X[i], C[i], ctx, with_refs=False)
-                text = rs[0]["text_uz"] if rs else NO_REASON_UZ
+                text = rs[0]["text"] if rs else dict(NO_REASON)
             else:
-                text = TEMPLATES[feats[j]](X[i, j], ctx)
+                text = render(feats[j], float(X[i, j]), ctx)
             base = color_of(float(risk[i]), self.thresholds)
             item = dict(
                 loan_id=lid, borrower_name_masked=cols["borrower_name_masked"][i], purpose=purpose[i],
                 amount_uzs=int(cols["amount_uzs"][i]), region=region[i], risk=float(risk[i]),
-                color=base, top_reason=text, base_color=base, priority=fusion.priority(base, risk[i]), escalations=[])
+                color=base, top_reason=text["uz"], top_reason_text=text, base_color=base, priority=fusion.priority(base, risk[i]), escalations=[])
             self._base_reason[lid] = text
             if lid in self._signals:
                 self._apply(item, self._signals[lid])
@@ -136,9 +136,10 @@ class Portfolio:
         item["color"], item["escalations"] = res["color"], res["escalations"]
         item["priority"] = fusion.priority(res["color"], item["risk"])
         base = self._base_reason[item["loan_id"]]
-        ordered = fusion.order_reasons([dict(text_uz=e["text_uz"]) for e in res["escalations"]],
-                                       [] if base == NO_REASON_UZ else [dict(text_uz=base)], res["escalations"])
-        item["top_reason"] = ordered[0]["text_uz"] if ordered else NO_REASON_UZ     # == get_loan().reasons[0]
+        ordered = fusion.order_reasons([dict(text=e["text"]) for e in res["escalations"]],
+                                       [] if base["uz"] == NO_REASON_UZ else [dict(text=base)], res["escalations"])
+        top = ordered[0]["text"] if ordered else dict(NO_REASON)                  # == get_loan().reasons[0]
+        item["top_reason"], item["top_reason_text"] = top["uz"], top
         return item
 
     def _portfolio_signals(self) -> dict:
@@ -223,7 +224,7 @@ class Portfolio:
             signals += sandbox_signals(sandbox_id).get(loan_id, [])
         base = color_of(risk, self.thresholds)
         fused = fusion.apply_policy(base, signals)
-        policy_reasons = [dict(code=e["code"], text_uz=e["text_uz"], weight=None, evidence_refs=e["evidence_refs"],
+        policy_reasons = [dict(code=e["code"], text_uz=e["text_uz"], text=e["text"], weight=None, evidence_refs=e["evidence_refs"],
                                source="fusion_policy") for e in fused["escalations"]]
         photo_evidence = {s["evidence_ref"]: s["evidence"] for s in signals}
         photo_items = copy.deepcopy([photo_evidence[r] for r in dict.fromkeys(r for e in fused["escalations"] for r in e["evidence_refs"])])

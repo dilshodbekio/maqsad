@@ -30,7 +30,7 @@ def test_presets_score_without_error(presets):
         assert set(r) == {"risk", "color", "reasons", "model_version", "latency_ms", "percentile", "features"}
         assert 0 <= r["risk"] <= 1 and r["color"] in ("green", "yellow", "red") and 0 <= r["percentile"] <= 100
         assert r["model_version"] == "money_trail_v2" and r["reasons"]
-        assert all(set(x) == {"code", "text_uz", "weight"} for x in r["reasons"])
+        assert all(set(x) == {"code", "text_uz", "text", "weight"} for x in r["reasons"])
         assert set(r["features"]) == set(FEATURE_COLUMNS)
 
 

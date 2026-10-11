@@ -1,5 +1,5 @@
 // All requests are relative (/api/...); the same FastAPI service serves the API and this build.
-// Contract: docs/api_contract.md (v1.5).
+// Contract: docs/api_contract.md (v1.9).
 
 import { getLang, t, type Lang } from "./i18n";
 

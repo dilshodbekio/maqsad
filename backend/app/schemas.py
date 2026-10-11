@@ -20,15 +20,20 @@ LOAN_ID_PATTERN = r"^[A-Za-z0-9_\-]+$"
 FunctionStatus = Literal["real", "stub", "not_ready", "missing"]
 
 
+Text3 = Dict[str, str]  # {"uz": ..., "en": ..., "ru": ...} (same facts and numbers in every language)
+
+
 class Reason(BaseModel):
     code: str
     text_uz: str
+    text: Optional[Text3] = None
     weight: float
 
 
 class LoanReason(BaseModel):
     code: str
     text_uz: str
+    text: Optional[Text3] = None
     weight: Optional[float] = None  # None for evidence-fusion policy reasons
     evidence_refs: List[str] = []  # each is an evidence[].ref of the same loan
     source: Optional[Literal["fusion_policy"]] = None
@@ -39,6 +44,7 @@ class Escalation(BaseModel):
     code: str  # PHOTO_DUPLICATE | PHOTO_FAR | PHOTO_TIME | PHOTO_ASSET_MISMATCH
     min_color: Color
     text_uz: str
+    text: Optional[Text3] = None
     evidence_refs: List[str] = []
     raises_color: bool
 
@@ -80,6 +86,7 @@ class AssetMatch(BaseModel):
     score: float
     matches_purpose: bool
     label_uz: str
+    label_i18n: Optional[Text3] = None
 
 
 class CheckPhotoResponse(BaseModel):
@@ -120,6 +127,7 @@ class Evidence(BaseModel):
     ref: str
     kind: Literal["txn", "invoice", "graph", "photo", "period"]
     summary_uz: Optional[str] = None
+    summary: Optional[Text3] = None
     data: Any = None
 
 
@@ -142,6 +150,7 @@ class QueueItem(BaseModel):
     risk: Risk
     color: Color  # after evidence fusion (>= base_color)
     top_reason: str
+    top_reason_text: Optional[Text3] = None
     base_color: Color  # money-trail colour
     priority: float  # queue sort key: colour rank (green 0, yellow 1, red 2) + risk
     escalations: List[Escalation] = []
@@ -232,7 +241,8 @@ class Fact(BaseModel):
 
 
 class DraftReport(BaseModel):
-    text_uz: str
+    text_uz: str  # the draft in the language of the request (Accept-Language: uz / en / ru); the field name is kept
+    lang: str = "uz"
     facts: List[Fact]
     model: str
     latency_ms: float
@@ -366,4 +376,6 @@ class ScenarioPreset(BaseModel):
     id: str
     title_uz: str
     description_uz: str
+    title: Optional[Text3] = None
+    description: Optional[Text3] = None
     scenario: Dict[str, Any]

@@ -331,7 +331,7 @@ def test_check_photo_asset_match_shape(make_client):
     am = {"label": "chorva", "score": 0.4, "matches_purpose": False, "label_uz": "avtomobil"}
     c = make_client(adapter=MLAdapter(_fake_ml(check_photo=lambda *a, **k: {**RESULT, "asset_match": am}), "real"))
     r = _upload(c, c.get("/api/queue").json()["items"][0]["loan_id"])
-    assert r.status_code == 200 and r.json()["asset_match"] == am
+    assert r.status_code == 200 and {k: v for k, v in r.json()["asset_match"].items() if v is not None} == am
     bad = {"label": "chorva", "score": 0.4}  # old shape: not valid any more -> ml contract error (502)
     c = make_client(adapter=MLAdapter(_fake_ml(check_photo=lambda *a, **k: {**RESULT, "asset_match": bad}), "real"))
     assert _upload(c, c.app.state.ml.get_queue()[0]["loan_id"]).status_code == 502

@@ -64,7 +64,7 @@ def _bad(**changes):
 
 def test_presets_and_score_pass_through(fake):
     c, m = fake
-    assert c.get("/api/scenario_presets").json() == PRESETS
+    assert [{k: v for k, v in p.items() if v is not None} for p in c.get("/api/scenario_presets").json()] == PRESETS
     r = c.post("/api/score_scenario", json=GOOD)
     assert r.status_code == 200, r.text
     assert r.json()["risk"] == 0.5 and r.json()["percentile"] == 50.0

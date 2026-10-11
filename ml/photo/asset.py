@@ -46,6 +46,36 @@ DEFAULT_CACHE = config.ROOT / "ml" / ".cache" / "clip"
 
 LABEL_UZ = {"tikuv_dastgohi": "tikuv mashinasi", "chorva": "chorva (qoramol)", "issiqxona": "issiqxona",
             "parranda": "parranda (tovuq)", "asalarichilik": "ari uyasi", "other": "boshqa narsa"}
+LABEL_I18N = {
+    "tikuv_dastgohi": dict(uz="tikuv mashinasi", en="sewing machine", ru="швейная машина"),
+    "chorva": dict(uz="chorva (qoramol)", en="livestock (cattle)", ru="скот (крупный рогатый)"),
+    "issiqxona": dict(uz="issiqxona", en="greenhouse", ru="теплица"),
+    "parranda": dict(uz="parranda (tovuq)", en="poultry (chickens)", ru="птица (куры)"),
+    "asalarichilik": dict(uz="ari uyasi", en="beehive", ru="улей"),
+    "other": dict(uz="boshqa narsa", en="something else", ru="другой предмет"),
+}
+# the Uzbek name of what was found in a non-asset photo -> the same name in uz / en / ru
+OTHER_FINE_I18N = {
+    "avtomobil": dict(uz="avtomobil", en="car", ru="автомобиль"),
+    "transport vositasi": dict(uz="transport vositasi", en="vehicle", ru="транспортное средство"),
+    "telefon yoki noutbuk": dict(uz="telefon yoki noutbuk", en="phone or laptop", ru="телефон или ноутбук"),
+    "xona": dict(uz="xona", en="room", ru="комната"),
+    "mebel": dict(uz="mebel", en="furniture", ru="мебель"),
+    "odam": dict(uz="odam", en="person", ru="человек"),
+    "oziq-ovqat": dict(uz="oziq-ovqat", en="food", ru="еда"),
+    "manzara": dict(uz="manzara", en="landscape", ru="пейзаж"),
+    "daraxtlar": dict(uz="daraxtlar", en="trees", ru="деревья"),
+    "hujjat": dict(uz="hujjat", en="document", ru="документ"),
+    "uy hayvoni": dict(uz="uy hayvoni", en="pet", ru="домашнее животное"),
+    "bino": dict(uz="bino", en="building", ru="здание"),
+    "velosiped": dict(uz="velosiped", en="bicycle", ru="велосипед"),
+}
+_BY_UZ = {v["uz"]: v for v in (*LABEL_I18N.values(), *OTHER_FINE_I18N.values())}
+
+
+def label_i18n(label_uz: str) -> dict:
+    """{uz, en, ru} name of what the asset check found, from its Uzbek name (also for results stored in the photo index)."""
+    return dict(_BY_UZ.get(label_uz, dict(uz=label_uz, en=label_uz, ru=label_uz)))
 PROMPTS = {
     "tikuv_dastgohi": ["a photo of a sewing machine", "a sewing machine on a table", "an industrial sewing machine in a garment workshop"],
     "chorva": ["a photo of a cow", "cattle on a farm", "a herd of cows in a pasture"],
@@ -154,9 +184,10 @@ class AssetModel:
         p = self.probe_probs(emb)[0]
         k = int(np.argmax(p))
         label = CLASSES[k]
+        label_uz = self.other_name(emb) if label == "other" else LABEL_UZ[label]
         return dict(label=label, score=round(float(p[k]), 4),
                     matches_purpose=bool(k == pi and p[pi] >= self.tau),
-                    label_uz=self.other_name(emb) if label == "other" else LABEL_UZ[label])
+                    label_uz=label_uz, label_i18n=label_i18n(label_uz))
 
 
 _init_lock = threading.Lock()

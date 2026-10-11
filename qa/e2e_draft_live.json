@@ -1,0 +1,104 @@
+[
+ {
+  "lang": "uz",
+  "sandbox": "19a435b7-5b05-413f-a14c-3a673259d1cd",
+  "fresh": {
+   "status": 200,
+   "client_ms": 6979,
+   "polls": 2,
+   "lang": "uz",
+   "cached": false,
+   "latency_ms": 3497.2,
+   "cost_usd": 0.003571,
+   "model": "gemini-3.6-flash",
+   "input_tokens": 1351,
+   "output_tokens": 682,
+   "facts": 6,
+   "unverified": 0,
+   "text": "Kredit monitoringi jarayonida quyidagi xavf belgilari aniqlandi va birinchi navbatda tekshirish tavsiya etiladi. 2025-12-30 dan 2026-07-31 gacha bo'lgan 213 kunlik tekshirilgan davrda hech qanday tushum qayd etilmagan, ya'ni kredit berilganidan beri tushum mavjud emas. Shuningdek, kredit tushgandan keyin 7 kun ichida mablag'ning 67 foizi naqd yechilgan bo'lib, xususan 2025-12-31 holatiga ko'ra 27 266 000 so'm, 234 000 so'm va 15 705 000 so'm naqd pul yechib olingan. Bundan tashqari, Mehr Agro YaTT tomonidan taqdim etilgan 59 500 000 so'mlik hisob-fakturni o'rganish natijasida hisob-faktura summasining 94 foizi ta'minotchiga to'lanmagani va 2026-01-03 kuni ta'minotchiga faqat 3 301 000 so'm o"
+  },
+  "again": {
+   "status": 200,
+   "client_ms": 200,
+   "polls": 0,
+   "lang": "uz",
+   "cached": true,
+   "latency_ms": 14.7,
+   "cost_usd": 0.0,
+   "model": "gemini-3.6-flash",
+   "input_tokens": null,
+   "output_tokens": null,
+   "facts": 6,
+   "unverified": 0,
+   "text": "Kredit monitoringi jarayonida quyidagi xavf belgilari aniqlandi va birinchi navbatda tekshirish tavsiya etiladi. 2025-12-30 dan 2026-07-31 gacha bo'lgan 213 kunlik tekshirilgan davrda hech qanday tushum qayd etilmagan, ya'ni kredit berilganidan beri tushum mavjud emas. Shuningdek, kredit tushgandan keyin 7 kun ichida mablag'ning 67 foizi naqd yechilgan bo'lib, xususan 2025-12-31 holatiga ko'ra 27 266 000 so'm, 234 000 so'm va 15 705 000 so'm naqd pul yechib olingan. Bundan tashqari, Mehr Agro YaTT tomonidan taqdim etilgan 59 500 000 so'mlik hisob-fakturni o'rganish natijasida hisob-faktura summasining 94 foizi ta'minotchiga to'lanmagani va 2026-01-03 kuni ta'minotchiga faqat 3 301 000 so'm o"
+  }
+ },
+ {
+  "lang": "en",
+  "sandbox": "59455b4a-be83-491b-8fd4-f3080bc33175",
+  "fresh": {
+   "status": 200,
+   "client_ms": 10436,
+   "polls": 3,
+   "lang": "en",
+   "cached": false,
+   "latency_ms": 8499.8,
+   "cost_usd": 0.003654,
+   "model": "gemini-3.6-flash",
+   "input_tokens": 1187,
+   "output_tokens": 737,
+   "facts": 6,
+   "unverified": 0,
+   "text": "DRAFT INSPECTION REPORT FOR BANK LOAN-MONITORING OFFICER\n\nSeveral observations have been flagged during the monitoring process:\n- A risk signal indicates no income recorded since the loan was issued. Specifically, for the checked period from 2025-12-30 to 2026-07-31 (213 days), no income was recorded. It is recommended to check this first.\n- A risk signal shows that 94% of the invoice amount was not paid to the supplier. The invoice total is 59 500 000 UZS from supplier Mehr Agro YaTT (OKED 01.41), whose line of business matches the loan purpose. On 2026-01-03, 3 301 000 UZS was transferred to the supplier. It is recommended to check this first.\n- A risk signal shows that 67% of the funds we"
+  },
+  "again": {
+   "status": 200,
+   "client_ms": 234,
+   "polls": 0,
+   "lang": "en",
+   "cached": true,
+   "latency_ms": 25.5,
+   "cost_usd": 0.0,
+   "model": "gemini-3.6-flash",
+   "input_tokens": null,
+   "output_tokens": null,
+   "facts": 6,
+   "unverified": 0,
+   "text": "DRAFT INSPECTION REPORT FOR BANK LOAN-MONITORING OFFICER\n\nSeveral observations have been flagged during the monitoring process:\n- A risk signal indicates no income recorded since the loan was issued. Specifically, for the checked period from 2025-12-30 to 2026-07-31 (213 days), no income was recorded. It is recommended to check this first.\n- A risk signal shows that 94% of the invoice amount was not paid to the supplier. The invoice total is 59 500 000 UZS from supplier Mehr Agro YaTT (OKED 01.41), whose line of business matches the loan purpose. On 2026-01-03, 3 301 000 UZS was transferred to the supplier. It is recommended to check this first.\n- A risk signal shows that 67% of the funds we"
+  }
+ },
+ {
+  "lang": "ru",
+  "sandbox": "9e77e49c-4ecf-4d26-9bf0-d9565e580b19",
+  "fresh": {
+   "status": 200,
+   "client_ms": 6596,
+   "polls": 2,
+   "lang": "ru",
+   "cached": false,
+   "latency_ms": 3599.0,
+   "cost_usd": 0.003704,
+   "model": "gemini-3.6-flash",
+   "input_tokens": 1239,
+   "output_tokens": 740,
+   "facts": 6,
+   "unverified": 0,
+   "text": "Черновик акта проверки кредита.\n\nВ ходе мониторинга кредита зафиксированы следующие данные:\n1. За период с 2025-12-30 по 2026-07-31 (213 дн.) поступлений дохода не зафиксировано.\n2. Был оформлен счёт-фактура на сумму 59 500 000 сум от поставщика Mehr Agro YaTT.\n3. 2026-01-03 переведено поставщику 3 301 000 сум (транзакция T150016477).\n4. 2025-12-31 проведены операции по снятию наличных: 27 266 000 сум (T150015906), 234 000 сум (T150015921) и 15 705 000 сум (T150015962).\n\nВыявленные признаки риска:\n- С момента выдачи кредита поступлений дохода не зафиксировано.\n- 94% суммы счёта-фактуры не переведено поставщику.\n- В течение 7 дней после выдачи кредита снято наличными 67% средств.\n\nДанные обст"
+  },
+  "again": {
+   "status": 200,
+   "client_ms": 121,
+   "polls": 0,
+   "lang": "ru",
+   "cached": true,
+   "latency_ms": 10.6,
+   "cost_usd": 0.0,
+   "model": "gemini-3.6-flash",
+   "input_tokens": null,
+   "output_tokens": null,
+   "facts": 6,
+   "unverified": 0,
+   "text": "Черновик акта проверки кредита.\n\nВ ходе мониторинга кредита зафиксированы следующие данные:\n1. За период с 2025-12-30 по 2026-07-31 (213 дн.) поступлений дохода не зафиксировано.\n2. Был оформлен счёт-фактура на сумму 59 500 000 сум от поставщика Mehr Agro YaTT.\n3. 2026-01-03 переведено поставщику 3 301 000 сум (транзакция T150016477).\n4. 2025-12-31 проведены операции по снятию наличных: 27 266 000 сум (T150015906), 234 000 сум (T150015921) и 15 705 000 сум (T150015962).\n\nВыявленные признаки риска:\n- С момента выдачи кредита поступлений дохода не зафиксировано.\n- 94% суммы счёта-фактуры не переведено поставщику.\n- В течение 7 дней после выдачи кредита снято наличными 67% средств.\n\nДанные обст"
+  }
+ }
+]

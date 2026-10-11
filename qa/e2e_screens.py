@@ -78,6 +78,8 @@ def main():
                     wrong = []
                     if html_lang != lang:
                         wrong.append(f"html lang={html_lang}")
+                    if "money_trail" not in text:
+                        wrong.append("footer: model status missing")
                     if lang == "ru" and not CYR.search(text):
                         wrong.append("no Cyrillic")
                     if lang in ("uz", "en") and CYR.search(text):

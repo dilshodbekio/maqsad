@@ -29,6 +29,7 @@ from .colors import color_of
 from .features import build_features
 from .model import MODEL_VERSION
 from .reasons import build_reasons
+from .reasons_i18n import money
 
 SCENARIO_LOAN_ID, SCENARIO_SUPPLIER_ID, SCENARIO_BORROWER_ID = "L-SCENARIO", "S-SCENARIO", "B-SCENARIO"
 TX_TYPES = ("cash_withdrawal", "supplier_payment", "p2p_out", "p2p_in", "external_transfer", "income")
@@ -51,86 +52,127 @@ def _som(v) -> str:
     return f"{int(round(v)):,}".replace(",", " ") + " so'm"
 
 
+def _e(uz: str, en: str, ru: str) -> ScenarioError:
+    return ScenarioError(uz, en, ru)
+
+
 def _int(v, what, lo=None, hi=None) -> int:
-    """Exact integer from an int or an integral finite float; bool, str, NaN, inf are rejected (ScenarioError)."""
+    """Exact integer from an int or an integral finite float; bool, str, NaN, inf are rejected (ScenarioError).
+    `what` is the name of the value in (uz, en, ru)."""
     if isinstance(v, (float, np.floating)) and math.isfinite(v) and float(v).is_integer():
         v = int(v)
     if isinstance(v, bool) or not isinstance(v, (int, np.integer)):
-        raise ScenarioError(f"{what}: butun son kiritilishi kerak")
+        raise _e(f"{what[0]}: butun son kiritilishi kerak", f"{what[1]}: a whole number is required", f"{what[2]}: требуется целое число")
     v = int(v)
     if (lo is not None and v < lo) or (hi is not None and v > hi):
-        raise ScenarioError(f"{what}: qiymat {lo if lo is not None else ''}..{hi if hi is not None else ''} oralig'ida bo'lishi kerak")
+        rng = f"{lo if lo is not None else ''}..{hi if hi is not None else ''}"
+        raise _e(f"{what[0]}: qiymat {rng} oralig'ida bo'lishi kerak", f"{what[1]}: the value must be in the range {rng}",
+                 f"{what[2]}: значение должно быть в диапазоне {rng}")
     return v
 
 
-def _no_unknown(d: dict, allowed, where: str):
+def _no_unknown(d: dict, allowed, where):
+    """`where` is the place in (uz, en, ru)."""
     extra = [k for k in d if k not in allowed]
     if extra:
-        raise ScenarioError(f"Noma'lum kalit(lar) {where}: {', '.join(sorted(map(str, extra)))}. Mumkin: {', '.join(allowed)}")
+        keys, ok = ", ".join(sorted(map(str, extra))), ", ".join(allowed)
+        raise _e(f"Noma'lum kalit(lar) {where[0]}: {keys}. Mumkin: {ok}", f"Unknown key(s) {where[1]}: {keys}. Allowed: {ok}",
+                 f"Неизвестные ключи {where[2]}: {keys}. Допустимые: {ok}")
+
+
+def _w(uz: str, en: str, ru: str) -> tuple:
+    return (uz, en, ru)
 
 
 def validate(scn, P) -> dict:
-    """Normalised scenario or ScenarioError (Uzbek message)."""
+    """Normalised scenario or ScenarioError (message in uz / en / ru)."""
     if not isinstance(scn, dict):
-        raise ScenarioError("Ssenariy lug'at (dict) bo'lishi kerak")
-    _no_unknown(scn, KEYS_TOP, "ssenariyda")
+        raise _e("Ssenariy lug'at (dict) bo'lishi kerak", "The scenario must be an object (dict)", "Сценарий должен быть объектом (dict)")
+    _no_unknown(scn, KEYS_TOP, _w("ssenariyda", "in the scenario", "в сценарии"))
     purpose = scn.get("purpose")
     if purpose not in PURPOSES:
-        raise ScenarioError(f"Noma'lum kredit maqsadi: {purpose!r}. Mumkin: {', '.join(PURPOSES)}")
-    amount = _int(scn.get("amount_uzs"), "Kredit summasi (amount_uzs)", 1, MAX_AMOUNT)
-    snap_day = _int(scn.get("snapshot_day"), "snapshot_day (kredit berilganidan baholash kunigacha kunlar)")
+        ok = ", ".join(PURPOSES)
+        raise _e(f"Noma'lum kredit maqsadi: {purpose!r}. Mumkin: {ok}", f"Unknown loan purpose: {purpose!r}. Allowed: {ok}",
+                 f"Неизвестная цель кредита: {purpose!r}. Допустимые: {ok}")
+    amount = _int(scn.get("amount_uzs"), _w("Kredit summasi (amount_uzs)", "Loan amount (amount_uzs)", "Сумма кредита (amount_uzs)"), 1, MAX_AMOUNT)
+    snap_day = _int(scn.get("snapshot_day"), _w("snapshot_day (kredit berilganidan baholash kunigacha kunlar)",
+                                               "snapshot_day (days from disbursement to the evaluation date)",
+                                               "snapshot_day (дней от выдачи кредита до даты оценки)"))
     if not SNAPSHOT_DAY_MIN <= snap_day <= SNAPSHOT_DAY_MAX:
-        raise ScenarioError(f"snapshot_day {SNAPSHOT_DAY_MIN}..{SNAPSHOT_DAY_MAX} kun oralig'ida bo'lishi kerak: model bir yilgacha "
-                            "(2-364 kunlik) berilgan kreditlar bo'yicha o'qitilgan")
+        raise _e(f"snapshot_day {SNAPSHOT_DAY_MIN}..{SNAPSHOT_DAY_MAX} kun oralig'ida bo'lishi kerak: model bir yilgacha "
+                 "(2-364 kunlik) berilgan kreditlar bo'yicha o'qitilgan",
+                 f"snapshot_day must be between {SNAPSHOT_DAY_MIN} and {SNAPSHOT_DAY_MAX} days: the model was trained on loans "
+                 "issued up to a year earlier (2-364 days)",
+                 f"snapshot_day должен быть в диапазоне {SNAPSHOT_DAY_MIN}..{SNAPSHOT_DAY_MAX} дней: модель обучена на кредитах, "
+                 "выданных до года назад (2-364 дня)")
     invoice = scn.get("invoice_amount_uzs")
     if invoice is not None:
-        invoice = _int(invoice, "Hisob-faktura summasi (invoice_amount_uzs)", 1, MAX_AMOUNT)
+        invoice = _int(invoice, _w("Hisob-faktura summasi (invoice_amount_uzs)", "Invoice amount (invoice_amount_uzs)",
+                                   "Сумма счёта-фактуры (invoice_amount_uzs)"), 1, MAX_AMOUNT)
         if invoice > MAX_SINGLE_X * amount:
-            raise ScenarioError(f"Hisob-faktura summasi kredit summasidan {MAX_SINGLE_X} baravardan katta bo'lishi mumkin emas")
+            raise _e(f"Hisob-faktura summasi kredit summasidan {MAX_SINGLE_X} baravardan katta bo'lishi mumkin emas",
+                     f"The invoice amount cannot be more than {MAX_SINGLE_X} times the loan amount",
+                     f"Сумма счёта-фактуры не может превышать сумму кредита более чем в {MAX_SINGLE_X} раз")
     region = scn.get("region")
     if region is not None and not (isinstance(region, str) and region in {r[0] for r in REGIONS}):
-        raise ScenarioError(f"Noma'lum hudud: {region!r}")
+        raise _e(f"Noma'lum hudud: {region!r}", f"Unknown region: {region!r}", f"Неизвестный регион: {region!r}")
     sup = scn.get("supplier")
     if not isinstance(sup, dict) or sup.get("mode") not in ("existing", "new"):
-        raise ScenarioError("Ta'minotchi (supplier) 'mode': 'existing' yoki 'new' bo'lishi kerak")
-    _no_unknown(sup, KEYS_SUPPLIER[sup["mode"]], "ta'minotchida")
+        raise _e("Ta'minotchi (supplier) 'mode': 'existing' yoki 'new' bo'lishi kerak", "The supplier 'mode' must be 'existing' or 'new'",
+                 "'mode' поставщика (supplier) должен быть 'existing' или 'new'")
+    _no_unknown(sup, KEYS_SUPPLIER[sup["mode"]], _w("ta'minotchida", "in the supplier", "у поставщика"))
     if sup["mode"] == "existing":
         sid = sup.get("supplier_id")
         if not isinstance(sid, str) or sid not in P.suppliers.index:
-            raise ScenarioError(f"Noma'lum ta'minotchi: {sid if isinstance(sid, str) else repr(sid)}")
+            shown = sid if isinstance(sid, str) else repr(sid)
+            raise _e(f"Noma'lum ta'minotchi: {shown}", f"Unknown supplier: {shown}", f"Неизвестный поставщик: {shown}")
         supplier = dict(mode="existing", supplier_id=sid)
     else:
         oked = sup.get("oked")
         if not isinstance(oked, str) or not re.fullmatch(r"[0-9]{2}\.[0-9]{2}", oked):
-            raise ScenarioError("Ta'minotchi OKED kodi 'NN.NN' ko'rinishida bo'lishi kerak (masalan 46.23)")
-        supplier = dict(mode="new", oked=oked, registered_days_before=_int(
-            sup.get("registered_days_before"), "registered_days_before", 0, 40_000))
+            raise _e("Ta'minotchi OKED kodi 'NN.NN' ko'rinishida bo'lishi kerak (masalan 46.23)",
+                     "The supplier OKED code must look like 'NN.NN' (for example 46.23)",
+                     "Код ОКЭД поставщика должен иметь вид 'NN.NN' (например, 46.23)")
+        reg = "registered_days_before"
+        supplier = dict(mode="new", oked=oked, registered_days_before=_int(sup.get(reg), _w(reg, reg, reg), 0, 40_000))
     txs = scn.get("transactions")
     if not isinstance(txs, list):
-        raise ScenarioError("transactions ro'yxat bo'lishi kerak")
+        raise _e("transactions ro'yxat bo'lishi kerak", "transactions must be a list", "transactions должен быть списком")
     if len(txs) > MAX_TX:
-        raise ScenarioError(f"Tranzaksiyalar soni {MAX_TX} tadan oshmasligi kerak (kiritildi: {len(txs)})")
+        raise _e(f"Tranzaksiyalar soni {MAX_TX} tadan oshmasligi kerak (kiritildi: {len(txs)})",
+                 f"The number of transactions must not exceed {MAX_TX} (entered: {len(txs)})",
+                 f"Количество транзакций не должно превышать {MAX_TX} (введено: {len(txs)})")
     norm = []
     for i, t in enumerate(txs, 1):
         if not isinstance(t, dict):
-            raise ScenarioError(f"{i}-tranzaksiya lug'at bo'lishi kerak")
-        _no_unknown(t, KEYS_TX, f"{i}-tranzaksiyada")
+            raise _e(f"{i}-tranzaksiya lug'at bo'lishi kerak", f"Transaction {i} must be an object (dict)",
+                     f"Транзакция {i} должна быть объектом (dict)")
+        _no_unknown(t, KEYS_TX, _w(f"{i}-tranzaksiyada", f"in transaction {i}", f"в транзакции {i}"))
         if t.get("type") not in TX_TYPES:
-            raise ScenarioError(f"{i}-tranzaksiya: noma'lum tur {t.get('type')!r}. Mumkin: {', '.join(TX_TYPES)}")
+            ok = ", ".join(TX_TYPES)
+            raise _e(f"{i}-tranzaksiya: noma'lum tur {t.get('type')!r}. Mumkin: {ok}",
+                     f"Transaction {i}: unknown type {t.get('type')!r}. Allowed: {ok}",
+                     f"Транзакция {i}: неизвестный тип {t.get('type')!r}. Допустимые: {ok}")
         kind = t.get("counterparty_kind")
         if kind is not None and kind not in CP_KINDS:
-            raise ScenarioError(f"{i}-tranzaksiya: noma'lum counterparty_kind {kind!r}")
-        norm.append(dict(i=i, day=_int(t.get("day"), f"{i}-tranzaksiya kuni (day)", 0, snap_day),
-                         type=t["type"], amount_uzs=_int(t.get("amount_uzs"), f"{i}-tranzaksiya summasi", 1, MAX_AMOUNT),
+            raise _e(f"{i}-tranzaksiya: noma'lum counterparty_kind {kind!r}", f"Transaction {i}: unknown counterparty_kind {kind!r}",
+                     f"Транзакция {i}: неизвестный counterparty_kind {kind!r}")
+        norm.append(dict(i=i, day=_int(t.get("day"), _w(f"{i}-tranzaksiya kuni (day)", f"Transaction {i} day (day)", f"День транзакции {i} (day)"), 0, snap_day),
+                         type=t["type"], amount_uzs=_int(t.get("amount_uzs"), _w(f"{i}-tranzaksiya summasi", f"Transaction {i} amount",
+                                                                               f"Сумма транзакции {i}"), 1, MAX_AMOUNT),
                          counterparty_kind=kind or DEFAULT_KIND[t["type"]]))
     for t in norm:
         if t["amount_uzs"] > MAX_SINGLE_X * amount:
-            raise ScenarioError(f"{t['i']}-tranzaksiya summasi ({_som(t['amount_uzs'])}) kredit summasidan {MAX_SINGLE_X} baravardan "
-                                "katta: ssenariy real emas")
+            a = [money(t["amount_uzs"], lang) for lang in ("uz", "en", "ru")]
+            raise _e(f"{t['i']}-tranzaksiya summasi ({a[0]}) kredit summasidan {MAX_SINGLE_X} baravardan katta: ssenariy real emas",
+                     f"Transaction {t['i']} amount ({a[1]}) is more than {MAX_SINGLE_X} times the loan amount: the scenario is not realistic",
+                     f"Сумма транзакции {t['i']} ({a[2]}) более чем в {MAX_SINGLE_X} раз больше суммы кредита: сценарий нереалистичен")
     inflow = sum(t["amount_uzs"] for t in norm if t["type"] in INFLOWS)
     if inflow > MAX_INFLOW_X * amount:
-        raise ScenarioError(f"Barcha kirimlar yig'indisi ({_som(inflow)}) kredit summasidan {MAX_INFLOW_X} baravardan katta: "
-                            "ssenariy real emas")
+        a = [money(inflow, lang) for lang in ("uz", "en", "ru")]
+        raise _e(f"Barcha kirimlar yig'indisi ({a[0]}) kredit summasidan {MAX_INFLOW_X} baravardan katta: ssenariy real emas",
+                 f"The total of all inflows ({a[1]}) is more than {MAX_INFLOW_X} times the loan amount: the scenario is not realistic",
+                 f"Сумма всех поступлений ({a[2]}) более чем в {MAX_INFLOW_X} раз больше суммы кредита: сценарий нереалистичен")
     # balance check: the loan arrives on day 0; inflows are applied before outflows of the same day
     balance = amount
     for t in sorted(norm, key=lambda t: (t["day"], t["type"] not in INFLOWS, t["i"])):
@@ -138,8 +180,11 @@ def validate(scn, P) -> dict:
             balance += t["amount_uzs"]
         else:
             if t["amount_uzs"] > balance:
-                raise ScenarioError(f"{t['i']}-tranzaksiya ({t['day']}-kun): hisobda mablag' yetarli emas "
-                                    f"(kerak: {_som(t['amount_uzs'])}, mavjud: {_som(balance)})")
+                need = [money(t["amount_uzs"], lang) for lang in ("uz", "en", "ru")]
+                have = [money(balance, lang) for lang in ("uz", "en", "ru")]
+                raise _e(f"{t['i']}-tranzaksiya ({t['day']}-kun): hisobda mablag' yetarli emas (kerak: {need[0]}, mavjud: {have[0]})",
+                         f"Transaction {t['i']} (day {t['day']}): insufficient funds in the account (needed: {need[1]}, available: {have[1]})",
+                         f"Транзакция {t['i']} (день {t['day']}): на счёте недостаточно средств (нужно: {need[2]}, доступно: {have[2]})")
             balance -= t["amount_uzs"]
     return dict(purpose=purpose, amount_uzs=amount, snapshot_day=snap_day, region=region, supplier=supplier,
                 transactions=norm, invoice_amount_uzs=invoice)
@@ -249,6 +294,10 @@ def get_scenario_presets() -> list[dict]:
     return [
         dict(id="honest_purchase", title_uz="Ta'minotchidan oddiy xarid",
              description_uz="Kredit tushgach, summa ta'minotchiga o'tkaziladi; keyin oyiga bir marta kichik tushum.",
+             title=dict(uz="Ta'minotchidan oddiy xarid", en="An ordinary purchase from a supplier", ru="Обычная покупка у поставщика"),
+             description=dict(uz="Kredit tushgach, summa ta'minotchiga o'tkaziladi; keyin oyiga bir marta kichik tushum.",
+                              en="After the loan arrives, the amount is paid to the supplier; then a small income payment once a month.",
+                              ru="После поступления кредита сумма переводится поставщику; затем раз в месяц небольшое поступление дохода."),
              scenario=dict(purpose="tikuv_dastgohi", amount_uzs=40_000_000, invoice_amount_uzs=40_000_000, region=None, snapshot_day=150,
                            supplier=dict(mode="new", oked="28.94", registered_days_before=2000),
                            transactions=[dict(day=3, type="supplier_payment", amount_uzs=39_000_000)] +
@@ -256,6 +305,14 @@ def get_scenario_presets() -> list[dict]:
         dict(id="fast_cash_out", title_uz="Kredit tushishi bilan tez naqdlashtirish",
              description_uz="Birinchi kuni mablag'ning katta qismi naqd yechiladi, ta'minotchiga atigi kichik summa o'tkaziladi. "
                             "Naqd yechish kunini (day) o'zgartirib ko'ring.",
+             title=dict(uz="Kredit tushishi bilan tez naqdlashtirish", en="Cashing out quickly after the loan arrives",
+                        ru="Быстрое снятие наличных сразу после поступления кредита"),
+             description=dict(uz="Birinchi kuni mablag'ning katta qismi naqd yechiladi, ta'minotchiga atigi kichik summa o'tkaziladi. "
+                                 "Naqd yechish kunini (day) o'zgartirib ko'ring.",
+                              en="On the first day a large part of the funds is withdrawn in cash and only a small amount goes to the supplier. "
+                                 "Try changing the day of the cash withdrawal (day).",
+                              ru="В первый день большая часть средств снимается наличными, поставщику переводится лишь небольшая сумма. "
+                                 "Попробуйте изменить день снятия наличных (day)."),
              scenario=dict(purpose="chorva", amount_uzs=50_000_000, invoice_amount_uzs=50_000_000, region=None, snapshot_day=60,
                            supplier=dict(mode="new", oked="01.41", registered_days_before=900),
                            transactions=[dict(day=1, type="cash_withdrawal", amount_uzs=42_000_000),
@@ -263,11 +320,25 @@ def get_scenario_presets() -> list[dict]:
         dict(id="supplier_ring", title_uz="Ko'p qarz oluvchi, bitta ta'minotchi, naqd chiqarish",
              description_uz="Ko'p kredit bitta ta'minotchiga to'lanadi va ta'minotchi pulni tez naqdlashtiradi (demo portfeldagi "
                             f"mavjud ta'minotchi {ring['supplier_id']}). Bu kredit shu ta'minotchining yana bir qarz oluvchisi.",
+             title=dict(uz="Ko'p qarz oluvchi, bitta ta'minotchi, naqd chiqarish", en="Many borrowers, one supplier, cash-out",
+                        ru="Много заёмщиков, один поставщик, снятие наличных"),
+             description=dict(uz="Ko'p kredit bitta ta'minotchiga to'lanadi va ta'minotchi pulni tez naqdlashtiradi (demo portfeldagi "
+                                 f"mavjud ta'minotchi {ring['supplier_id']}). Bu kredit shu ta'minotchining yana bir qarz oluvchisi.",
+                              en="Many loans are paid to one supplier and the supplier quickly turns the money into cash (existing supplier "
+                                 f"{ring['supplier_id']} of the demo portfolio). This loan is one more borrower of that supplier.",
+                              ru="Многие кредиты переводятся одному поставщику, и поставщик быстро снимает деньги наличными (существующий "
+                                 f"поставщик {ring['supplier_id']} демо-портфеля). Этот кредит — ещё один заёмщик этого поставщика."),
              scenario=dict(purpose=ring["purpose"], amount_uzs=ring["amount"], invoice_amount_uzs=ring["amount"], region=None, snapshot_day=90,
                            supplier=dict(mode="existing", supplier_id=ring["supplier_id"]),
                            transactions=[dict(day=2, type="supplier_payment", amount_uzs=int(ring["amount"] * 0.92))])),
         dict(id="asset_resale", title_uz="Aktiv sotib olinadi, keyin bir martalik tushum va naqd chiqarish",
              description_uz="Ta'minotchiga to'lov o'tkaziladi; ikki oy o'tib katta bir martalik tushum keladi va u naqd yechiladi.",
+             title=dict(uz="Aktiv sotib olinadi, keyin bir martalik tushum va naqd chiqarish",
+                        en="The asset is bought, then a one-off inflow and a cash withdrawal",
+                        ru="Актив куплен, затем разовое поступление и снятие наличных"),
+             description=dict(uz="Ta'minotchiga to'lov o'tkaziladi; ikki oy o'tib katta bir martalik tushum keladi va u naqd yechiladi.",
+                              en="A payment goes to the supplier; two months later a large one-off inflow arrives and is withdrawn in cash.",
+                              ru="Поставщику переводится платёж; через два месяца приходит крупное разовое поступление, и оно снимается наличными."),
              scenario=dict(purpose="chorva", amount_uzs=60_000_000, invoice_amount_uzs=60_000_000, region=None, snapshot_day=120,
                            supplier=dict(mode="new", oked="01.41", registered_days_before=1200),
                            transactions=[dict(day=3, type="supplier_payment", amount_uzs=58_000_000),

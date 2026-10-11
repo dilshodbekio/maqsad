@@ -33,7 +33,7 @@ def test_draft_report_fact_check(make_client, monkeypatch, loan_id):
     monkeypatch.setattr(llm, "_chat", lambda settings, messages: (json.dumps(llm_answer), 100, 50))
     d = draft(c, loan_id)
     assert set(d) == {"text_uz", "facts", "model", "latency_ms", "cost_usd", "cached", "input_tokens", "output_tokens",
-                      "generated_at"}
+                      "generated_at", "lang"}
     assert [f["unverified"] for f in d["facts"]] == [False, True, True]
     assert d["model"] == "test-model"
     assert d["cost_usd"] is None  # price not configured -> not guessed

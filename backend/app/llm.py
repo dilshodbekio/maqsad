@@ -18,7 +18,7 @@ from .config import Settings
 log = logging.getLogger("maqsad.llm")
 
 
-PROMPT_VERSION = "2"  # part of the draft cache key: a prompt change invalidates cached drafts
+PROMPT_VERSION = "3"  # part of the draft cache key: a prompt change invalidates cached drafts
 
 
 class LLMNotConfigured(Exception):
@@ -37,7 +37,7 @@ class LLMRateLimited(LLMError):
         self.retry_after_s = retry_after_s
 
 
-SYSTEM_PROMPT = (
+SYSTEM_PROMPT_UZ = (
     "Siz bank kredit monitoringi xodimi uchun tekshiruv dalolatnomasining QORALAMASINI yozasiz. "
     "Faqat berilgan dalillar (evidence) va sabablar (reasons) dagi faktlardan foydalaning, hech narsa "
     "o'ylab topmang. Hech kimni aybdor demang: 'xavf belgisi', 'birinchi navbatda tekshirish tavsiya etiladi' "
@@ -47,6 +47,26 @@ SYSTEM_PROMPT = (
     "bo'lsin (boshqa qiymat tekshiruvdan o'tmaydi); raqamlarni dalildagidek yozing. "
     "'risk' ehtimollik emas, foiz sifatida yozmang."
 )
+SYSTEM_PROMPT_EN = (
+    "You write a DRAFT of an inspection report for a bank loan-monitoring officer. Use only the facts in the given evidence "
+    "and reasons; do not invent anything. Never call anyone guilty: use phrases such as 'risk signal' and 'it is recommended "
+    "to check this first'. The final decision is made by the officer. Write the text in English. "
+    "Return JSON only: {\"text\": string, \"facts\": [{\"claim\": string, \"evidence_ref\": string}]}. "
+    "Each fact must rely on one piece of evidence; evidence_ref MUST be one of the values in 'allowed_refs' "
+    "(any other value fails the check); write numbers exactly as in the evidence. "
+    "'risk' is not a probability: do not write it as a percentage."
+)
+SYSTEM_PROMPT_RU = (
+    "Вы пишете ЧЕРНОВИК акта проверки для сотрудника банка, который контролирует кредиты. Используйте только факты из "
+    "переданных данных (evidence) и причин (reasons), ничего не выдумывайте. Никого не называйте виновным: используйте "
+    "выражения «признак риска», «рекомендуется проверить в первую очередь». Окончательное решение принимает сотрудник. "
+    "Пишите текст на русском языке. Верните только JSON: {\"text\": string, \"facts\": [{\"claim\": string, \"evidence_ref\": string}]}. "
+    "Каждый факт должен опираться на одно основание; evidence_ref ДОЛЖЕН быть одним из значений списка 'allowed_refs' "
+    "(другое значение не пройдёт проверку); числа пишите так же, как в данных. "
+    "'risk' — не вероятность: не записывайте его в процентах."
+)
+SYSTEM_PROMPTS = {"uz": SYSTEM_PROMPT_UZ, "en": SYSTEM_PROMPT_EN, "ru": SYSTEM_PROMPT_RU}
+SYSTEM_PROMPT = SYSTEM_PROMPT_UZ
 
 _NUM_RE = re.compile(r"\d+(?:[   .,]\d+)*")
 
@@ -152,11 +172,12 @@ def _chat(settings: Settings, messages: list) -> tuple:
     return data["choices"][0]["message"]["content"], usage.get("prompt_tokens"), usage.get("completion_tokens")
 
 
-def draft_report(settings: Settings, loan_id: str, evidence: list, reasons: list, db=None) -> dict:
+def draft_report(settings: Settings, loan_id: str, evidence: list, reasons: list, db=None, lang: str = "uz") -> dict:
+    """`evidence` / `reasons` carry their texts in `lang` (uz / en / ru); the draft is written in that language."""
     if not settings.llm_configured:
         raise LLMNotConfigured()
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": SYSTEM_PROMPTS.get(lang, SYSTEM_PROMPT_UZ)},
         {"role": "user", "content": json.dumps({
             "allowed_refs": [e["ref"] for e in evidence if e.get("ref")],
             "reasons": reasons,
@@ -168,7 +189,7 @@ def draft_report(settings: Settings, loan_id: str, evidence: list, reasons: list
     try:
         content, tin, tout = _chat(settings, messages)
         parsed = json.loads(content)
-        text_uz = str(parsed["text_uz"])
+        text_uz = str(parsed.get("text") or parsed["text_uz"])      # the key is "text" (en / ru) or "text_uz" (uz prompt)
         facts = parsed.get("facts") or []
         if not isinstance(facts, list):
             raise ValueError("facts is not a list")
@@ -192,7 +213,8 @@ def draft_report(settings: Settings, loan_id: str, evidence: list, reasons: list
         db.llm_log(loan_id=loan_id, model=settings.llm_model, latency_ms=latency, input_tokens=tin,
                    output_tokens=tout, cost_usd=cost, ok=True)
     return {
-        "text_uz": text_uz,
+        "text_uz": text_uz,                      # the draft in the language of the request (field name kept for the contract)
+        "lang": lang,
         "facts": fact_check([f for f in facts if isinstance(f, dict)], evidence),
         "model": settings.llm_model,
         "latency_ms": latency,

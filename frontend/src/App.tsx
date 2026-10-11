@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import { HealthStatus, type HealthState } from "./components/HealthStatus";
+import { LangSwitch } from "./components/LangSwitch";
 import { StubBanner } from "./components/StubBanner";
 import { CapturePage } from "./pages/CapturePage";
 import { LoanPage } from "./pages/loan/LoanPage";
 import { ScenarioPage } from "./pages/ScenarioPage";
 import { QueuePage } from "./pages/QueuePage";
+import { t, useLang } from "./i18n";
 import { onLinkClick, useLocation } from "./router";
 
 const WARMUP_POLL_MS = 2000;
@@ -13,6 +15,7 @@ const WARMUP_POLL_MS = 2000;
 export default function App() {
   const [state, setState] = useState<HealthState>({ kind: "loading" });
   const loc = useLocation();
+  useLang(); // re-render the whole tree when the UI language changes
 
   const load = useCallback(() => {
     setState({ kind: "loading" });
@@ -49,10 +52,11 @@ export default function App() {
           <a className="brand" href="/" onClick={(e) => onLinkClick(e, "/")}>
             Maqsad
           </a>
-          <HealthStatus state={state} onRetry={load} />
+          <LangSwitch />
         </div>
-        <p className="subtitle">Imtiyozli kreditlarning maqsadli ishlatilishini masofadan tekshirish</p>
+        <p className="subtitle">{t("app.subtitle")}</p>
       </header>
+      <HealthStatus state={state} onRetry={load} />
       <main className="container">
         {loanMatch ? (
           <LoanPage key={loanMatch[1]} loanId={safeDecode(loanMatch[1])} ready={ready} />
@@ -64,13 +68,16 @@ export default function App() {
           <ScenarioPage ready={ready} />
         ) : (
           <section className="card">
-            <h2>Sahifa topilmadi</h2>
+            <h2>{t("app.notFound")}</h2>
             <a href="/" onClick={(e) => onLinkClick(e, "/")}>
-              Navbatga qaytish
+              {t("app.backToQueue")}
             </a>
           </section>
         )}
       </main>
+      {state.kind === "ok" && (
+        <footer className="footer muted small">{t("app.footerModel", { version: state.health.model_version })}</footer>
+      )}
     </>
   );
 }

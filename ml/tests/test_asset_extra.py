@@ -20,7 +20,7 @@ from ml.photo.index import get_index
 
 pytestmark = pytest.mark.clip
 
-KEYS = {"label", "score", "matches_purpose", "label_uz"}
+KEYS = {"label", "score", "matches_purpose", "label_uz", "label_i18n"}
 
 
 @pytest.fixture(autouse=True)

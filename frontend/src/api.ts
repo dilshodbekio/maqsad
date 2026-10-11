@@ -1,5 +1,10 @@
 // All requests are relative (/api/...); the same FastAPI service serves the API and this build.
-// Contract: docs/api_contract.md (v1.5).
+// Contract: docs/api_contract.md (v1.9).
+
+import { getLang, t, type Lang } from "./i18n";
+
+/** A text in the three UI languages (ml: reasons, escalations, evidence, labels, presets). */
+export type Text3 = Partial<Record<Lang, string>>;
 
 export type FunctionStatus = "real" | "stub" | "not_ready" | "missing";
 
@@ -17,6 +22,7 @@ export type Escalation = {
   code: string;
   min_color: Color;
   text_uz: string;
+  text?: Text3;
   evidence_refs: string[];
   raises_color: boolean;
 };
@@ -31,6 +37,7 @@ export type QueueItem = {
   risk: number;
   color: Color;
   top_reason: string;
+  top_reason_text?: Text3;
   base_color: Color;
   priority: number;
   escalations: Escalation[];
@@ -105,7 +112,7 @@ export type Transaction = {
 export type Duplicate = { loan_id: string; similarity: number };
 
 // CLIP asset check (v1.5); null when CLIP is unavailable. score is a model score, not shown as %.
-export type AssetMatch = { label: string; score: number; matches_purpose: boolean; label_uz: string };
+export type AssetMatch = { label: string; score: number; matches_purpose: boolean; label_uz: string; label_i18n?: Text3 };
 
 export type CheckPhotoResult = {
   asset_match: AssetMatch | null;
@@ -139,18 +146,20 @@ export type Invoice = {
   invoice_amount_uzs?: number | null;
 };
 
-export type EvidenceKind = "txn" | "invoice" | "graph" | "photo";
+export type EvidenceKind = "txn" | "invoice" | "graph" | "photo" | "period";
 
 export type Evidence = {
   ref: string;
   kind: EvidenceKind;
   summary_uz?: string | null;
+  summary?: Text3 | null;
   data?: unknown;
 };
 
 export type LoanReason = {
   code: string;
   text_uz: string;
+  text?: Text3;
   weight: number | null; // null for evidence-fusion policy reasons
   evidence_refs: string[];
   source?: "fusion_policy" | null;
@@ -225,12 +234,19 @@ export type Scenario = {
   transactions: ScenarioTx[];
 };
 
-export type ScenarioPreset = { id: string; title_uz: string; description_uz: string; scenario: Scenario };
+export type ScenarioPreset = {
+  id: string;
+  title_uz: string;
+  description_uz: string;
+  title?: Text3;
+  description?: Text3;
+  scenario: Scenario;
+};
 
 export type ScenarioScore = {
   risk: number; // model score 0..1, "xavf bahosi"
   color: Color;
-  reasons: { code: string; text_uz: string; weight: number }[];
+  reasons: { code: string; text_uz: string; text?: Text3; weight: number }[];
   model_version: string;
   latency_ms: number;
   percentile: number; // 0..100, rank among the demo portfolio's loans
@@ -245,9 +261,10 @@ export class ApiError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(path, { ...init, headers: { Accept: "application/json", ...init?.headers } });
+    // the language of the UI: the backend answers error messages in it (uz / en / ru)
+    res = await fetch(path, { ...init, headers: { Accept: "application/json", "Accept-Language": getLang(), ...init?.headers } });
   } catch {
-    throw new ApiError("Server bilan aloqa yo'q. Internetni tekshirib, qayta urinib ko'ring.", 0);
+    throw new ApiError(t("net.offline"), 0);
   }
   let body: unknown = null;
   try {
@@ -257,7 +274,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (!res.ok) {
     const detail = (body as { detail?: unknown } | null)?.detail;
-    throw new ApiError(typeof detail === "string" ? detail : `Server xatosi (${res.status}).`, res.status);
+    throw new ApiError(typeof detail === "string" ? detail : t("net.serverError", { status: res.status }), res.status);
   }
   return body as T;
 }

@@ -71,7 +71,8 @@ def test_library_has_a_negative_class_with_licences():
 def test_asset_match_shape_and_values(P):
     r = api.check_photo(loan_of(P, "tikuv_dastgohi"), image("tikuv_dastgohi_00.jpg"))
     a = r["asset_match"]
-    assert set(a) == {"label", "score", "matches_purpose", "label_uz"}
+    assert set(a) == {"label", "score", "matches_purpose", "label_uz", "label_i18n"}
+    assert set(a["label_i18n"]) == {"uz", "en", "ru"} and a["label_i18n"]["uz"] == a["label_uz"]
     assert a["label"] in asset.CLASSES and 0 < a["score"] <= 1 and isinstance(a["matches_purpose"], bool) and a["label_uz"]
 
 
@@ -192,7 +193,7 @@ def test_portfolio_photos_carry_the_asset_check(P):
     lid = next(iter(idx.by_loan))
     ph = api.get_loan(lid)["photos"][0]
     assert "asset_match" not in ph                                    # not part of the backend's Photo schema (contract v1.4 shape)
-    assert set(idx.photos_of(lid)[0]["asset_match"]) == {"label", "score", "matches_purpose", "label_uz"}
+    assert set(idx.photos_of(lid)[0]["asset_match"]) == {"label", "score", "matches_purpose", "label_uz", "label_i18n"}
 
 
 def test_warm_up_loads_clip():

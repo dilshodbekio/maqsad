@@ -67,7 +67,7 @@ def test_api_contract_asset_match_shape_lists_all_four_fields():
     m = re.search(r"asset_match: \{([^}]*)\}", t)
     assert m, "asset_match shape missing"
     fields = {f.strip() for f in m.group(1).split(",")}
-    assert fields == {"label", "score", "matches_purpose", "label_uz"}, fields
+    assert fields == {"label", "score", "matches_purpose", "label_uz", "label_i18n"}, fields
 
 
 def test_metrics_has_no_stale_inactive_claim():

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, type DraftJob, type DraftReport } from "../../api";
 import { formatLocalDateTime } from "../../format";
+import { t } from "../../i18n";
 import { BlockError, BlockLoading, EvidenceChip } from "./evidence";
 
 type State =
@@ -103,7 +104,7 @@ export function DraftReportBlock({ loanId }: { loanId: string }) {
     if (job.status === "done" && job.result) return done(job.result, id);
     if (job.status === "error") {
       store(jobKey(loanId), null);
-      setState({ kind: "unavailable", detail: job.error ?? "Dalolatnoma tayyorlanmadi." });
+      setState({ kind: "unavailable", detail: job.error ?? t("report.failed") });
       return;
     }
     store(jobKey(loanId), job.job_id);
@@ -154,26 +155,26 @@ export function DraftReportBlock({ loanId }: { loanId: string }) {
 
   return (
     <section className="card" aria-labelledby="h-report">
-      <h2 id="h-report">Dalolatnoma</h2>
+      <h2 id="h-report">{t("report.title")}</h2>
       {state.kind !== "ok" && !busy && (
         <button type="button" onClick={() => start()}>
-          Dalolatnoma qoralamasi
+          {t("report.start")}
         </button>
       )}
       {state.kind === "idle" && (
-        <p className="muted small">AI faqat shu kreditning dalillari asosida qoralama yozadi; har bir fakt kodda tekshiriladi.</p>
+        <p className="muted small">{t("report.hint")}</p>
       )}
-      {state.kind === "loading" && <BlockLoading text="Qoralama so'ralmoqda…" />}
+      {state.kind === "loading" && <BlockLoading text={t("report.requesting")} />}
       {state.kind === "waiting" && <Waiting job={state.job} />}
       {state.kind === "unavailable" && (
         <div className="notice" role="status">
           <p>
-            <strong>Qoralama hozircha mavjud emas.</strong>
+            <strong>{t("report.unavailable")}</strong>
           </p>
           <p className="muted small">{state.detail}</p>
         </div>
       )}
-      {state.kind === "error" && <BlockError message={`Qoralama tayyorlanmadi: ${state.message}`} onRetry={() => start()} />}
+      {state.kind === "error" && <BlockError message={t("report.error", { message: state.message })} onRetry={() => start()} />}
       {state.kind === "ok" && <Report data={state.data} cooldown={cooldown} onRefresh={() => start(true)} />}
     </section>
   );
@@ -182,15 +183,16 @@ export function DraftReportBlock({ loanId }: { loanId: string }) {
 function Waiting({ job }: { job: DraftJob }) {
   const text =
     job.status === "queued"
-      ? `Navbatda: ${job.position}-o'rin${job.eta_s != null && job.eta_s > 0 ? `, taxminan ${job.eta_s} soniya` : ""}`
-      : "Tayyorlanmoqda…";
+      ? t("report.queued", {
+          position: job.position,
+          eta: job.eta_s != null && job.eta_s > 0 ? t("report.eta", { seconds: job.eta_s }) : "",
+        })
+      : t("report.running");
   return (
     <div aria-live="polite">
       <BlockLoading text={text} />
       {job.status === "queued" && (
-        <p className="muted small">
-          Dalolatnoma xizmati daqiqada cheklangan sonli so'rov qabul qiladi. Sahifadan chiqib qaytsangiz ham, so'rov davom etadi.
-        </p>
+        <p className="muted small">{t("report.queueNote")}</p>
       )}
     </div>
   );
@@ -201,7 +203,7 @@ function Report({ data, cooldown, onRefresh }: { data: DraftReport; cooldown: nu
   const unverified = data.facts.filter((f) => f.unverified);
   return (
     <div className="report">
-      <p className="report-badge small">AI qoralamasi — yakuniy qarorni bank xodimi qabul qiladi</p>
+      <p className="report-badge small">{t("report.badge")}</p>
       <div className="report-text">
         {data.text_uz
           .split(/\n+/)
@@ -213,7 +215,7 @@ function Report({ data, cooldown, onRefresh }: { data: DraftReport; cooldown: nu
 
       {verified.length > 0 && (
         <>
-          <h3 className="sub-h">Dalil bilan tasdiqlangan faktlar</h3>
+          <h3 className="sub-h">{t("report.verified")}</h3>
           <ul className="facts">
             {verified.map((f, i) => (
               <li key={i}>
@@ -225,10 +227,8 @@ function Report({ data, cooldown, onRefresh }: { data: DraftReport; cooldown: nu
       )}
       {unverified.length > 0 && (
         <>
-          <h3 className="sub-h warn">⚠ Tasdiqlanmagan faktlar ({unverified.length})</h3>
-          <p className="muted small">
-            Bu faktlar keltirilgan dalilda topilmadi (havola yo'q yoki raqam mos emas). Ularga tayanmang.
-          </p>
+          <h3 className="sub-h warn">{t("report.unverified", { n: unverified.length })}</h3>
+          <p className="muted small">{t("report.unverifiedNote")}</p>
           <ul className="facts unverified">
             {unverified.map((f, i) => (
               <li key={i}>
@@ -238,19 +238,19 @@ function Report({ data, cooldown, onRefresh }: { data: DraftReport; cooldown: nu
           </ul>
         </>
       )}
-      {data.facts.length === 0 && <p className="muted small">Qoralamada alohida fakt ro'yxati yo'q.</p>}
+      {data.facts.length === 0 && <p className="muted small">{t("report.noFacts")}</p>}
 
       <p className="report-meta">
-        Model: {data.model} · {data.cached ? "Keshdan" : "Yangi qoralama"}
-        {data.generated_at ? ` · yaratilgan ${formatLocalDateTime(data.generated_at)}` : ""} ·{" "}
-        {data.cached ? "o'qish" : "kechikish"} {Math.round(data.latency_ms)} ms · narx{" "}
-        {data.cost_usd === null ? "noma'lum" : data.cost_usd === 0 ? "$0 (LLM chaqirilmadi)" : `$${data.cost_usd.toFixed(5)}`}
+        {t("app.footerModel", { version: data.model })} · {data.cached ? t("report.metaCached") : t("report.metaNew")}
+        {data.generated_at ? t("report.metaCreated", { time: formatLocalDateTime(data.generated_at) }) : ""} ·{" "}
+        {data.cached ? t("report.metaRead") : t("report.metaLatency")} {Math.round(data.latency_ms)} ms · {t("report.metaCost")}{" "}
+        {data.cost_usd === null ? t("report.costUnknown") : data.cost_usd === 0 ? t("report.costZero") : `$${data.cost_usd.toFixed(5)}`}
         {data.input_tokens != null && data.output_tokens != null
-          ? ` · tokenlar: ${data.input_tokens} kirish / ${data.output_tokens} chiqish`
+          ? t("report.tokens", { in: data.input_tokens, out: data.output_tokens })
           : ""}
       </p>
       <button type="button" className="secondary" onClick={onRefresh} disabled={cooldown > 0}>
-        {cooldown > 0 ? `Qayta yaratish (${cooldown} s)` : "Qayta yaratish"}
+        {cooldown > 0 ? t("report.regenerateWait", { seconds: cooldown }) : t("report.regenerate")}
       </button>
     </div>
   );

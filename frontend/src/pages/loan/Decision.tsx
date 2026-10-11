@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { api, type DecisionAction, type LoanDetail, type Session } from "../../api";
-import { COLOR_ICON, COLOR_UZ, DECISION_UZ, formatRisk } from "../../format";
+import { COLOR_ICON, colorName, decisionName, formatRisk } from "../../format";
+import { t } from "../../i18n";
+import { tn } from "../../i18n/jsx";
 import { BlockError, BlockLoading, type Load } from "./evidence";
 
-const ACTIONS: { action: DecisionAction; label: string; cls: string }[] = [
-  { action: "approve", label: "Tasdiqlash", cls: "btn-approve" },
-  { action: "reject", label: "Rad etish", cls: "btn-reject" },
-  { action: "visit", label: "Tashrif belgilash", cls: "btn-visit" },
+const ACTIONS: { action: DecisionAction; cls: string }[] = [
+  { action: "approve", cls: "btn-approve" },
+  { action: "reject", cls: "btn-reject" },
+  { action: "visit", cls: "btn-visit" },
 ];
 
 type Sent = { kind: "idle" } | { kind: "sending"; action: DecisionAction } | { kind: "done"; action: DecisionAction; auditId: number } | { kind: "error"; message: string };
@@ -42,28 +44,34 @@ export function Decision({ detail, onSaved }: { detail: LoanDetail; onSaved: () 
   const busy = sent.kind === "sending";
   return (
     <section className="card" aria-labelledby="h-decision">
-      <h2 id="h-decision">Qaror</h2>
+      <h2 id="h-decision">{t("decision.title")}</h2>
       <p className="small">
-        AI tavsiyasi: {COLOR_ICON[detail.color]} <strong>{COLOR_UZ[detail.color]}</strong>, xavf bahosi{" "}
-        {formatRisk(detail.risk)}. Yakuniy qarorni siz qabul qilasiz.
+        {tn("decision.aiRec", {
+          color: (
+            <>
+              {COLOR_ICON[detail.color]} <strong>{colorName(detail.color)}</strong>
+            </>
+          ),
+          risk: formatRisk(detail.risk),
+        })}
       </p>
-      {session.kind === "loading" && <BlockLoading text="Xodim ma'lumoti yuklanmoqda…" />}
+      {session.kind === "loading" && <BlockLoading text={t("decision.sessionLoading")} />}
       {session.kind === "error" && (
-        <BlockError message={`Xodim aniqlanmadi, qaror yuborib bo'lmaydi: ${session.message}`} onRetry={loadSession} />
+        <BlockError message={t("decision.sessionError", { message: session.message })} onRetry={loadSession} />
       )}
       {session.kind === "ok" && (
         <p className="muted small">
-          Xodim: <strong>{session.data.officer_id}</strong> (demo: brauzeringiz sandbox'idan)
+          {t("decision.officer")} <strong>{session.data.officer_id}</strong> {t("decision.officerDemo")}
         </p>
       )}
       <label className="comment-field">
-        <span>Izoh</span>
+        <span>{t("decision.comment")}</span>
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           maxLength={2000}
           rows={3}
-          placeholder="Masalan: joyiga borib uskunani ko'rish kerak"
+          placeholder={t("decision.placeholder")}
         />
       </label>
       <div className="decision-buttons">
@@ -75,16 +83,16 @@ export function Decision({ detail, onSaved }: { detail: LoanDetail; onSaved: () 
             onClick={() => submit(a.action)}
             disabled={busy || session.kind !== "ok"}
           >
-            {sent.kind === "sending" && sent.action === a.action ? "Saqlanmoqda…" : a.label}
+            {sent.kind === "sending" && sent.action === a.action ? t("decision.saving") : t(`decision.btn.${a.action}` as const)}
           </button>
         ))}
       </div>
       {sent.kind === "done" && (
         <p className="ok decision-done" role="status">
-          ✓ Qaror saqlandi: {DECISION_UZ[sent.action]} (audit yozuvi #{sent.auditId})
+          {t("decision.saved", { action: decisionName(sent.action), id: sent.auditId })}
         </p>
       )}
-      {sent.kind === "error" && <BlockError message={`Qaror saqlanmadi: ${sent.message}`} />}
+      {sent.kind === "error" && <BlockError message={t("decision.saveError", { message: sent.message })} />}
     </section>
   );
 }

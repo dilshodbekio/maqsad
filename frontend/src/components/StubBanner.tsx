@@ -1,4 +1,5 @@
 import type { Health } from "../api";
+import { t } from "../i18n";
 
 // Mandatory (frontend/CLAUDE.md): visible on every page while the real model is not connected.
 export function StubBanner({ health }: { health: Health | null }) {
@@ -6,14 +7,14 @@ export function StubBanner({ health }: { health: Health | null }) {
   if (health.ml_mode === "stub") {
     return (
       <div className="stub-banner" role="alert">
-        STUB — haqiqiy model ulanmagan
+        {t("banner.stub")}
       </div>
     );
   }
   if (health.warmup === "pending" || health.warmup === "running") {
     return (
       <div className="partial-banner" role="status">
-        Model tayyorlanmoqda… Navbat bir necha soniyadan keyin chiqadi.
+        {t("banner.warming")}
       </div>
     );
   }
@@ -23,7 +24,7 @@ export function StubBanner({ health }: { health: Health | null }) {
   if (notReady.length === 0) return null;
   return (
     <div className="partial-banner" role="status">
-      Hali ulanmagan funksiyalar: {notReady.join(", ")}
+      {t("banner.notReady", { names: notReady.join(", ") })}
     </div>
   );
 }

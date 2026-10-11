@@ -2,13 +2,16 @@ import type { LoanDetail, Transaction } from "../../api";
 import {
   counterpartyName,
   daysBetween,
-  formatCount,
   formatDate,
   formatDateTime,
+  formatDays,
   formatUzs,
   INFLOW_TYPES,
+  reasonText,
   txnTypeName,
 } from "../../format";
+import { t as tr } from "../../i18n";
+import { tn } from "../../i18n/jsx";
 import { useFocus } from "./evidence";
 
 const TYPE_ORDER = [
@@ -35,7 +38,7 @@ export function MoneyTrail({ detail }: { detail: LoanDetail }) {
   const cited = new Map<string, string[]>();
   for (const r of detail.reasons) {
     for (const ref of r.evidence_refs) {
-      if (detail.transactions.some((t) => t.txn_id === ref)) cited.set(ref, [...(cited.get(ref) ?? []), r.text_uz]);
+      if (detail.transactions.some((t) => t.txn_id === ref)) cited.set(ref, [...(cited.get(ref) ?? []), reasonText(r)]);
     }
   }
   for (const e of detail.evidence) {
@@ -53,19 +56,23 @@ export function MoneyTrail({ detail }: { detail: LoanDetail }) {
 
   return (
     <section className="card" aria-labelledby="h-trail">
-      <h2 id="h-trail">Pul izi</h2>
+      <h2 id="h-trail">{tr("trail.title")}</h2>
       <p className="small trail-intro">
-        Kredit tushgan sana: <strong>{formatDate(start)}</strong>
+        {tr("trail.disbursedOn")} <strong>{formatDate(start)}</strong>
         {snapshotDays !== null && (
           <>
             {" "}
-            · holat sanasi {formatDate(loan.snapshot_date)} — <strong>{formatCount(snapshotDays)} kun</strong> o'tgan
+            ·{" "}
+            {tn("trail.asOf", {
+              date: formatDate(loan.snapshot_date),
+              days: <strong>{formatDays(snapshotDays)}</strong>,
+            })}
           </>
         )}
       </p>
 
       {txns.length === 0 ? (
-        <p className="muted">Tranzaksiyalar yo'q.</p>
+        <p className="muted">{tr("trail.none")}</p>
       ) : (
         <>
           <div className="trail-axis" aria-hidden="true">
@@ -77,21 +84,21 @@ export function MoneyTrail({ detail }: { detail: LoanDetail }) {
                   key={t.txn_id}
                   className={`axis-dot t-${t.type}${cited.has(t.txn_id) ? " cited" : ""}${activeRef === t.txn_id ? " active" : ""}`}
                   style={{ left: `${(Math.max(0, d) / axisMax) * 100}%` }}
-                  title={`+${d} kun · ${txnTypeName(t.type)} · ${formatUzs(t.amount_uzs)}`}
+                  title={tr("trail.dot", { days: formatDays(d), type: txnTypeName(t.type), amount: formatUzs(t.amount_uzs) })}
                 />
               );
             })}
             <span className="axis-label axis-start">0</span>
-            <span className="axis-label axis-end">{formatCount(axisMax)} kun</span>
+            <span className="axis-label axis-end">{formatDays(axisMax)}</span>
           </div>
 
-          <ul className="type-totals small" aria-label="Tur bo'yicha jami">
+          <ul className="type-totals small" aria-label={tr("trail.totals")}>
             {totalTypes.map((type) => {
               const s = totals.get(type)!;
               return (
                 <li key={type}>
                   <span className={`type-dot t-${type}`} aria-hidden="true" />
-                  {txnTypeName(type)}: <strong>{formatUzs(s.sum)}</strong> ({s.n} ta)
+                  {txnTypeName(type)}: <strong>{formatUzs(s.sum)}</strong> {tr("common.count", { n: s.n })}
                 </li>
               );
             })}
@@ -109,7 +116,7 @@ export function MoneyTrail({ detail }: { detail: LoanDetail }) {
                   id={`txn-${t.txn_id}`}
                   className={`trail-row${why ? " cited" : ""}${activeRef === t.txn_id ? " is-active" : ""}`}
                 >
-                  <span className="trail-day">{d === null ? "—" : `+${formatCount(d)} kun`}</span>
+                  <span className="trail-day">{d === null ? "—" : tr("trail.dayPlus", { days: formatDays(d) })}</span>
                   <div className="trail-main">
                     <div className="trail-line">
                       <span className={`type-dot t-${t.type}`} aria-hidden="true" />
@@ -125,7 +132,7 @@ export function MoneyTrail({ detail }: { detail: LoanDetail }) {
                     </div>
                     {why && (
                       <button type="button" className="trail-why small" onClick={() => focusRef(t.txn_id, false)}>
-                        ⚑ Dalil{why.length ? `: ${why.join("; ")}` : ""}
+                        {tr("trail.why", { why: why.length ? `: ${why.join("; ")}` : "" })}
                       </button>
                     )}
                   </div>

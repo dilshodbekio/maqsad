@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type LoanDetail } from "../../api";
-import { COLOR_ICON, COLOR_UZ, escalationLabel, formatDate, formatRisk, formatUzs, purposeName } from "../../format";
+import { COLOR_ICON, colorName, escalationLabel, escalationText, formatDate, formatRisk, formatUzs, purposeName, regionName } from "../../format";
+import { t } from "../../i18n";
+import { useLang } from "../../i18n";
 import { lastQueueUrl, navigate, onLinkClick } from "../../router";
 import { AuditLog } from "./AuditLog";
 import { Decision } from "./Decision";
@@ -17,6 +19,7 @@ export function LoanPage({ loanId, ready }: { loanId: string; ready: boolean }) 
   const [state, setState] = useState<Load<LoanDetail>>({ kind: "loading" });
   const [activeRef, setActiveRef] = useState<string | null>(null);
   const [auditVersion, setAuditVersion] = useState(0);
+  const lang = useLang();
 
   const load = useCallback(() => {
     setState({ kind: "loading" });
@@ -58,20 +61,20 @@ export function LoanPage({ loanId, ready }: { loanId: string; ready: boolean }) 
   return (
     <div className="loan-page">
       <BackLink />
-      {!ready && <BlockLoading text="Model tayyorlanmoqda… Kredit bir necha soniyadan keyin ochiladi." />}
+      {!ready && <BlockLoading text={t("loan.waiting")} />}
       {ready && state.kind === "loading" && (
         <section className="card">
-          <h2>Kredit {loanId}</h2>
-          <BlockLoading text="Kredit ma'lumotlari yuklanmoqda…" />
+          <h2>{t("loan.title", { id: loanId })}</h2>
+          <BlockLoading text={t("loan.loading")} />
         </section>
       )}
       {ready && state.kind === "error" && (
         <section className="card">
-          <h2>Kredit {loanId}</h2>
+          <h2>{t("loan.title", { id: loanId })}</h2>
           {state.status === 404 ? (
             <BlockError message={state.message} />
           ) : (
-            <BlockError message={`Kredit ma'lumotlari yuklanmadi: ${state.message}`} onRetry={load} />
+            <BlockError message={t("loan.loadError", { message: state.message })} onRetry={load} />
           )}
         </section>
       )}
@@ -87,7 +90,7 @@ export function LoanPage({ loanId, ready }: { loanId: string; ready: boolean }) 
             </div>
             <div className="loan-side">
               <Decision detail={state.data} onSaved={() => setAuditVersion((v) => v + 1)} />
-              <DraftReportBlock loanId={loanId} />
+              <DraftReportBlock key={lang} loanId={loanId} />
               <AuditLog loanId={loanId} version={auditVersion} />
             </div>
           </div>
@@ -109,7 +112,7 @@ function BackLink() {
         navigate(href);
       }}
     >
-      ← Navbatga qaytish
+      ← {t("app.backToQueue")}
     </a>
   );
 }
@@ -121,14 +124,14 @@ function LoanHeader({ detail }: { detail: LoanDetail }) {
     <section className={`card loan-header border-top-${detail.color}`}>
       <div className="lh-top">
         <span className={`color-pill pill-${detail.color}`}>
-          <span aria-hidden="true">{COLOR_ICON[detail.color]}</span> {COLOR_UZ[detail.color]}
+          <span aria-hidden="true">{COLOR_ICON[detail.color]}</span> {colorName(detail.color)}
         </span>
         <span className="lh-risk">
-          Xavf bahosi <strong>{formatRisk(detail.risk)}</strong>
+          {t("loan.riskScore")} <strong>{formatRisk(detail.risk)}</strong>
         </span>
       </div>
       <h1 className="lh-title">
-        Kredit {loan.loan_id}
+        {t("loan.title", { id: loan.loan_id })}
         {loan.borrower_name_masked && <span className="lh-name"> · {loan.borrower_name_masked}</span>}
       </h1>
       <a
@@ -136,48 +139,49 @@ function LoanHeader({ detail }: { detail: LoanDetail }) {
         href={`/capture?loan=${encodeURIComponent(loan.loan_id)}`}
         onClick={(e) => onLinkClick(e, `/capture?loan=${encodeURIComponent(loan.loan_id)}`)}
       >
-        <span aria-hidden="true">📷</span> Rasm yuklash
+        <span aria-hidden="true">📷</span> {t("loan.uploadPhoto")}
       </a>
       <dl className="lh-facts">
         <div>
-          <dt>Maqsad</dt>
+          <dt>{t("loan.purpose")}</dt>
           <dd>{loan.purpose ? purposeName(loan.purpose) : "—"}</dd>
         </div>
         <div>
-          <dt>Summa</dt>
+          <dt>{t("loan.amount")}</dt>
           <dd>{typeof loan.amount_uzs === "number" ? formatUzs(loan.amount_uzs) : "—"}</dd>
         </div>
         <div>
-          <dt>Hudud</dt>
-          <dd>{loan.region ?? "—"}</dd>
+          <dt>{t("loan.region")}</dt>
+          <dd>{regionName(loan.region)}</dd>
         </div>
         <div>
-          <dt>Berilgan sana</dt>
+          <dt>{t("loan.disbursed")}</dt>
           <dd>{formatDate(loan.disbursed_at)}</dd>
         </div>
       </dl>
       {esc && (
         <div className="lh-escalation" role="note">
           <strong>
-            ⬆ Rang ko'tarildi: {COLOR_ICON[detail.base_color]} {COLOR_UZ[detail.base_color]} → {COLOR_ICON[detail.color]}{" "}
-            {COLOR_UZ[detail.color]}
+            ⬆{" "}
+            {t("loan.raised", {
+              from: `${COLOR_ICON[detail.base_color]} ${colorName(detail.base_color)}`,
+              to: `${COLOR_ICON[detail.color]} ${colorName(detail.color)}`,
+            })}
           </strong>
           <ul className="small">
             {detail.escalations
               .filter((e) => e.raises_color)
               .map((e) => (
-                <li key={e.code}>{e.text_uz}</li>
+                <li key={e.code}>{escalationText(e)}</li>
               ))}
           </ul>
           <p className="small">
-            Pul izi bo'yicha rang — {COLOR_UZ[detail.base_color]}. Xavf bahosi o'zgarmaydi, faqat navbatdagi o'rin
-            ko'tariladi.
+            {t("loan.raisedNote", { base: colorName(detail.base_color) })}
           </p>
         </div>
       )}
       <p className="lh-model muted">
-        Model: {detail.model_version} · Xavf bahosi — tartiblash uchun model bahosi (0..1). Yakuniy qarorni bank xodimi
-        qabul qiladi.
+        {t("loan.modelNote", { version: detail.model_version })}
       </p>
     </section>
   );

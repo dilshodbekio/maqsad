@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { LoanDetail, LoanReason } from "../../api";
+import { evidenceSummary, reasonText } from "../../format";
+import { t } from "../../i18n";
 import { anchorId, EvidenceChip, useFocus } from "./evidence";
 
 /** Order: policy reasons that raised the colour (they explain it), then money-trail reasons by weight, then the rest. */
@@ -21,14 +23,14 @@ export function Reasons({ detail }: { detail: LoanDetail }) {
     <section className="card" aria-labelledby="h-reasons">
       {detail.color === "green" ? (
         <>
-          <h2 id="h-reasons">Xavf bahosiga ta'sir qilgan omillar</h2>
-          <p className="muted small">Yashil: navbat bo'yicha birinchi navbatda tekshirish talab etilmaydi.</p>
+          <h2 id="h-reasons">{t("reasons.titleGreen")}</h2>
+          <p className="muted small">{t("reasons.greenNote")}</p>
         </>
       ) : (
-        <h2 id="h-reasons">Nega birinchi navbatda tekshirish kerak</h2>
+        <h2 id="h-reasons">{t("reasons.title")}</h2>
       )}
       {reasons.length === 0 ? (
-        <p className="muted">Sezilarli xavf belgisi aniqlanmadi.</p>
+        <p className="muted">{t("reasons.none")}</p>
       ) : (
         <ol className="reasons">
           {reasons.map((r, i) => (
@@ -41,10 +43,7 @@ export function Reasons({ detail }: { detail: LoanDetail }) {
           ))}
         </ol>
       )}
-      <p className="muted small">
-        Og'irlik — sababning xavf bahosini oshirishdagi ulushi (0..1). Rasm siyosati sabablari xavf bahosini
-        o'zgartirmaydi, faqat navbatdagi rangni ko'taradi.
-      </p>
+      <p className="muted small">{t("reasons.weightNote")}</p>
     </section>
   );
 }
@@ -63,38 +62,38 @@ function ReasonItem({ reason, raisedColor, maxWeight }: { reason: LoanReason; ra
 
   return (
     <li className={`reason-item${reason.weight === null ? " policy" : ""}`}>
-      <div className="reason-text">{reason.text_uz}</div>
+      <div className="reason-text">{reasonText(reason)}</div>
       <div className="reason-meta small">
         {reason.weight === null ? (
           <span className="policy-tag">
-            {reason.code.startsWith("PHOTO_") ? "Rasm siyosati" : "Dalil siyosati"}
-            {raisedColor && " — rangni ko'tardi"}
+            {reason.code.startsWith("PHOTO_") ? t("reasons.policyPhoto") : t("reasons.policyEvidence")}
+            {raisedColor && t("reasons.raisedColor")}
           </span>
         ) : (
           <span className="weight">
             <span className="weight-bar" aria-hidden="true">
               <span style={{ width: `${maxWeight > 0 ? (reason.weight / maxWeight) * 100 : 0}%` }} />
             </span>
-            og'irligi {reason.weight.toFixed(2)}
+            {t("reasons.weight", { weight: reason.weight.toFixed(2) })}
           </span>
         )}
       </div>
       {reason.evidence_refs.length > 0 ? (
         <div className="chips">
-          <span className="muted small">Dalil:</span>
+          <span className="muted small">{t("reasons.evidence")}</span>
           {reason.evidence_refs.map((ref) => (
             <EvidenceChip key={ref} refId={ref} onClick={() => toggle(ref)} />
           ))}
         </div>
       ) : (
-        <p className="muted small no-refs">Alohida dalil havolasi yo'q (pul izi bo'yicha umumiy ko'rsatkich).</p>
+        <p className="muted small no-refs">{t("reasons.noRefs")}</p>
       )}
       {open && ev && (
         <div className="ev-open">
-          <p>{ev.summary_uz ?? open}</p>
+          <p>{evidenceSummary(ev) || open}</p>
           {target && (
             <button type="button" className="link-button" onClick={() => focusRef(open)}>
-              Sahifada ko'rsatish ↓
+              {t("reasons.showOnPage")}
             </button>
           )}
         </div>

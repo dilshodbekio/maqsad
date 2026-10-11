@@ -53,7 +53,8 @@ CREATE TABLE IF NOT EXISTS draft_cache (
     inputs_hash TEXT NOT NULL,
     response_json TEXT NOT NULL,
     ts TEXT NOT NULL,
-    PRIMARY KEY (sandbox_id, loan_id)
+    lang TEXT NOT NULL DEFAULT 'uz',
+    PRIMARY KEY (sandbox_id, loan_id, lang)
 );
 
 CREATE TABLE IF NOT EXISTS llm_calls (
@@ -100,6 +101,9 @@ class Database:
         self._write_lock = threading.Lock()
         with self.conn() as c:
             c.execute("PRAGMA journal_mode=WAL")
+            cols = [r["name"] for r in c.execute("PRAGMA table_info(draft_cache)")]
+            if cols and "lang" not in cols:
+                c.execute("DROP TABLE draft_cache")      # a cache of an older version (one draft per loan): rebuilt, nothing is lost
             c.executescript(SCHEMA)
 
     @contextmanager
@@ -200,20 +204,22 @@ class Database:
 
     SHARED_SCOPE = "shared"
 
-    def draft_cache_get(self, scope: str, loan_id: str, inputs_hash: str) -> Optional[dict]:
+    def draft_cache_get(self, scope: str, loan_id: str, inputs_hash: str, lang: str = "uz") -> Optional[dict]:
         with self.conn() as c:
-            r = c.execute("SELECT response_json, ts FROM draft_cache WHERE sandbox_id = ? AND loan_id = ? "
-                          "AND inputs_hash = ?", (scope, loan_id, inputs_hash)).fetchone()
+            r = c.execute("SELECT response_json, ts FROM draft_cache WHERE sandbox_id = ? AND loan_id = ? AND lang = ? "
+                          "AND inputs_hash = ?", (scope, loan_id, lang, inputs_hash)).fetchone()
         if not r:
             return None
         out = json.loads(r["response_json"])
         out.setdefault("generated_at", r["ts"])
         return out
 
-    def draft_cache_put(self, scope: str, loan_id: str, inputs_hash: str, response: dict) -> None:
+    def draft_cache_put(self, scope: str, loan_id: str, inputs_hash: str, response: dict, lang: str = "uz") -> None:
+        """One draft per (scope, loan, language): a draft in another language does not replace this one."""
         with self._write_lock, self.conn() as c:
-            c.execute("INSERT OR REPLACE INTO draft_cache VALUES (?, ?, ?, ?, ?)",
-                      (scope, loan_id, inputs_hash, json.dumps(response, ensure_ascii=False), utc_now()))
+            c.execute("INSERT OR REPLACE INTO draft_cache (sandbox_id, loan_id, inputs_hash, response_json, ts, lang) "
+                      "VALUES (?, ?, ?, ?, ?, ?)",
+                      (scope, loan_id, inputs_hash, json.dumps(response, ensure_ascii=False), utc_now(), lang))
 
     def draft_cache_clear(self, *, shared: bool = False) -> None:
         """Sandbox drafts always; the shared (pre-warmed) ones only when asked."""

@@ -24,8 +24,9 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import TypeAdapter, ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import llm
+from . import i18n, llm
 from .config import Settings
+from .i18n import Msg
 from .draft_queue import MSG_BUSY, PRIORITY_PREWARM, DraftQueue, Prewarm, QueueFull
 from .db import Database, canonical, sha256_hex, utc_now
 from .ml_adapter import (MLAdapter, MLBadInput, MLFailure, MLInvalidImage, MLInvalidRequest, MLNotFound, MLNotReady,
@@ -47,22 +48,13 @@ QUEUE_DEFAULT_LIMIT = 50
 QUEUE_MAX_LIMIT = 200
 PREWARM_DEFAULT_N = 40
 
-MSG_TOO_MANY = "Juda ko'p so'rov. Bir daqiqadan keyin qayta urinib ko'ring."
-MSG_BAD_TYPE = "Faqat JPEG, PNG yoki WebP rasm qabul qilinadi."
-MSG_EMPTY = "Rasm fayli bo'sh."
-MSG_NO_IMAGE = "Rasm yuborilmadi: 'image' maydoniga JPEG, PNG yoki WebP fayl biriktiring."
-MSG_REPORT_NOT_READY = "Dalolatnoma qoralamasi hozircha tayyor emas"
-MSG_NOT_READY = "Bu funksiya hali ulanmagan"
-MSG_BAD_IMAGE = "Rasmni o'qib bo'lmadi: fayl buzilgan yoki rasm emas."
+MSG_TOO_MANY = Msg("too_many")
+MSG_BAD_TYPE = Msg("bad_type")
+MSG_EMPTY = Msg("empty_image")
+MSG_NO_IMAGE = Msg("no_image")
+MSG_BAD_IMAGE = Msg("bad_image")
 ASSET_SUFFIXES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
-HTTP_MSG_UZ = {
-    400: "So'rov noto'g'ri.",
-    403: "Ruxsat yo'q.",
-    404: "Topilmadi.",
-    405: "Bu metod qo'llab-quvvatlanmaydi.",
-    413: "So'rov hajmi juda katta.",
-    429: MSG_TOO_MANY,
-}
+HTTP_MSG = {code: Msg(f"http_{code}") for code in (400, 403, 404, 405, 413, 429)}
 
 LoanIdPath = Annotated[str, Path(min_length=1, max_length=64, pattern=LOAN_ID_PATTERN)]
 LoanIdQuery = Annotated[str, Query(min_length=1, max_length=64, pattern=LOAN_ID_PATTERN)]
@@ -145,12 +137,13 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         except ValueError:
             sid, new_cookie = str(uuid.uuid4()), True
         request.state.sandbox_id = sid
+        request.state.lang = i18n.parse_lang(request.headers.get("accept-language"))
 
         if request.url.path in UPLOAD_PATHS:
             cl = request.headers.get("content-length", "")
             # base64 is ~4/3 of the file; +64 KB for form fields / JSON overhead
             if cl.isdigit() and int(cl) > settings.max_upload_bytes * 4 // 3 + 65536:
-                return JSONResponse({"detail": _too_large_msg(settings)}, status_code=413)
+                return JSONResponse({"detail": i18n.render(_too_large_msg(settings), request.state.lang)}, status_code=413)
 
         response = await call_next(request)
         if new_cookie:
@@ -160,55 +153,58 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         response.headers["X-Model-Version"] = adapter.model_version
         return response
 
-    # ---------- errors: always {detail: "<Uzbek message>"} ----------
+    # ---------- errors: always {detail: "<message in the caller's language (Accept-Language, default uz)>"} ----------
+
+    def lang_of(request: Request) -> str:
+        return getattr(request.state, "lang", i18n.DEFAULT_LANG)
 
     @app.exception_handler(RequestValidationError)
-    async def on_validation(_: Request, exc: RequestValidationError):
-        parts = []
-        for err in exc.errors()[:5]:
-            loc = ".".join(str(x) for x in err.get("loc", ()) if x not in ("body", "query", "path"))
-            parts.append(f"{loc or 'body'}: {err.get('msg')}")
-        return JSONResponse({"detail": "So'rov ma'lumotlari noto'g'ri — " + "; ".join(parts)}, status_code=422)
+    async def on_validation(request: Request, exc: RequestValidationError):
+        msg = Msg("validation", details=lambda lg: i18n.error_details(exc.errors(), lg))
+        return JSONResponse({"detail": msg.render(lang_of(request))}, status_code=422)
 
     @app.exception_handler(StarletteHTTPException)
-    async def on_http(_: Request, exc: StarletteHTTPException):
+    async def on_http(request: Request, exc: StarletteHTTPException):
         detail = exc.detail
         if not isinstance(detail, str) or detail == _phrase(exc.status_code):
-            # default English phrase ("Not Found", ...) -> Uzbek
-            detail = HTTP_MSG_UZ.get(exc.status_code, str(detail))
-        return JSONResponse({"detail": detail}, status_code=exc.status_code, headers=getattr(exc, "headers", None))
+            # default English phrase ("Not Found", ...) -> a message in the caller's language
+            detail = HTTP_MSG.get(exc.status_code, str(detail))
+        return JSONResponse({"detail": i18n.render(detail, lang_of(request))}, status_code=exc.status_code,
+                            headers=getattr(exc, "headers", None))
 
     @app.exception_handler(MLNotFound)
-    async def on_ml_not_found(_: Request, exc: MLNotFound):
-        return JSONResponse({"detail": f"Kredit topilmadi: {str(exc).strip(chr(39))}"}, status_code=404)
+    async def on_ml_not_found(request: Request, exc: MLNotFound):
+        msg = Msg("loan_not_found", loan_id=str(exc).strip(chr(39)))
+        return JSONResponse({"detail": msg.render(lang_of(request))}, status_code=404)
 
     @app.exception_handler(MLNotReady)
-    async def on_ml_not_ready(_: Request, exc: MLNotReady):
-        return JSONResponse({"detail": f"{MSG_NOT_READY} ({exc})."}, status_code=503)
+    async def on_ml_not_ready(request: Request, exc: MLNotReady):
+        return JSONResponse({"detail": Msg("ml_not_ready", name=str(exc)).render(lang_of(request))}, status_code=503)
 
     @app.exception_handler(MLInvalidImage)
-    async def on_ml_invalid_image(_: Request, exc: MLInvalidImage):
+    async def on_ml_invalid_image(request: Request, exc: MLInvalidImage):
         if exc.too_large:
-            return JSONResponse({"detail": _too_large_msg(settings)}, status_code=413)
-        return JSONResponse({"detail": MSG_BAD_IMAGE}, status_code=400)
+            return JSONResponse({"detail": i18n.render(_too_large_msg(settings), lang_of(request))}, status_code=413)
+        return JSONResponse({"detail": i18n.render(MSG_BAD_IMAGE, lang_of(request))}, status_code=400)
 
     @app.exception_handler(MLInvalidRequest)
-    async def on_ml_invalid_request(_: Request, exc: MLInvalidRequest):
-        return JSONResponse({"detail": f"So'rov qabul qilinmadi: {exc}"}, status_code=400)
+    async def on_ml_invalid_request(request: Request, exc: MLInvalidRequest):
+        msg = Msg("request_rejected", detail=lambda lg: i18n.pick(getattr(exc, "messages", None), lg, str(exc)))
+        return JSONResponse({"detail": msg.render(lang_of(request))}, status_code=400)
 
     @app.exception_handler(MLBadInput)
-    async def on_ml_bad_input(_: Request, exc: MLBadInput):
-        return JSONResponse({"detail": f"Model kiritilgan ma'lumotni qabul qilmadi: {exc}"}, status_code=422)
+    async def on_ml_bad_input(request: Request, exc: MLBadInput):
+        msg = Msg("model_rejected", detail=lambda lg: i18n.pick(getattr(exc, "messages", None), lg, str(exc)))
+        return JSONResponse({"detail": msg.render(lang_of(request))}, status_code=422)
 
     @app.exception_handler(MLFailure)
-    async def on_ml_failure(_: Request, exc: MLFailure):
-        return JSONResponse({"detail": "Model xizmatida xatolik yuz berdi, keyinroq qayta urinib ko'ring."},
-                            status_code=502)
+    async def on_ml_failure(request: Request, exc: MLFailure):
+        return JSONResponse({"detail": Msg("ml_failure").render(lang_of(request))}, status_code=502)
 
     @app.exception_handler(Exception)
-    async def on_unexpected(_: Request, exc: Exception):
+    async def on_unexpected(request: Request, exc: Exception):
         log.exception("unhandled error")
-        return JSONResponse({"detail": "Ichki xatolik yuz berdi."}, status_code=500)
+        return JSONResponse({"detail": Msg("internal").render(lang_of(request))}, status_code=500)
 
     def rate_check(request: Request, bucket: str) -> None:
         sid = request.state.sandbox_id
@@ -294,11 +290,11 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         try:
             payload = await request.json()
         except ValueError:
-            raise HTTPException(400, "So'rov JSON ko'rinishida bo'lishi kerak.") from None
+            raise HTTPException(400, Msg("json_required")) from None
         try:
             scenario = ScenarioRequest.model_validate(payload)
         except ValidationError as e:
-            raise HTTPException(400, "Ssenariy noto'g'ri: " + scenario_error_text(e)) from None
+            raise HTTPException(400, Msg("scenario_invalid", details=lambda lg, errs=e.errors(): scenario_error_text(errs, lg))) from None
         result = await run_in_threadpool(adapter.score_scenario, scenario.model_dump(mode="json"))
         return _validated(ScenarioScore, result)
 
@@ -322,7 +318,7 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
             try:
                 payload = await request.json()
             except ValueError as e:
-                raise HTTPException(400, "JSON noto'g'ri formatda.") from e
+                raise HTTPException(400, Msg("json_malformed")) from e
             try:
                 fields = CheckPhotoJSON.model_validate(payload)
             except ValidationError as e:
@@ -333,9 +329,9 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
             try:
                 image = base64.b64decode(b64, validate=True)
             except (binascii.Error, ValueError) as e:
-                raise HTTPException(400, "image_base64 noto'g'ri (base64 emas).") from e
+                raise HTTPException(400, Msg("base64_invalid")) from e
         else:
-            raise HTTPException(400, "So'rov multipart/form-data (asosiy) yoki application/json bo'lishi kerak.")
+            raise HTTPException(400, Msg("content_type"))
 
         if len(image) == 0:
             raise HTTPException(400, MSG_EMPTY)
@@ -368,31 +364,50 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         # only the owner sandbox can read its photo; anyone else gets the same 404 as a missing photo
         p = db.photo_file(request.state.sandbox_id, photo_id)
         if p is None:
-            raise HTTPException(404, "Rasm topilmadi.")
+            raise HTTPException(404, Msg("photo_not_found"))
         with p.open("rb") as f:
             head = f.read(16)
         return FileResponse(p, media_type=sniff_image(head) or "application/octet-stream",
                             headers={"Cache-Control": "private, no-store"})
 
-    def draft_inputs(loan_id: str, sandbox_id: Optional[str]):
-        """(cache scope, cache key, evidence, reasons). Scope is "shared" unless this sandbox added evidence to the loan
-        (an uploaded photo / escalation): then the draft depends on the sandbox and is cached under its id."""
+    def localized_view(view: dict, lang: str):
+        """(evidence, reasons) of a loan with every text in `lang` only: this is what the LLM sees (and what the cache key covers)."""
+        evidence = []
+        for e in view.get("evidence") or []:
+            e = dict(e)
+            summary = e.pop("summary", None) or {}
+            e["summary"] = summary.get(lang) or summary.get("uz") or e.get("summary_uz")
+            e.pop("summary_uz", None)
+            evidence.append(e)
+        reasons = []
+        for r in view.get("reasons") or []:
+            r = dict(r)
+            text = r.pop("text", None) or {}
+            r["text"] = text.get(lang) or text.get("uz") or r.get("text_uz")
+            r.pop("text_uz", None)
+            reasons.append(r)
+        return evidence, reasons
+
+    def draft_inputs(loan_id: str, sandbox_id: Optional[str], lang: str = i18n.DEFAULT_LANG):
+        """(cache scope, cache key, evidence, reasons) in `lang`. Scope is "shared" unless this sandbox added evidence to the loan
+        (an uploaded photo / escalation): then the draft depends on the sandbox and is cached under its id.
+        The key covers the language, so each language has its own cached draft."""
         view = adapter.get_loan(loan_id, sandbox_id)
-        evidence, reasons = view.get("evidence") or [], view.get("reasons") or []
+        evidence, reasons = localized_view(view, lang)
 
         def key_of(ev, rs):
             return sha256_hex(canonical({"evidence": ev, "reasons": rs, "model": settings.llm_model,
-                                         "prompt": llm.PROMPT_VERSION}))
+                                         "prompt": llm.PROMPT_VERSION, "lang": lang}))
 
         key, scope = key_of(evidence, reasons), Database.SHARED_SCOPE
         if sandbox_id is not None and db.photo_list(sandbox_id, loan_id):
-            base = adapter.get_loan(loan_id, None)
-            if key_of(base.get("evidence") or [], base.get("reasons") or []) != key:
+            base = localized_view(adapter.get_loan(loan_id, None), lang)
+            if key_of(*base) != key:
                 scope = sandbox_id
         return scope, key, evidence, reasons
 
-    def cached_draft(scope: str, loan_id: str, key: str, lookup_started: float) -> Optional[dict]:
-        hit = db.draft_cache_get(scope, loan_id, key)
+    def cached_draft(scope: str, loan_id: str, key: str, lookup_started: float, lang: str = i18n.DEFAULT_LANG) -> Optional[dict]:
+        hit = db.draft_cache_get(scope, loan_id, key, lang)
         if hit is None:
             return None
         return {**hit, "cached": True, "cost_usd": 0.0, "input_tokens": None, "output_tokens": None,
@@ -406,29 +421,32 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         t0 = time.perf_counter()
         if not settings.llm_configured:
             adapter.get_loan(body.loan_id, sid)  # 404 for an unknown loan first
-            raise HTTPException(503, f"{MSG_REPORT_NOT_READY}: LLM ulanmagan. Kredit sahifasi undan mustaqil ishlaydi.")
-        scope, key, evidence, reasons = draft_inputs(body.loan_id, sid)
+            raise HTTPException(503, Msg("report_no_llm"))
+        lang = request.state.lang
+        scope, key, evidence, reasons = draft_inputs(body.loan_id, sid, lang)
         if not body.regenerate:
-            hit = cached_draft(scope, body.loan_id, key, t0)
+            hit = cached_draft(scope, body.loan_id, key, t0, lang)
             if hit is not None:
                 return hit
         elif not limiter.allow(f"regenerate:sb:{sid}", 1):
-            raise HTTPException(429, "Qayta yaratish daqiqada bir marta mumkin. Biroz kuting.")
+            raise HTTPException(429, Msg("regen_limit"))
         try:
             ticket = drafts.submit(
-                sandbox_id=sid, scope=scope, loan_id=body.loan_id, key=key, evidence=evidence, reasons=reasons,
-                cache_lookup=None if body.regenerate else (lambda: db.draft_cache_get(scope, body.loan_id, key)))
+                sandbox_id=sid, scope=scope, loan_id=body.loan_id, key=key, evidence=evidence, reasons=reasons, lang=lang,
+                cache_lookup=None if body.regenerate else (lambda: db.draft_cache_get(scope, body.loan_id, key, lang)))
         except QueueFull:
             raise HTTPException(503, MSG_BUSY) from None
         if ticket is None:  # the draft appeared in the cache while we were deciding
-            return cached_draft(scope, body.loan_id, key, t0)
+            return cached_draft(scope, body.loan_id, key, t0, lang)
         return JSONResponse(drafts.ticket_view(ticket), status_code=202)
 
     @api.get("/draft_report/job/{job_id}", response_model=DraftJob)
     def draft_job(job_id: Annotated[str, Path(pattern=r"^[0-9a-f]{32}$")], request: Request):
         view = drafts.view(job_id, request.state.sandbox_id)
         if view is None:  # unknown, expired, lost in a restart, or another sandbox's job: the client resubmits
-            raise HTTPException(404, "Ish topilmadi. Dalolatnomani qayta so'rang.")
+            raise HTTPException(404, Msg("job_not_found"))
+        if view.get("error"):
+            view = {**view, "error": i18n.render(view["error"], request.state.lang)}
         return view
 
     @api.post("/decision", response_model=DecisionResponse)
@@ -460,7 +478,7 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
     def admin_check(token: Optional[str]) -> None:
         if not settings.admin_token or not token or not hmac.compare_digest(
                 token.encode(), settings.admin_token.encode()):
-            raise HTTPException(403, "Ruxsat yo'q: X-Admin-Token noto'g'ri yoki ADMIN_TOKEN sozlanmagan.")
+            raise HTTPException(403, Msg("admin_forbidden"))
 
     @api.post("/admin/prewarm", response_model=PrewarmStatus, status_code=202)
     def admin_prewarm(x_admin_token: Annotated[Optional[str], Header()] = None,
@@ -468,7 +486,7 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
         """Shared-cache drafts for the top-n loans of the default queue (red + escalated first), lowest queue priority."""
         admin_check(x_admin_token)
         if not settings.llm_configured:
-            raise HTTPException(503, f"{MSG_REPORT_NOT_READY}: LLM ulanmagan.")
+            raise HTTPException(503, Msg("report_no_llm_short"))
 
         def loan_ids() -> List[str]:
             items = _validated(List[QueueItem], adapter.get_queue(None))
@@ -503,15 +521,15 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
     def asset(asset_path: str):
         """Only the portfolio photos listed in ml's photo index (photos[].url); everything else is 404."""
         if asset_path not in adapter.portfolio_asset_paths():
-            raise HTTPException(404, "Fayl topilmadi.")
+            raise HTTPException(404, Msg("file_not_found"))
         root = settings.ml_assets_dir.resolve()
         try:
             target = (root / asset_path).resolve()
         except (OSError, ValueError):
-            raise HTTPException(404, "Fayl topilmadi.") from None
+            raise HTTPException(404, Msg("file_not_found")) from None
         media_type = ASSET_SUFFIXES.get(target.suffix.lower())
         if root not in target.parents or media_type is None or not target.is_file():
-            raise HTTPException(404, "Fayl topilmadi.")
+            raise HTTPException(404, Msg("file_not_found"))
         return FileResponse(target, media_type=media_type, headers={"Cache-Control": "public, max-age=86400"})
 
     app.include_router(api)
@@ -521,7 +539,7 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa(full_path: str):
         if full_path == "api" or full_path.startswith("api/"):
-            raise HTTPException(404, "API endpoint topilmadi.")
+            raise HTTPException(404, Msg("api_not_found"))
         dist = settings.frontend_dist
         index = dist / "index.html"
         if not index.is_file():
@@ -539,38 +557,9 @@ def create_app(settings: Optional[Settings] = None, adapter: Optional[MLAdapter]
     return app
 
 
-def scenario_error_text(e: ValidationError) -> str:
-    """Pydantic errors of a scenario -> short Uzbek text (first 4 problems)."""
-    parts = []
-    for err in e.errors()[:4]:
-        loc = ".".join(str(x) for x in err.get("loc", ()))
-        t, ctx = err.get("type", ""), err.get("ctx") or {}
-        if t == "extra_forbidden":
-            what = "noma'lum kalit"
-        elif t == "missing":
-            what = "majburiy maydon yetishmaydi"
-        elif t == "model_type" or t == "dict_type":
-            what = "obyekt bo'lishi kerak"
-        elif t == "list_type":
-            what = "ro'yxat bo'lishi kerak"
-        elif t in ("int_type", "int_parsing", "int_from_float"):
-            what = "butun son bo'lishi kerak"
-        elif t in ("greater_than_equal", "less_than_equal"):
-            what = "qiymat ruxsat etilgan oralig'dan tashqarida"
-        elif t == "too_long":
-            what = f"{ctx.get('max_length', '')} tadan oshmasligi kerak"
-        elif t == "literal_error":
-            what = f"ruxsat etilgan qiymatlardan biri bo'lishi kerak ({ctx.get('expected', '')})"
-        elif t == "union_tag_invalid" or t == "union_tag_not_found":
-            what = "ta'minotchi 'mode' qiymati 'existing' yoki 'new' bo'lishi kerak"
-        elif t == "string_pattern_mismatch":
-            what = "format noto'g'ri"
-        elif t == "value_error":
-            what = str(err.get("msg", "")).removeprefix("Value error, ")
-        else:
-            what = "qiymat noto'g'ri"
-        parts.append(f"{loc or 'ssenariy'}: {what}")
-    return "; ".join(parts) + "."
+def scenario_error_text(errors: list, lang: str = "uz") -> str:
+    """Pydantic errors of a scenario -> short text in `lang` (first 4 problems)."""
+    return i18n.error_details(errors, lang, limit=4, root="v_scenario") + "."
 
 
 def _asset_url(path: Optional[str]) -> Optional[str]:
@@ -588,8 +577,8 @@ def demo_officer_id(sandbox_id: str) -> str:
     return "Xodim-" + sha256_hex(sandbox_id.encode())[:4].upper()
 
 
-def _too_large_msg(settings: Settings) -> str:
-    return f"Rasm hajmi {settings.max_upload_bytes // (1024 * 1024)} MB dan oshmasligi kerak."
+def _too_large_msg(settings: Settings) -> Msg:
+    return Msg("too_large", mb=settings.max_upload_bytes // (1024 * 1024))
 
 
 def _phrase(status_code: int) -> str:

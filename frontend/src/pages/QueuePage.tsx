@@ -9,7 +9,7 @@ import {
 } from "../api";
 import {
   COLOR_ICON,
-  COLOR_UZ,
+  colorName,
   COLORS,
   escalationLabel,
   formatCount,
@@ -17,7 +17,10 @@ import {
   formatShare,
   formatUzs,
   purposeName,
+  regionName,
+  topReasonText,
 } from "../format";
+import { t } from "../i18n";
 import { navigate, onLinkClick, rememberQueueUrl } from "../router";
 
 type Load<T> = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; data: T };
@@ -140,24 +143,21 @@ export function QueuePage({ search, ready }: { search: string; ready: boolean })
     <>
       <div className="top-links">
         <a className="capture-link" href="/capture" onClick={(e) => onLinkClick(e, "/capture")}>
-          <span aria-hidden="true">📷</span> Rasm tekshirish
+          <span aria-hidden="true">📷</span> {t("queue.capture")}
         </a>
         <a className="capture-link" href="/scenario" onClick={(e) => onLinkClick(e, "/scenario")}>
-          <span aria-hidden="true">🧪</span> Ssenariy sinash
+          <span aria-hidden="true">🧪</span> {t("queue.scenario")}
         </a>
       </div>
       <section className="card">
         <div className="queue-head">
           <div>
-            <h2>Xavf navbati</h2>
-            <p className="muted small">
-              Birinchi navbatda tekshirilishi kerak bo'lgan kreditlar yuqorida. Yakuniy qarorni bank xodimi qabul
-              qiladi.
-            </p>
+            <h2>{t("queue.title")}</h2>
+            <p className="muted small">{t("queue.intro")}</p>
           </div>
         </div>
 
-        <div className="counts" role="group" aria-label="Rang bo'yicha soni">
+        <div className="counts" role="group" aria-label={t("queue.countsAria")}>
           {COLORS.map((c) => (
             <button
               key={c}
@@ -168,7 +168,7 @@ export function QueuePage({ search, ready }: { search: string; ready: boolean })
             >
               <span aria-hidden="true">{COLOR_ICON[c]}</span>
               <strong>{list.counts ? formatCount(list.counts[c]) : "…"}</strong>
-              <span className="chip-label">{COLOR_UZ[c]}</span>
+              <span className="chip-label">{colorName(c)}</span>
             </button>
           ))}
         </div>
@@ -177,42 +177,42 @@ export function QueuePage({ search, ready }: { search: string; ready: boolean })
 
         <div className="filters">
           <label>
-            <span>Rang</span>
+            <span>{t("queue.filterColor")}</span>
             <select
               value={filters.color ?? ""}
               onChange={(e) => setFilters({ ...filters, color: (e.target.value || undefined) as Color | undefined })}
             >
-              <option value="">Hammasi</option>
+              <option value="">{t("common.all")}</option>
               {COLORS.map((c) => (
                 <option key={c} value={c}>
-                  {COLOR_ICON[c]} {COLOR_UZ[c]}
+                  {COLOR_ICON[c]} {colorName(c)}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            <span>Hudud</span>
+            <span>{t("queue.filterRegion")}</span>
             <select
               value={filters.region ?? ""}
               onChange={(e) => setFilters({ ...filters, region: e.target.value || undefined })}
               disabled={facets.kind === "loading"}
             >
-              <option value="">Hammasi</option>
+              <option value="">{t("common.all")}</option>
               {regions.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {regionName(r)}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            <span>Maqsad</span>
+            <span>{t("queue.filterPurpose")}</span>
             <select
               value={filters.purpose ?? ""}
               onChange={(e) => setFilters({ ...filters, purpose: e.target.value || undefined })}
               disabled={facets.kind === "loading"}
             >
-              <option value="">Hammasi</option>
+              <option value="">{t("common.all")}</option>
               {purposes.map((p) => (
                 <option key={p} value={p}>
                   {purposeName(p)}
@@ -222,43 +222,43 @@ export function QueuePage({ search, ready }: { search: string; ready: boolean })
           </label>
           {anyFilter && (
             <button className="secondary" onClick={() => setFilters({})}>
-              Filtrlarni tozalash
+              {t("queue.clearFilters")}
             </button>
           )}
         </div>
         {facets.kind === "error" && (
           <p className="error small">
-            Hudud va maqsad ro'yxati yuklanmadi: {facets.message}{" "}
+            {t("queue.facetsError", { message: facets.message })}{" "}
             <button className="link-button" onClick={loadSide}>
-              Qayta urinish
+              {t("common.retry")}
             </button>
           </p>
         )}
       </section>
 
       <section className="card list-card">
-        {!ready && <p className="muted">Model tayyorlanmoqda… Navbat bir necha soniyadan keyin chiqadi.</p>}
-        {ready && list.kind === "loading" && <p className="muted">Navbat yuklanmoqda…</p>}
+        {!ready && <p className="muted">{t("queue.warming")}</p>}
+        {ready && list.kind === "loading" && <p className="muted">{t("queue.loading")}</p>}
         {ready && list.kind === "error" && (
           <div className="error">
-            <p>Navbat yuklanmadi: {list.error}</p>
-            <button onClick={loadFirst}>Qayta urinish</button>
+            <p>{t("queue.loadError", { message: list.error ?? "" })}</p>
+            <button onClick={loadFirst}>{t("common.retry")}</button>
           </div>
         )}
         {ready && list.kind === "ok" && (
           <>
             <p className="muted small summary">
               {list.total === 0
-                ? "Bu filtrlarga mos kredit yo'q."
-                : `${formatCount(list.total)} ta kreditdan ${formatCount(list.items.length)} tasi ko'rsatilmoqda`}
+                ? t("queue.none")
+                : t("queue.shown", { total: formatCount(list.total), shown: formatCount(list.items.length) })}
             </p>
             {list.items.length > 0 && <QueueTable items={list.items} />}
             {list.items.length > 0 && <QueueCards items={list.items} />}
             {list.items.length < list.total && (
               <div className="more">
-                {list.more === "error" && <p className="error small">Yuklanmadi: {list.moreError}</p>}
+                {list.more === "error" && <p className="error small">{t("queue.moreError", { message: list.moreError ?? "" })}</p>}
                 <button onClick={loadMore} disabled={list.more === "loading"}>
-                  {list.more === "loading" ? "Yuklanmoqda…" : "Yana yuklash"}
+                  {list.more === "loading" ? t("queue.moreLoading") : t("queue.more")}
                 </button>
               </div>
             )}
@@ -270,13 +270,13 @@ export function QueuePage({ search, ready }: { search: string; ready: boolean })
 }
 
 function Legend({ state, onRetry }: { state: Load<ColorLegend>; onRetry: () => void }) {
-  if (state.kind === "loading") return <p className="legend muted small">Rang qoidasi yuklanmoqda…</p>;
+  if (state.kind === "loading") return <p className="legend muted small">{t("legend.loading")}</p>;
   if (state.kind === "error") {
     return (
       <p className="legend error small">
-        Rang qoidasi yuklanmadi: {state.message}{" "}
+        {t("legend.error", { message: state.message })}{" "}
         <button className="link-button" onClick={onRetry}>
-          Qayta urinish
+          {t("common.retry")}
         </button>
       </p>
     );
@@ -285,16 +285,11 @@ function Legend({ state, onRetry }: { state: Load<ColorLegend>; onRetry: () => v
   const escalated = l.n_escalated_to_red + l.n_escalated_to_yellow;
   return (
     <div className="legend small">
-      <p>
-        Rang navbatdagi o'rin bo'yicha: eng yuqori {formatShare(l.n_red, l.n_loans)}% — qizil, keyingi{" "}
-        {formatShare(l.n_yellow, l.n_loans)}% — sariq, qolganlari — yashil.
-      </p>
+      <p>{t("legend.rule", { red: formatShare(l.n_red, l.n_loans), yellow: formatShare(l.n_yellow, l.n_loans) })}</p>
       <p className="muted">
-        Xavf bahosi chegaralari: qizil ≥ {formatRisk(l.red)}, sariq ≥ {formatRisk(l.yellow)}. Xavf bahosi — tartiblash
-        uchun model bahosi.
+        {t("legend.thresholds", { red: formatRisk(l.red), yellow: formatRisk(l.yellow) })}
         {escalated > 0 &&
-          ` Rasm dalillari tufayli yana ${formatCount(l.n_escalated_to_red)} ta kredit qizilga, ` +
-            `${formatCount(l.n_escalated_to_yellow)} ta kredit sariqqa ko'tarilgan (xavf bahosi o'zgarmaydi).`}
+          t("legend.escalated", { red: formatCount(l.n_escalated_to_red), yellow: formatCount(l.n_escalated_to_yellow) })}
       </p>
     </div>
   );
@@ -302,9 +297,9 @@ function Legend({ state, onRetry }: { state: Load<ColorLegend>; onRetry: () => v
 
 function ColorMark({ color }: { color: Color }) {
   return (
-    <span className={`color-mark mark-${color}`} title={COLOR_UZ[color]}>
+    <span className={`color-mark mark-${color}`} title={colorName(color)}>
       <span aria-hidden="true">{COLOR_ICON[color]}</span>
-      <span className="sr-only">{COLOR_UZ[color]}</span>
+      <span className="sr-only">{colorName(color)}</span>
     </span>
   );
 }
@@ -329,14 +324,14 @@ function QueueTable({ items }: { items: QueueItem[] }) {
       <table className="queue-table">
         <thead>
           <tr>
-            <th>Rang</th>
-            <th>Kredit</th>
-            <th>Qarz oluvchi</th>
-            <th>Maqsad</th>
-            <th className="num">Summa</th>
-            <th>Hudud</th>
-            <th className="num">Xavf bahosi</th>
-            <th>Asosiy sabab</th>
+            <th>{t("th.color")}</th>
+            <th>{t("th.loan")}</th>
+            <th>{t("th.borrower")}</th>
+            <th>{t("th.purpose")}</th>
+            <th className="num">{t("th.amount")}</th>
+            <th>{t("th.region")}</th>
+            <th className="num">{t("th.risk")}</th>
+            <th>{t("th.reason")}</th>
           </tr>
         </thead>
         <tbody>
@@ -353,10 +348,10 @@ function QueueTable({ items }: { items: QueueItem[] }) {
               <td>{it.borrower_name_masked}</td>
               <td>{purposeName(it.purpose)}</td>
               <td className="num">{formatUzs(it.amount_uzs)}</td>
-              <td>{it.region}</td>
+              <td>{regionName(it.region)}</td>
               <td className="num">{formatRisk(it.risk)}</td>
               <td className="reason">
-                {it.top_reason}
+                {topReasonText(it)}
                 <EscalationBadge item={it} />
               </td>
             </tr>
@@ -380,14 +375,14 @@ function QueueCards({ items }: { items: QueueItem[] }) {
             <div className="qc-top">
               <ColorMark color={it.color} />
               <span className="qc-id">{it.loan_id}</span>
-              <span className="qc-risk">xavf bahosi {formatRisk(it.risk)}</span>
+              <span className="qc-risk">{t("card.risk", { risk: formatRisk(it.risk) })}</span>
             </div>
             <div className="qc-name">{it.borrower_name_masked}</div>
             <div className="qc-meta">
-              {purposeName(it.purpose)} · {it.region}
+              {purposeName(it.purpose)} · {regionName(it.region)}
             </div>
             <div className="qc-amount">{formatUzs(it.amount_uzs)}</div>
-            <div className="qc-reason">{it.top_reason}</div>
+            <div className="qc-reason">{topReasonText(it)}</div>
             <EscalationBadge item={it} />
           </a>
         </li>

@@ -11,10 +11,12 @@ import numpy as np
 import pandas as pd
 
 from .features import NEVER
+from .reasons_i18n import FORMATTERS, NO_REASON, TXN_TYPE, graph_summary, invoice_summary, money, period_summary
 
 TOP_K = 3
 MAX_REFS = 8
-NO_REASON_UZ = "Sezilarli xavf belgisi aniqlanmadi"
+LANGS = ("uz", "en", "ru")
+NO_REASON_UZ = NO_REASON["uz"]                     # NO_REASON = the same sentence in uz / en / ru
 
 # "atigi" (only) is used only below these values; above them the value is stated neutrally
 LOW_PAY_SHARE, LOW_SUPPLIER_AGE_DAYS, LOW_ACTIVE_SPAN_DAYS = 0.25, 60, 100
@@ -61,6 +63,7 @@ TEMPLATES = {
     "p2p_in_count": lambda v, c: f"Shaxslardan {v:.0f} ta o'tkazma qabul qilingan",
     "big_inbound_share": lambda v, c: f"Hisobga kredit summasining {_pct(v, 'iga')} teng bitta yirik kirim tushgan",
     "big_inbound_day": lambda v, c: ("Yirik kirim qayd etilmagan" if v < 0 else
+                                     "Eng yirik kirim kredit tushgan kunning o'zida kelgan" if v < 0.5 else
                                      f"Eng yirik kirim kredit tushgandan {_d(v)} kun o'tib kelgan"),
     "big_inbound_person": lambda v, c: ("Eng yirik kirim jismoniy shaxsdan kelgan" if v >= 0.5 else
                                         "Eng yirik kirim tashkilotdan kelgan"),
@@ -77,6 +80,7 @@ TEMPLATES = {
     "sup_cash_share": lambda v, c: f"Ta'minotchi olgan mablag'ning {_pct(v, 'ini')} naqd yechgan",
     "sup_exit_share": lambda v, c: f"Ta'minotchi olgan mablag'ning {_pct(v, 'ini')} hisobidan chiqarib yuborgan",
     "sup_cash_lag_days": lambda v, c: ("Ta'minotchi naqd yechmagan" if v >= NEVER else
+                                       "Ta'minotchi pulni olgan kunning o'zida naqd yechgan" if v < 0.5 else
                                        f"Ta'minotchi pulni olgandan {_d(v)} kun o'tib naqd yechgan"),
     "sup_active_span_days": lambda v, c: ("Ta'minotchi hisobida hali harakat qayd etilmagan" if v < 0 else
                                           f"Ta'minotchi hisobi atigi {_d(v)} kun faol bo'lgan" if v < LOW_ACTIVE_SPAN_DAYS else
@@ -119,12 +123,24 @@ DUPLICATE_GROUPS = [
 _GROUP_OF = {code: i for i, g in enumerate(DUPLICATE_GROUPS) for code in g}
 
 
-TXN_TYPE_UZ = {
-    "disbursement": "kredit tushgan", "cash_withdrawal": "naqd yechilgan",
-    "supplier_payment": "ta'minotchiga o'tkazilgan", "p2p_out": "shaxsga o'tkazilgan",
-    "p2p_in": "shaxsdan qabul qilingan", "external_transfer": "boshqa bankka o'tkazilgan",
-    "income": "tushum qayd etilgan",
-}
+TXN_TYPE_UZ = TXN_TYPE["uz"]
+
+
+# a reason about something that did NOT happen (no income, no cash withdrawal, no large inflow) has no transaction to cite:
+# it points at the checked period instead ("period:<loan_id>:<what>", kind "period")
+PERIOD_GROUP = {**{c: "income" for c in ("income_rate_per_month", "income_missing_flag", "income_after_big_count", "income_gap_days",
+                                          "income_stopped_flag")},
+                **{c: "cash" for c in ("first_cash_days", "cash_share_d1", "cash_share_d7", "cash_share_d30", "cash_share_all")},
+                **{c: "inflow" for c in ("big_inbound_share", "big_inbound_day", "big_inbound_person", "post_inbound_exit")}}
+
+
+def render(code: str, v: float, c: dict) -> dict:
+    """The reason sentence of one feature in all three languages {uz, en, ru}: same facts, same numbers."""
+    return {"uz": TEMPLATES[code](v, c), **{lang: f(code, v, c) for lang, f in FORMATTERS.items()}}
+
+
+def period_ref(code: str, c: dict) -> str:
+    return f"period:{c['loan_id']}:{PERIOD_GROUP.get(code, 'other')}"
 
 
 def _refs(code: str, c: dict) -> list[str]:
@@ -166,7 +182,7 @@ def _refs(code: str, c: dict) -> list[str]:
 
 def build_reasons(model_features: list[str], x: np.ndarray, contrib: np.ndarray, c: dict,
                   with_refs: bool = True, exclude=frozenset()) -> list[dict]:
-    """Top-K features pushing the risk UP -> [{code, text_uz, weight, evidence_refs}]. May be empty.
+    """Top-K features pushing the risk UP -> [{code, text_uz, text: {uz, en, ru}, weight, evidence_refs}]. May be empty.
     `with_refs=False` skips the evidence lookup (then `c` only needs `supplier_oked`)."""
     pos = np.where(contrib > 1e-9)[0]
     if len(pos) == 0:
@@ -186,9 +202,10 @@ def build_reasons(model_features: list[str], x: np.ndarray, contrib: np.ndarray,
         weight = round(float(contrib[i]) / total, 3)
         if weight <= 0:
             continue                                  # a share that rounds to 0.0 is not a reason
-        item = dict(code=code, text_uz=TEMPLATES[code](float(x[i]), c), weight=weight)
+        text = render(code, float(x[i]), c)
+        item = dict(code=code, text_uz=text["uz"], text=text, weight=weight)
         if with_refs:
-            item["evidence_refs"] = _refs(code, c)[:MAX_REFS]
+            item["evidence_refs"] = _refs(code, c)[:MAX_REFS] or [period_ref(code, c)]      # every reason cites evidence
         out.append(item)
         if len(out) == TOP_K:
             break
@@ -196,7 +213,7 @@ def build_reasons(model_features: list[str], x: np.ndarray, contrib: np.ndarray,
 
 
 def build_evidence(refs: list[str], c: dict) -> list[dict]:
-    """Evidence items {ref, kind: txn|invoice|graph, summary_uz, data} for the given refs (deduplicated, in order)."""
+    """Evidence items {ref, kind: txn|invoice|graph|period, summary_uz, summary: {uz, en, ru}, data} for the given refs (deduplicated, in order)."""
     t = c["txs"].set_index("txn_id")
     seen, out = set(), []
     for ref in refs:
@@ -204,24 +221,20 @@ def build_evidence(refs: list[str], c: dict) -> list[dict]:
             continue
         seen.add(ref)
         if ref.startswith("invoice:"):
-            inv = c["invoice"]
-            ok = "mos keladi" if inv["oked_matches_purpose"] else "mos kelmaydi"
-            out.append(dict(ref=ref, kind="invoice", data=inv, summary_uz=(
-                f"Hisob-faktura {_som(inv['invoice_amount_uzs'])}, ta'minotchi {inv['supplier_name']} "
-                f"(OKED {inv['supplier_oked']}); faoliyat turi kredit maqsadiga {ok}")))
+            summary = {lang: invoice_summary(lang, c["invoice"]) for lang in LANGS}
+            out.append(dict(ref=ref, kind="invoice", data=c["invoice"], summary_uz=summary["uz"], summary=summary))
+        elif ref.startswith("period:"):
+            p, group = c["period"], ref.rsplit(":", 1)[1]
+            summary = {lang: period_summary(lang, p["start"], p["end"], p["days"], group) for lang in LANGS}
+            out.append(dict(ref=ref, kind="period", data=dict(p, what=group), summary_uz=summary["uz"], summary=summary))
         elif ref.startswith("graph:"):
-            g = c["graph"]
-            out.append(dict(ref=ref, kind="graph", data=g, summary_uz=(
-                f"Ta'minotchi {g['supplier_name']}: {g['in_degree']} ta kreditning hisob-fakturasida ko'rsatilgan; olgan "
-                + ("mablag'dan naqd yechmagan; hisobi " if g["cash_share"] < 0.005 else
-                   f"mablag'ning {_pct(g['cash_share'], 'ini')} naqd yechgan; hisobi ")
-                + ("hali faol emas; " if g["active_span_days"] < 0 else "faqat bir kun faol bo'lgan; " if g["active_span_days"] < 1 else
-                   f"{_d(g['active_span_days'])} kun faol; ") +
-                f"bank xodimi bilan bog'lanish: {'bor' if g['employee_link'] else "yo'q"}")))
+            summary = {lang: graph_summary(lang, c["graph"]) for lang in LANGS}
+            out.append(dict(ref=ref, kind="graph", data=c["graph"], summary_uz=summary["uz"], summary=summary))
         elif ref in t.index:
             r = t.loc[ref]
+            summary = {lang: f"{r['ts']:%Y-%m-%d}: {money(r['amount_uzs'], lang)} {TXN_TYPE[lang][r['type']]}" for lang in LANGS}
             out.append(dict(ref=ref, kind="txn", data=dict(
                 txn_id=ref, ts=r["ts"].isoformat(), type=r["type"], amount_uzs=int(r["amount_uzs"]),
                 counterparty_id=None if pd.isna(r["counterparty_id"]) else r["counterparty_id"]),
-                summary_uz=f"{r['ts']:%Y-%m-%d}: {_som(r['amount_uzs'])} {TXN_TYPE_UZ[r['type']]}"))
+                summary_uz=summary["uz"], summary=summary))
     return out

@@ -331,7 +331,7 @@ def test_reasons_use_the_same_templates_and_are_clean(P):
     for _ in range(20):
         r = api.score_scenario(random_scenario(rng, P))
         for x in r["reasons"]:
-            assert set(x) == {"code", "text_uz", "weight"}
+            assert set(x) == {"code", "text_uz", "text", "weight"}
             assert isinstance(x["text_uz"], str) and x["text_uz"].strip()
             assert isinstance(x["weight"], float)
             assert x["code"] in set(FEATURE_COLUMNS) or x["code"]
@@ -375,7 +375,7 @@ def test_presets_are_stable_and_inputs_only():
     a, b = api.get_scenario_presets(), api.get_scenario_presets()
     assert a == b and [p["id"] for p in a] == ["honest_purchase", "fast_cash_out", "supplier_ring", "asset_resale"]
     for p in a:
-        assert set(p) == {"id", "title_uz", "description_uz", "scenario"}
+        assert set(p) == {"id", "title_uz", "description_uz", "title", "description", "scenario"}
         assert not ({"risk", "color", "percentile"} & set(p["scenario"]))
     a[0]["scenario"]["amount_uzs"] = 1                       # mutating a returned preset must not leak
     assert api.get_scenario_presets()[0]["scenario"]["amount_uzs"] != 1

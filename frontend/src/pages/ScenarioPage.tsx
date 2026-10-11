@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, type Color, type Scenario, type ScenarioPreset, type ScenarioScore, type ScenarioTx } from "../api";
-import { COLOR_ICON, COLOR_UZ, formatRisk, purposeName, txnTypeName } from "../format";
+import { COLOR_ICON, colorName, formatRisk, purposeName, reasonText, regionName, txnTypeName } from "../format";
+import { localized, t } from "../i18n";
 import { onLinkClick } from "../router";
 import "./scenario.css";
 
@@ -64,32 +65,32 @@ const digits = (v: string) => v.replace(/[\s']/g, "");
 
 function toInt(v: string, what: string): number {
   const d = digits(v);
-  if (!/^[0-9]+$/.test(d)) throw new Error(`${what}: butun son kiriting.`);
+  if (!/^[0-9]+$/.test(d)) throw new Error(t("scn.intError", { what }));
   return Number(d);
 }
 
 function toScenario(f: Form): Scenario {
   const rows: ScenarioTx[] = f.rows.map((r, i) => {
-    const t: ScenarioTx = {
-      day: toInt(r.day, `${i + 1}-tranzaksiya kuni`),
+    const tx: ScenarioTx = {
+      day: toInt(r.day, t("scn.w.txDay", { i: i + 1 })),
       type: r.type,
-      amount_uzs: toInt(r.amount, `${i + 1}-tranzaksiya summasi`),
+      amount_uzs: toInt(r.amount, t("scn.w.txAmount", { i: i + 1 })),
     };
-    if (r.kind) t.counterparty_kind = r.kind;
-    return t;
+    if (r.kind) tx.counterparty_kind = r.kind;
+    return tx;
   });
   const supplier: Scenario["supplier"] =
     f.supplierMode === "existing"
       ? { mode: "existing", supplier_id: f.supplierId.trim() }
-      : { mode: "new", oked: f.oked.trim(), registered_days_before: toInt(f.registeredDays, "Ta'minotchi ro'yxatdan o'tganiga (kun)") };
+      : { mode: "new", oked: f.oked.trim(), registered_days_before: toInt(f.registeredDays, t("scn.w.registered")) };
   const s: Scenario = {
     purpose: f.purpose,
-    amount_uzs: toInt(f.amount, "Kredit summasi"),
-    snapshot_day: toInt(f.snapshotDay, "Baholash kuni"),
+    amount_uzs: toInt(f.amount, t("scn.w.amount")),
+    snapshot_day: toInt(f.snapshotDay, t("scn.w.snapshot")),
     supplier,
     transactions: rows,
   };
-  if (f.hasInvoice) s.invoice_amount_uzs = toInt(f.invoice, "Hisob-faktura summasi");
+  if (f.hasInvoice) s.invoice_amount_uzs = toInt(f.invoice, t("scn.w.invoice"));
   if (f.region) s.region = f.region;
   return s;
 }
@@ -156,44 +157,41 @@ export function ScenarioPage({ ready }: { ready: boolean }) {
   return (
     <div className="scenario">
       <a className="back-link" href="/" onClick={(e) => onLinkClick(e, "/")}>
-        ← Navbatga qaytish
+        ← {t("app.backToQueue")}
       </a>
       <section className="card">
-        <h2>🧪 Ssenariy sinash</h2>
-        <p className="scn-note">Bu gipotetik ssenariy, portfelga yozilmaydi.</p>
-        <p className="muted small">
-          Taxminiy kredit va pul harakatlarini kiriting: model uni xuddi portfeldagi kredit kabi baholaydi. Natija —
-          birinchi navbatda tekshirish uchun belgi, yakuniy qarorni xodim qabul qiladi.
-        </p>
+        <h2>{t("scn.title")}</h2>
+        <p className="scn-note">{t("scn.note")}</p>
+        <p className="muted small">{t("scn.intro")}</p>
 
-        {!ready && <p className="muted">Model tayyorlanmoqda…</p>}
-        {ready && presets.kind === "loading" && <p className="muted">Namunalar yuklanmoqda…</p>}
+        {!ready && <p className="muted">{t("scn.warming")}</p>}
+        {ready && presets.kind === "loading" && <p className="muted">{t("scn.presetsLoading")}</p>}
         {ready && presets.kind === "error" && (
           <div className="error">
-            <p>Namunalar yuklanmadi: {presets.message}</p>
-            <button onClick={loadPresets}>Qayta urinish</button>
+            <p>{t("scn.presetsError", { message: presets.message })}</p>
+            <button onClick={loadPresets}>{t("common.retry")}</button>
           </div>
         )}
         {presets.kind === "ok" && (
           <label className="capture-field">
-            <span>Tayyor namuna</span>
+            <span>{t("scn.preset")}</span>
             <select value={presetId} onChange={(e) => choosePreset(e.target.value)}>
-              <option value="">— o'zingiz to'ldiring —</option>
+              <option value="">{t("scn.presetNone")}</option>
               {presets.data.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.title_uz}
+                  {localized(p.title, p.title_uz)}
                 </option>
               ))}
             </select>
           </label>
         )}
-        {selected && <p className="muted small scn-desc">{selected.description_uz}</p>}
+        {selected && <p className="muted small scn-desc">{localized(selected.description, selected.description_uz)}</p>}
       </section>
 
       <form className="card scn-form" onSubmit={submit}>
-        <h3>Kredit</h3>
+        <h3>{t("scn.loanHeading")}</h3>
         <label className="capture-field">
-          <span>Kredit maqsadi</span>
+          <span>{t("scn.purpose")}</span>
           <select value={form.purpose} onChange={(e) => patch({ purpose: e.target.value })}>
             {PURPOSES.map((p) => (
               <option key={p} value={p}>
@@ -203,11 +201,11 @@ export function ScenarioPage({ ready }: { ready: boolean }) {
           </select>
         </label>
         <label className="capture-field">
-          <span>Kredit summasi (so'm)</span>
+          <span>{t("scn.amount")}</span>
           <input inputMode="numeric" value={form.amount} onChange={(e) => patch({ amount: e.target.value })} required />
         </label>
         <label className="capture-field">
-          <span>Baholash kuni (kredit berilganidan necha kun keyin, 2–364)</span>
+          <span>{t("scn.snapshotDay")}</span>
           <input
             inputMode="numeric"
             value={form.snapshotDay}
@@ -216,51 +214,51 @@ export function ScenarioPage({ ready }: { ready: boolean }) {
           />
         </label>
         <label className="capture-field">
-          <span>Hudud (ixtiyoriy)</span>
+          <span>{t("scn.region")}</span>
           <select value={form.region} onChange={(e) => patch({ region: e.target.value })}>
-            <option value="">Ko'rsatilmagan</option>
+            <option value="">{t("scn.regionNone")}</option>
             {regions.map((r) => (
               <option key={r} value={r}>
-                {r}
+                {regionName(r)}
               </option>
             ))}
           </select>
         </label>
         <label className="scn-check">
           <input type="checkbox" checked={form.hasInvoice} onChange={(e) => patch({ hasInvoice: e.target.checked })} />
-          <span>Hisob-faktura bor</span>
+          <span>{t("scn.hasInvoice")}</span>
         </label>
         {form.hasInvoice && (
           <label className="capture-field">
-            <span>Hisob-faktura summasi (so'm)</span>
+            <span>{t("scn.invoiceAmount")}</span>
             <input inputMode="numeric" value={form.invoice} onChange={(e) => patch({ invoice: e.target.value })} required />
           </label>
         )}
 
-        <h3>Ta'minotchi</h3>
+        <h3>{t("scn.supplierHeading")}</h3>
         <label className="capture-field">
-          <span>Ta'minotchi turi</span>
+          <span>{t("scn.supplierType")}</span>
           <select
             value={form.supplierMode}
             onChange={(e) => patch({ supplierMode: e.target.value as "existing" | "new" })}
           >
-            <option value="new">Yangi ta'minotchi</option>
-            <option value="existing">Portfeldagi ta'minotchi</option>
+            <option value="new">{t("scn.supplierNew")}</option>
+            <option value="existing">{t("scn.supplierExisting")}</option>
           </select>
         </label>
         {form.supplierMode === "existing" ? (
           <label className="capture-field">
-            <span>Ta'minotchi kodi (masalan S1500747)</span>
+            <span>{t("scn.supplierId")}</span>
             <input value={form.supplierId} onChange={(e) => patch({ supplierId: e.target.value })} required />
           </label>
         ) : (
           <>
             <label className="capture-field">
-              <span>Faoliyat kodi (OKED, NN.NN)</span>
+              <span>{t("scn.oked")}</span>
               <input value={form.oked} onChange={(e) => patch({ oked: e.target.value })} placeholder="01.41" required />
             </label>
             <label className="capture-field">
-              <span>Ro'yxatdan o'tganiga (kun, kreditdan oldin)</span>
+              <span>{t("scn.registered")}</span>
               <input
                 inputMode="numeric"
                 value={form.registeredDays}
@@ -271,32 +269,29 @@ export function ScenarioPage({ ready }: { ready: boolean }) {
           </>
         )}
 
-        <h3>Pul harakatlari</h3>
-        <p className="muted small">
-          Kredit summasi 0-kuni hisobga tushadi (ro'yxatga yozilmaydi). Naqd yechish va ta'minotchiga to'lovning kuni va
-          summasini o'zgartirib ko'ring.
-        </p>
-        {form.rows.length === 0 && <p className="muted small">Hozircha harakat yo'q.</p>}
+        <h3>{t("scn.movesHeading")}</h3>
+        <p className="muted small">{t("scn.movesNote")}</p>
+        {form.rows.length === 0 && <p className="muted small">{t("scn.movesNone")}</p>}
         <ul className="scn-rows">
           {form.rows.map((r, i) => (
             <li key={r.key} className="scn-row">
               <strong className="scn-row-n">{i + 1}.</strong>
               <label className="capture-field">
-                <span>Turi</span>
+                <span>{t("scn.type")}</span>
                 <select value={r.type} onChange={(e) => patchRow(r.key, { type: e.target.value })}>
-                  {TX_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {txnTypeName(t)}
+                  {TX_TYPES.map((ty) => (
+                    <option key={ty} value={ty}>
+                      {txnTypeName(ty)}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="capture-field">
-                <span>Kun</span>
+                <span>{t("scn.day")}</span>
                 <input inputMode="numeric" value={r.day} onChange={(e) => patchRow(r.key, { day: e.target.value })} required />
               </label>
               <label className="capture-field">
-                <span>Summa (so'm)</span>
+                <span>{t("scn.rowAmount")}</span>
                 <input
                   inputMode="numeric"
                   value={r.amount}
@@ -309,7 +304,7 @@ export function ScenarioPage({ ready }: { ready: boolean }) {
                 className="secondary"
                 onClick={() => setForm((f) => ({ ...f, rows: f.rows.filter((x) => x.key !== r.key) }))}
               >
-                O'chirish
+                {t("scn.remove")}
               </button>
             </li>
           ))}
@@ -320,11 +315,11 @@ export function ScenarioPage({ ready }: { ready: boolean }) {
           disabled={form.rows.length >= MAX_TX}
           onClick={() => setForm((f) => ({ ...f, rows: [...f.rows, newRow()] }))}
         >
-          + Harakat qo'shish
+          {t("scn.add")}
         </button>
 
         <button type="submit" className="shutter" disabled={run.kind === "loading" || !ready}>
-          {run.kind === "loading" ? "Baholanmoqda…" : "Baholash"}
+          {run.kind === "loading" ? t("scn.scoring") : t("scn.submit")}
         </button>
       </form>
 
@@ -338,7 +333,7 @@ function Result({ run }: { run: Load<ScenarioScore> | { kind: "idle" } }) {
   if (run.kind === "loading") {
     return (
       <section className="card" aria-live="polite">
-        <p className="muted">Baholanmoqda…</p>
+        <p className="muted">{t("scn.scoring")}</p>
       </section>
     );
   }
@@ -353,32 +348,28 @@ function Result({ run }: { run: Load<ScenarioScore> | { kind: "idle" } }) {
   const c: Color = r.color;
   return (
     <section className="card scn-result" aria-live="polite">
-      <p className="scn-note">Gipotetik ssenariy natijasi — portfelga yozilmadi.</p>
+      <p className="scn-note">{t("scn.resultNote")}</p>
       <div className={`scn-score border-${c}`}>
         <span className="scn-color">
-          {COLOR_ICON[c]} {COLOR_UZ[c]}
+          {COLOR_ICON[c]} {colorName(c)}
         </span>
         <span>
-          Xavf bahosi: <strong>{formatRisk(r.risk)}</strong>
+          {t("scn.riskLine")} <strong>{formatRisk(r.risk)}</strong>
         </span>
       </div>
-      <p className="muted small">
-        Portfeldagi o'rni (persentil): {r.percentile.toFixed(1)}. Xavf bahosi — 0 dan 1 gacha, kreditlarni
-        tartiblash uchun ball.
-      </p>
-      <h3>Nega shunday?</h3>
+      <p className="muted small">{t("scn.percentile", { percentile: r.percentile.toFixed(1) })}</p>
+      <h3>{t("scn.why")}</h3>
       {r.reasons.length === 0 ? (
-        <p>Sezilarli xavf belgisi aniqlanmadi.</p>
+        <p>{t("scn.noReasons")}</p>
       ) : (
         <ul className="scn-reasons">
           {r.reasons.map((x) => (
-            <li key={x.code}>{x.text_uz}</li>
+            <li key={x.code}>{reasonText(x)}</li>
           ))}
         </ul>
       )}
       <p className="muted small">
-        Bu kredit birinchi navbatda tekshirilishi kerakligini ko'rsatadi, hech kimni ayblamaydi. Model: {r.model_version}
-        , hisoblash {Math.round(r.latency_ms)} ms.
+        {t("scn.footer", { version: r.model_version, ms: Math.round(r.latency_ms) })}
       </p>
     </section>
   );

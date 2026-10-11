@@ -26,12 +26,13 @@ from typing import Callable, Dict, List, Optional
 
 from . import llm
 from .db import utc_now
+from .i18n import Msg
 
 log = logging.getLogger("maqsad.draft_queue")
 
 PRIORITY_USER, PRIORITY_PREWARM = 0, 1
-MSG_BUSY = "Dalolatnoma xizmati hozir band, birozdan keyin qayta urinib ko'ring."
-MSG_FAILED = "Dalolatnoma qoralamasi hozircha tayyor emas: LLM xatosi. Keyinroq qayta urinib ko'ring."
+MSG_BUSY = Msg("busy")
+MSG_FAILED = Msg("draft_failed")
 BACKOFF_MIN_S, BACKOFF_MAX_S = 5.0, 30.0
 RECENT_DURATIONS = 20
 
@@ -41,8 +42,8 @@ class QueueFull(Exception):
 
 
 class Task:
-    def __init__(self, seq: int, scope: str, loan_id: str, key: str, evidence: list, reasons: list, priority: int):
-        self.seq, self.scope, self.loan_id, self.key = seq, scope, loan_id, key
+    def __init__(self, seq: int, scope: str, loan_id: str, key: str, evidence: list, reasons: list, priority: int, lang: str = "uz"):
+        self.seq, self.scope, self.loan_id, self.key, self.lang = seq, scope, loan_id, key, lang
         self.evidence, self.reasons, self.priority = evidence, reasons, priority
         self.status = "queued"  # queued | running | done | error
         self.result: Optional[dict] = None
@@ -79,7 +80,7 @@ class DraftQueue:
     # ---------- submit / inspect ----------
 
     def submit(self, *, sandbox_id: str, scope: str, loan_id: str, key: str, evidence: list, reasons: list,
-               priority: int = PRIORITY_USER, cache_lookup: Optional[Callable[[], Optional[dict]]] = None,
+               priority: int = PRIORITY_USER, lang: str = "uz", cache_lookup: Optional[Callable[[], Optional[dict]]] = None,
                on_finish: Optional[Callable[[Task], None]] = None) -> Optional[Ticket]:
         """Returns a Ticket, or None when `cache_lookup` found a draft meanwhile (nothing to wait for).
         Raises QueueFull for a new user task when more than `max_queue` user tasks are waiting."""
@@ -94,7 +95,7 @@ class DraftQueue:
                     raise QueueFull()  # the provider will not answer within a job's lifetime
                 if priority == PRIORITY_USER and sum(1 for t in self._queued if t.priority == PRIORITY_USER) >= self.max_queue:
                     raise QueueFull()
-                task = Task(next(self._seq), scope, loan_id, key, evidence, reasons, priority)
+                task = Task(next(self._seq), scope, loan_id, key, evidence, reasons, priority, lang)
                 self._tasks[tkey] = task
                 self._queued.append(task)
                 self._ensure_worker()
@@ -207,9 +208,9 @@ class DraftQueue:
             task = self._next_task()
             t0 = self.clock()
             try:
-                result = llm.draft_report(self.settings, task.loan_id, task.evidence, task.reasons, self.db)
+                result = llm.draft_report(self.settings, task.loan_id, task.evidence, task.reasons, self.db, lang=task.lang)
                 result["generated_at"] = utc_now()
-                self.db.draft_cache_put(task.scope, task.loan_id, task.key, result)
+                self.db.draft_cache_put(task.scope, task.loan_id, task.key, result, task.lang)
                 self._finish(task, result=result, duration=self.clock() - t0)
             except llm.LLMRateLimited as e:
                 self._requeue_after_429(task, e.retry_after_s)

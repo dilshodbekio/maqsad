@@ -2,7 +2,8 @@
 // clicking it highlights the evidence and scrolls to where it is shown (money-trail row, photo, invoice).
 import { createContext, useContext } from "react";
 import type { Duplicate, Evidence } from "../../api";
-import { formatDate, formatUzs } from "../../format";
+import { evidenceSummary, formatDate, formatUzs } from "../../format";
+import { t } from "../../i18n";
 
 export type Load<T> = { kind: "loading" } | { kind: "error"; message: string; status?: number } | { kind: "ok"; data: T };
 
@@ -58,17 +59,22 @@ export function evidenceLabel(ev: Evidence | undefined, ref: string): string {
         .join(" · ");
     }
     case "invoice":
-      return "Hisob-faktura";
+      return t("ev.invoice");
     case "graph":
-      return `Ta'minotchi: ${field<string>(ev, "supplier_name") ?? ev.ref.slice("graph:".length)}`;
+      return t("ev.supplier", { name: field<string>(ev, "supplier_name") ?? ev.ref.slice("graph:".length) });
     case "photo":
-      return isSandboxPhotoRef(ev.ref) ? "Yuklangan rasm" : "Portfel rasmi";
+      return isSandboxPhotoRef(ev.ref) ? t("ev.photoUpload") : t("ev.photoPortfolio");
+    case "period": {
+      const start = field<string>(ev, "start");
+      const end = field<string>(ev, "end");
+      return start && end ? t("ev.period", { from: formatDate(start), to: formatDate(end) }) : t("ev.periodShort");
+    }
     default:
       return ref;
   }
 }
 
-const KIND_ICON: Record<string, string> = { txn: "💸", invoice: "🧾", graph: "🏪", photo: "📷" };
+const KIND_ICON: Record<string, string> = { txn: "💸", invoice: "🧾", graph: "🏪", photo: "📷", period: "🗓" };
 
 /** A clickable evidence reference. A ref missing from evidence[] is shown, never hidden. */
 export function EvidenceChip({ refId, onClick }: { refId: string; onClick?: () => void }) {
@@ -77,7 +83,7 @@ export function EvidenceChip({ refId, onClick }: { refId: string; onClick?: () =
   if (!ev) {
     return (
       <span className="ev-chip ev-missing" title={refId}>
-        ⚠ dalil topilmadi: {refId}
+        {t("ev.missing", { ref: refId })}
       </span>
     );
   }
@@ -86,7 +92,7 @@ export function EvidenceChip({ refId, onClick }: { refId: string; onClick?: () =
       type="button"
       className={`ev-chip${activeRef === refId ? " active" : ""}`}
       onClick={onClick ?? (() => focusRef(refId))}
-      title={ev.summary_uz ?? refId}
+      title={evidenceSummary(ev) || refId}
     >
       <span aria-hidden="true">{KIND_ICON[ev.kind] ?? "•"}</span> {evidenceLabel(ev, refId)}
     </button>
@@ -104,7 +110,7 @@ export function BlockError({ message, onRetry }: { message: string; onRetry?: ()
       <p>{message}</p>
       {onRetry && (
         <button type="button" className="secondary" onClick={onRetry}>
-          Qayta urinish
+          {t("common.retry")}
         </button>
       )}
     </div>

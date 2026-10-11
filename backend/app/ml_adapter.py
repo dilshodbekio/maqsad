@@ -232,7 +232,9 @@ class MLAdapter:
         except ValueError as e:
             log.warning("ml.%s rejected input: %s", name, e)
             if type(e).__name__ in ("InvalidRequestError", "ScenarioError"):
-                raise MLInvalidRequest(str(e)) from e
+                err = MLInvalidRequest(str(e))
+                err.messages = getattr(e, "messages", None)          # {uz, en, ru} when ml provides them
+                raise err from e
             if name == "check_photo":
                 raise MLInvalidImage(str(e)) from e
             raise MLBadInput(str(e)) from e

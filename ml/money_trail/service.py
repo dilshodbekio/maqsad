@@ -92,7 +92,9 @@ class Portfolio:
         graph = dict(supplier_name=sup["name"], in_degree=int(F["sup_in_degree"]),
                      cash_share=float(F["sup_cash_share"]), exit_share=float(F["sup_exit_share"]),
                      active_span_days=float(F["sup_active_span_days"]), employee_link=bool(F["sup_employee_link"]))
-        return dict(loan_id=loan_id, supplier_id=loan.supplier_id, supplier_oked=sup["oked_code"], txs=txs,
+        period = dict(start=f"{loan.disbursed_at:%Y-%m-%d}", end=f"{loan.snapshot_date:%Y-%m-%d}",
+                      days=int((loan.snapshot_date.normalize() - loan.disbursed_at.normalize()) / pd.Timedelta(days=1)))
+        return dict(loan_id=loan_id, supplier_id=loan.supplier_id, supplier_oked=sup["oked_code"], txs=txs, period=period,
                     big_inbound_txn=None if big.empty else big["txn_id"].iloc[0], invoice=invoice, graph=graph)
 
     def _make_queue(self) -> list[dict]:

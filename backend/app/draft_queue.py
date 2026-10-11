@@ -26,12 +26,13 @@ from typing import Callable, Dict, List, Optional
 
 from . import llm
 from .db import utc_now
+from .i18n import Msg
 
 log = logging.getLogger("maqsad.draft_queue")
 
 PRIORITY_USER, PRIORITY_PREWARM = 0, 1
-MSG_BUSY = "Dalolatnoma xizmati hozir band, birozdan keyin qayta urinib ko'ring."
-MSG_FAILED = "Dalolatnoma qoralamasi hozircha tayyor emas: LLM xatosi. Keyinroq qayta urinib ko'ring."
+MSG_BUSY = Msg("busy")
+MSG_FAILED = Msg("draft_failed")
 BACKOFF_MIN_S, BACKOFF_MAX_S = 5.0, 30.0
 RECENT_DURATIONS = 20
 

@@ -118,7 +118,7 @@ class Invoice(BaseModel):
 
 class Evidence(BaseModel):
     ref: str
-    kind: Literal["txn", "invoice", "graph", "photo"]
+    kind: Literal["txn", "invoice", "graph", "photo", "period"]
     summary_uz: Optional[str] = None
     data: Any = None
 

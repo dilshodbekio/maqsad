@@ -63,12 +63,17 @@ export function evidenceLabel(ev: Evidence | undefined, ref: string): string {
       return `Ta'minotchi: ${field<string>(ev, "supplier_name") ?? ev.ref.slice("graph:".length)}`;
     case "photo":
       return isSandboxPhotoRef(ev.ref) ? "Yuklangan rasm" : "Portfel rasmi";
+    case "period": {
+      const start = field<string>(ev, "start");
+      const end = field<string>(ev, "end");
+      return start && end ? `Tekshirilgan davr: ${formatDate(start)} – ${formatDate(end)}` : "Tekshirilgan davr";
+    }
     default:
       return ref;
   }
 }
 
-const KIND_ICON: Record<string, string> = { txn: "💸", invoice: "🧾", graph: "🏪", photo: "📷" };
+const KIND_ICON: Record<string, string> = { txn: "💸", invoice: "🧾", graph: "🏪", photo: "📷", period: "🗓" };
 
 /** A clickable evidence reference. A ref missing from evidence[] is shown, never hidden. */
 export function EvidenceChip({ refId, onClick }: { refId: string; onClick?: () => void }) {

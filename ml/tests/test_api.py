@@ -67,7 +67,7 @@ def test_get_loan(queue, pos):
         assert 0 < r["weight"] <= 1 and r["code"] in FEATURE_COLUMNS
     assert d["escalations"] == item["escalations"] and d["priority"] == item["priority"]
     for e in d["evidence"]:
-        assert e["kind"] in ("txn", "invoice", "graph") and e["summary_uz"] and e["data"]
+        assert e["kind"] in ("txn", "invoice", "graph", "period") and e["summary_uz"] and e["data"]
     raised = [e for e in d["escalations"] if e["raises_color"]]
     expected = raised[0]["text_uz"] if raised else (model_reasons[0]["text_uz"] if model_reasons else item["top_reason"])
     assert item["top_reason"] == expected

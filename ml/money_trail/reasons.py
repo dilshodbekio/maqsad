@@ -127,6 +127,20 @@ TXN_TYPE_UZ = {
 }
 
 
+# a reason about something that did NOT happen (no income, no cash withdrawal, no large inflow) has no transaction to cite:
+# it points at the checked period instead ("period:<loan_id>:<what>", kind "period")
+PERIOD_GROUP = {**{c: "income" for c in ("income_rate_per_month", "income_missing_flag", "income_after_big_count", "income_gap_days",
+                                          "income_stopped_flag")},
+                **{c: "cash" for c in ("first_cash_days", "cash_share_d1", "cash_share_d7", "cash_share_d30", "cash_share_all")},
+                **{c: "inflow" for c in ("big_inbound_share", "big_inbound_day", "big_inbound_person", "post_inbound_exit")}}
+PERIOD_WHAT_UZ = {"income": "tushum qayd etilmagan", "cash": "naqd yechish qayd etilmagan",
+                  "inflow": "yirik kirim qayd etilmagan", "other": "tegishli tranzaksiya topilmagan"}
+
+
+def period_ref(code: str, c: dict) -> str:
+    return f"period:{c['loan_id']}:{PERIOD_GROUP.get(code, 'other')}"
+
+
 def _refs(code: str, c: dict) -> list[str]:
     """Evidence refs (transaction ids / invoice / graph) a feature is computed from."""
     t = c["txs"]
@@ -188,7 +202,7 @@ def build_reasons(model_features: list[str], x: np.ndarray, contrib: np.ndarray,
             continue                                  # a share that rounds to 0.0 is not a reason
         item = dict(code=code, text_uz=TEMPLATES[code](float(x[i]), c), weight=weight)
         if with_refs:
-            item["evidence_refs"] = _refs(code, c)[:MAX_REFS]
+            item["evidence_refs"] = _refs(code, c)[:MAX_REFS] or [period_ref(code, c)]      # every reason cites evidence
         out.append(item)
         if len(out) == TOP_K:
             break
@@ -209,6 +223,10 @@ def build_evidence(refs: list[str], c: dict) -> list[dict]:
             out.append(dict(ref=ref, kind="invoice", data=inv, summary_uz=(
                 f"Hisob-faktura {_som(inv['invoice_amount_uzs'])}, ta'minotchi {inv['supplier_name']} "
                 f"(OKED {inv['supplier_oked']}); faoliyat turi kredit maqsadiga {ok}")))
+        elif ref.startswith("period:"):
+            p, group = c["period"], ref.rsplit(":", 1)[1]
+            out.append(dict(ref=ref, kind="period", data=dict(p, what=group), summary_uz=(
+                f"Tekshirilgan davr: {p['start']} dan {p['end']} gacha ({p['days']} kun): {PERIOD_WHAT_UZ[group]}")))
         elif ref.startswith("graph:"):
             g = c["graph"]
             out.append(dict(ref=ref, kind="graph", data=g, summary_uz=(

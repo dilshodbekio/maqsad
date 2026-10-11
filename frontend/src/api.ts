@@ -139,7 +139,7 @@ export type Invoice = {
   invoice_amount_uzs?: number | null;
 };
 
-export type EvidenceKind = "txn" | "invoice" | "graph" | "photo";
+export type EvidenceKind = "txn" | "invoice" | "graph" | "photo" | "period";
 
 export type Evidence = {
   ref: string;

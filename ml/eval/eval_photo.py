@@ -113,8 +113,8 @@ def faces_eval() -> dict | None:
     people are not redistributed); then the detectors are re-run on the blurred output. None if the folder is not there."""
     import csv
     from ml.photo.faces import FaceDetector, blur_faces
-    counts = config.FACES / "faces_test_counts.csv"
-    if not counts.exists():
+    counts = config.ASSETS.parent / "faces_test_manifest.csv"        # committed metadata: file, source URL, licence, hand count (no images)
+    if not counts.exists() or not (config.FACES / "faces_test_00.jpg").exists():
         return None
     det = FaceDetector()
     truth = {r["file"]: (int(r["faces_visible"]), r["note"]) for r in csv.DictReader(open(counts, encoding="utf-8"))}
@@ -193,7 +193,8 @@ def render(dup, faces, lat, idx) -> str:
     w("")
     w(f"- Library: {dup['n_images']} asset photos (Wikimedia Commons; `ml/assets/photos/manifest.csv`) "
       f"(the CLIP `other` negatives are not counted here); {idx['size_kb']} KB for all committed JPEGs in `ml/assets/photos/` including the `other` negatives. "
-      "No committed photo shows a recognisable person (checked with two face detectors and by eye; background figures in one image are pixelated).")
+      "No committed image contains a recognisable face (faces were removed or pixelated); a few images show people from behind, far away or partially "
+      "(`asalarichilik_03`, `asalarichilik_13`, `chorva_14`, `parranda_17`).")
     w("- Portfolio photo index (`ml/artifacts/photo_index_v1.json`): "
       f"{idx['stats']['images']} images on {idx['stats']['loans']} loans of the demo portfolio; "
       f"{idx['stats']['shared_images']} images are shared by 2-3 loans (the generator's photo-reuse groups). "
@@ -234,9 +235,9 @@ def render(dup, faces, lat, idx) -> str:
     w("### Face blur (YuNet, OpenCV zoo, MIT; Haar cascade as fallback)")
     w("")
     w(f"Measured on {len(faces['rows'])} CC-licensed images containing people, counted by eye (faces that are very small, dark or out of focus are not counted). "
-      "**The images are not redistributed, for privacy reasons.** The script runs this part when such images are put in `ml/assets/faces_test/` "
-      "(git-ignored) together with a `faces_test_counts.csv` (columns `file,faces_visible,note`); without them it keeps the numbers stored from the run on the "
-      "author's machine (`ml/artifacts/eval_photo.json`).")
+      "**The images are not redistributed, for privacy reasons.** To reproduce, download them from the URLs in `ml/assets/faces_test_manifest.csv` "
+      "(title, author, licence, source URL and the hand count per image) into `ml/assets/faces_test/` (git-ignored) and run `ml/eval/eval_photo.py`; "
+      "without the images the script keeps the numbers stored in `ml/artifacts/eval_photo.json` (measured once from these images).")
     w("")
     w("| Item | Value |")
     w("|---|---|")

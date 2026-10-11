@@ -5,7 +5,7 @@
    "check": "GET /api/health: ml_mode real, warmup done, clip_loaded true, all functions real",
    "ok": true,
    "evidence": "{\"ml_mode\": \"real\", \"model_version\": \"money_trail_v2\", \"warmup\": \"done\", \"functions\": {\"get_queue\": \"real\", \"get_loan\": \"real\", \"score_loan\": \"real\", \"check_photo\": \"real\", \"reset_sandbox\": \"real\", \"get_color_thresholds\": \"real\", \"score_scenario\": \"real\", \"get_scenario_presets\": \"real\"}, \"clip_loaded\": true}",
-   "ms": 2044
+   "ms": 633
   },
   {
    "section": "1 Health",
@@ -19,14 +19,14 @@
    "check": "page 1: 50 items, total 5000, counts sum to total",
    "ok": true,
    "evidence": "total 5000 counts {'red': 513, 'yellow': 501, 'green': 3986}",
-   "ms": 92
+   "ms": 354
   },
   {
    "section": "2 Queue",
    "check": "page 2: no overlap with page 1, priority non-increasing across pages",
    "ok": true,
    "evidence": "p1 last 2.991 p2 first 2.991",
-   "ms": 102
+   "ms": 404
   },
   {
    "section": "2 Queue",
@@ -54,14 +54,14 @@
    "check": "filter region=Andijon",
    "ok": true,
    "evidence": "total 370",
-   "ms": 131
+   "ms": 345
   },
   {
    "section": "2 Queue",
    "check": "filter purpose=tikuv_dastgohi",
    "ok": true,
    "evidence": "total 1022",
-   "ms": 333
+   "ms": 353
   },
   {
    "section": "2 Queue",
@@ -89,7 +89,7 @@
    "check": "GET /api/loan/L1504044 (red): colour = queue, top_reason == reasons[0], Uzbek reasons",
    "ok": true,
    "evidence": "3 reasons, 6 evidence, 8 tx, invoice=yes, photos=0; reason0='Kredit berilganidan beri tushum qayd etilmagan'",
-   "ms": 26
+   "ms": 208
   },
   {
    "section": "2 Loan",
@@ -110,7 +110,7 @@
    "check": "GET /api/loan/L1503806 (yellow): colour = queue, top_reason == reasons[0], Uzbek reasons",
    "ok": true,
    "evidence": "3 reasons, 3 evidence, 8 tx, invoice=yes, photos=0; reason0=\"Kredit davrida oyiga o'rtacha 0.1 ta tushum qayd etilgan\"",
-   "ms": 25
+   "ms": 210
   },
   {
    "section": "2 Loan",
@@ -124,7 +124,7 @@
    "check": "GET /api/loan/L1504711 (green): colour = queue, top_reason == reasons[0], Uzbek reasons",
    "ok": true,
    "evidence": "3 reasons, 2 evidence, 2 tx, invoice=yes, photos=0; reason0='Yirik kirim qayd etilmagan'",
-   "ms": 23
+   "ms": 207
   },
   {
    "section": "2 Loan",
@@ -138,21 +138,21 @@
    "check": "photos[] of a portfolio loan (L1500951): asset route returns 200 image/jpeg",
    "ok": true,
    "evidence": "/api/asset/photos/tikuv_dastgohi_02.jpg -> 200 image/jpeg 27314 B",
-   "ms": 10
+   "ms": 310
   },
   {
    "section": "2 Loan",
    "check": "unknown loan id -> 404 with Uzbek detail",
    "ok": true,
    "evidence": "HTTP 404 detail='Kredit topilmadi: L9999999'",
-   "ms": 3
+   "ms": 192
   },
   {
    "section": "3 Photo",
    "check": "A: other image (phones) for green L1504130: asset_match not null, matches_purpose false, label_uz present",
    "ok": true,
-   "evidence": "{\"label\": \"other\", \"score\": 0.8649, \"matches_purpose\": false, \"label_uz\": \"telefon yoki noutbuk\", \"label_i18n\": {\"uz\": \"telefon yoki noutbuk\", \"en\": \"phone or laptop\", \"ru\": \"телефон или ноутбук\"}} server 101.78 ms",
-   "ms": 2165
+   "evidence": "{\"label\": \"other\", \"score\": 0.8649, \"matches_purpose\": false, \"label_uz\": \"telefon yoki noutbuk\", \"label_i18n\": {\"uz\": \"telefon yoki noutbuk\", \"en\": \"phone or laptop\", \"ru\": \"телефон или ноутбук\"}} server 120.72 ms",
+   "ms": 598
   },
   {
    "section": "3 Photo",
@@ -186,15 +186,15 @@
    "section": "3 Photo",
    "check": "A: sewing machine NOT in the index (tikuv_dastgohi_16.jpg) for green L1503050: matches_purpose true, no escalation",
    "ok": true,
-   "evidence": "{\"label\": \"tikuv_dastgohi\", \"score\": 0.77, \"matches_purpose\": true, \"label_uz\": \"tikuv mashinasi\", \"label_i18n\": {\"uz\": \"tikuv mashinasi\", \"en\": \"sewing machine\", \"ru\": \"швейная машина\"}} duplicate_of [] colour green server 92.12 ms",
-   "ms": 114
+   "evidence": "{\"label\": \"tikuv_dastgohi\", \"score\": 0.77, \"matches_purpose\": true, \"label_uz\": \"tikuv mashinasi\", \"label_i18n\": {\"uz\": \"tikuv mashinasi\", \"en\": \"sewing machine\", \"ru\": \"швейная машина\"}} duplicate_of [] colour green server 121.92 ms",
+   "ms": 351
   },
   {
    "section": "3 Photo",
    "check": "A: portfolio image of ANOTHER loan (tikuv_dastgohi_15.jpg = L1503448) for L1500270: duplicate_of lists it, colour red, PHOTO_DUPLICATE",
    "ok": true,
-   "evidence": "duplicate_of [{'loan_id': 'L1503448', 'similarity': 1.0}] colour red codes ['PHOTO_DUPLICATE'] server 115.17 ms",
-   "ms": 136
+   "evidence": "duplicate_of [{'loan_id': 'L1503448', 'similarity': 1.0}] colour red codes ['PHOTO_DUPLICATE'] server 129.68 ms",
+   "ms": 258
   },
   {
    "section": "3 Photo",
@@ -277,15 +277,15 @@
    "section": "3 Photo",
    "check": "5 parallel uploads from 5 sandboxes (other_00..04 for the same loan): all 200, each sees only its own escalation, no cross-duplicates",
    "ok": true,
-   "evidence": "other_00.jpg: HTTP 200, server 218.58 ms, client 2372 ms, esc ['PHOTO_ASSET_MISMATCH']; other_01.jpg: HTTP 200, server 318.51 ms, client 2495 ms, esc ['PHOTO_ASSET_MISMATCH']; other_02.jpg: HTTP 200, server 111.84 ms, client 2251 ms, esc ['PHOTO_ASSET_MISMATCH']; other_03.jpg: HTTP 200, server 576.58 ms, client 2758 ms, esc ['PHOTO_ASSET_MISMATCH']; other_04.jpg: HTTP 200, server 434.57 ms, client 2625 ms, esc ['PHOT",
-   "ms": 2758
+   "evidence": "other_00.jpg: HTTP 200, server 124.4 ms, client 841 ms, esc ['PHOTO_ASSET_MISMATCH']; other_01.jpg: HTTP 200, server 186.62 ms, client 953 ms, esc ['PHOTO_ASSET_MISMATCH']; other_02.jpg: HTTP 200, server 183.19 ms, client 1610 ms, esc ['PHOTO_ASSET_MISMATCH']; other_03.jpg: HTTP 200, server 242.76 ms, client 1162 ms, esc ['PHOTO_ASSET_MISMATCH']; other_04.jpg: HTTP 200, server 174.28 ms, client 1476 ms, esc ['PHOTO_A",
+   "ms": 1610
   },
   {
    "section": "4 Scenario",
    "check": "presets load (4)",
    "ok": true,
    "evidence": "['honest_purchase', 'fast_cash_out', 'supplier_ring', 'asset_resale']",
-   "ms": 2067
+   "ms": 652
   },
   {
    "section": "4 Scenario",
@@ -299,28 +299,28 @@
    "check": "score preset honest_purchase",
    "ok": true,
    "evidence": "risk 0.014 colour green percentile 33.9 reason0 \"Ta'minotchiga kredit summasining 98 foizi o'tkazilgan\"",
-   "ms": 75
+   "ms": 281
   },
   {
    "section": "4 Scenario",
    "check": "score preset fast_cash_out",
    "ok": true,
    "evidence": "risk 0.993 colour red percentile 99.3 reason0 \"Kredit tushgandan keyingi 24 soat ichida mablag'ning 84 foizi naqd yechilgan\"",
-   "ms": 93
+   "ms": 243
   },
   {
    "section": "4 Scenario",
    "check": "score preset supplier_ring",
    "ok": true,
    "evidence": "risk 0.481 colour yellow percentile 86.2 reason0 \"Ta'minotchi olgan mablag'ning 69 foizini naqd yechgan\"",
-   "ms": 120
+   "ms": 238
   },
   {
    "section": "4 Scenario",
    "check": "score preset asset_resale",
    "ok": true,
    "evidence": "risk 0.506 colour yellow percentile 86.8 reason0 'Kredit berilganidan beri tushum qayd etilmagan'",
-   "ms": 124
+   "ms": 431
   },
   {
    "section": "4 Scenario",
@@ -396,15 +396,15 @@
    "section": "5 Decision",
    "check": "POST /api/decision on L1504044 (officer e2e-test, visit)",
    "ok": true,
-   "evidence": "HTTP 200 {'audit_id': 13}",
-   "ms": 47
+   "evidence": "HTTP 200 {'audit_id': 168}",
+   "ms": 215
   },
   {
    "section": "5 Decision",
    "check": "GET /api/audit shows the row with ai_recommendation and model_version",
    "ok": true,
-   "evidence": "{\"ts\": \"2026-10-11T00:55:44.558+00:00\", \"actor\": \"e2e-test\", \"action\": \"visit\", \"ai_recommendation\": \"red (risk=0.998)\", \"model_version\": \"money_trail_v2\", \"inputs_hash\": \"5bbb67cf6c77487116b4bf26ba2ad4f2839ae1f6b53051953e7b7b921012edd9\"}",
-   "ms": 37
+   "evidence": "{\"ts\": \"2026-10-11T04:31:16.034+00:00\", \"actor\": \"e2e-test\", \"action\": \"visit\", \"ai_recommendation\": \"red (risk=0.998)\", \"model_version\": \"money_trail_v2\", \"inputs_hash\": \"5bbb67cf6c77487116b4bf26ba2ad4f2839ae1f6b53051953e7b7b921012edd9\"}",
+   "ms": 203
   },
   {
    "section": "5 Decision",
@@ -416,75 +416,82 @@
   {
    "section": "5 Report",
    "check": "POST /api/draft_report on L1504044: text_uz + facts each with evidence_ref (or flagged unverified)",
-   "ok": false,
-   "evidence": "HTTP 503 cached=None model=None facts=0 unverified=0 latency_ms=None cost_usd=None",
-   "ms": 29
+   "ok": true,
+   "evidence": "HTTP 200 cached=True model=gemini-3.6-flash facts=6 unverified=0 latency_ms=13.1 cost_usd=0.0",
+   "ms": 275
+  },
+  {
+   "section": "5 Report",
+   "check": "second call is cached: same text, faster, cost 0",
+   "ok": true,
+   "evidence": "call1 275 ms cost 0.0 cached True; call2 204 ms cost 0.0 cached True same_text=True",
+   "ms": 204
   },
   {
    "section": "6 Frontend",
    "check": "GET /: 200 HTML referencing built JS (JS loads)",
    "ok": true,
    "evidence": "HTTP 200 js=['/assets/index-BPFJzFhb.js']",
-   "ms": 83
+   "ms": 194
   },
   {
    "section": "6 Frontend",
    "check": "GET /loan/L1504044: 200 HTML referencing built JS (JS loads)",
    "ok": true,
    "evidence": "HTTP 200 js=['/assets/index-BPFJzFhb.js']",
-   "ms": 4
+   "ms": 201
   },
   {
    "section": "6 Frontend",
    "check": "GET /capture?loan=L1504130: 200 HTML referencing built JS (JS loads)",
    "ok": true,
    "evidence": "HTTP 200 js=['/assets/index-BPFJzFhb.js']",
-   "ms": 4
+   "ms": 195
   },
   {
    "section": "6 Frontend",
    "check": "GET /scenario: 200 HTML referencing built JS (JS loads)",
    "ok": true,
    "evidence": "HTTP 200 js=['/assets/index-BPFJzFhb.js']",
-   "ms": 4
+   "ms": 344
   },
   {
    "section": "6 Frontend",
    "check": "GET /capture: 200 HTML referencing built JS (JS loads)",
    "ok": true,
    "evidence": "HTTP 200 js=['/assets/index-BPFJzFhb.js']",
-   "ms": 4
+   "ms": 468
   },
   {
    "section": "6 Frontend",
    "check": "GET /nonexistent-page: 200 HTML referencing built JS (JS loads)",
    "ok": true,
    "evidence": "HTTP 200 js=['/assets/index-BPFJzFhb.js']",
-   "ms": 4
+   "ms": 271
   }
  ],
  "created": {
   "audit_ids": [
-   13
+   168
   ],
   "sandboxes": [
-   "d45192c6-e1cd-4b2b-89de-e12ff5a7b158",
-   "dce98d3e-2d1c-4e52-8c9a-dd6dd5f39d94",
-   "187644d1-0032-47a1-bc18-c422ea957b9a",
-   "3ed5cce0-e2f0-4fd4-a15a-847a26797eea",
-   "f56fc8a3-2f79-4e55-8d63-90efeebfd8a3",
-   "1bdd70f7-d1a4-4597-8cba-f2a7536922a8",
-   "2b2ef2c2-fe72-473e-adc0-ae3d7ae5f3c3",
-   "7f70c9a6-db5a-4bdc-adef-9b6119fbffb9",
-   "8c801ea1-60cf-492e-b348-32ed760031ed",
-   "17d8e01e-20f9-43eb-abda-ab1b373248c8"
+   "b60daaab-697f-4a2e-9a4d-f2a6ff9fb830",
+   "adc25b78-64ba-4c30-87a6-95b3ff442f9f",
+   "c6f8a951-c0a2-41a3-81e1-f7da8675aa8a",
+   "a48c10e2-ba50-492a-9c67-7427c4d7d224",
+   "cf8f6395-f586-429f-8896-f474472f7813",
+   "7e42044e-62c5-420d-964b-dfc20ac92bc4",
+   "8ac7a0f1-22af-4403-9f40-c464f058d333",
+   "1988b255-e1e1-444e-8d02-4902581c0e15",
+   "d4bfb774-b61d-414d-99e2-7e3b8dbd519b",
+   "a04232a7-0b5a-44cf-adea-99c6a6961009"
   ],
   "loans_written": [
    "L1504044"
   ]
  },
  "data": {
-  "started": "2026-10-11 00:55:20 UTC",
+  "started": "2026-10-11 04:30:44 UTC",
   "lang": "uz",
   "model_version": "money_trail_v2",
   "red_loan": "L1504044",
@@ -509,18 +516,18 @@
   "photo_latency": [
    [
     "other_06.jpg",
-    80.51,
-    2145.658999972511
+    123.58,
+    833.3998000016436
    ],
    [
     "tikuv_dastgohi_16.jpg",
-    90.82,
-    114.08760002814233
+    122.48,
+    256.4827000023797
    ],
    [
     "chorva_09.jpg",
-    109.3,
-    135.11279999511316
+    122.6,
+    259.6339999581687
    ]
   ],
   "scenario_cmp": {
@@ -528,6 +535,8 @@
    "cash-out day 30": "risk 0.598, colour yellow, percentile 88.8, first reason: Hisob-fakturadagi summaning 90 foizi ta'minotchiga to'lanmagan",
    "all paid to supplier": "risk 0.130, colour green, percentile 72.2, first reason: Yirik kirim qayd etilmagan"
   },
+  "report_text": "Kredit monitoringi jarayonida quyidagi xavf belgilari aniqlandi va birinchi navbatda tekshirish tavsiya etiladi. 2025-12-30 dan 2026-07-31 gacha bo'lgan 213 kunlik tekshirilgan davrda hech qanday tushum qayd etilmagan, ya'ni kredit berilganidan beri tushum mavjud emas. Shuningdek, kredit tushgandan keyin 7 kun ichida mablag'ning 67 foizi naqd yechilgan bo'lib, xususan 2025-12-31 holatiga ko'ra 27 266 000 so'm, 234 000 so'm va 15 705 000 so'm naqd pul yechib olingan. Bundan tashqari, Mehr Agro YaTT tomonidan taqdim etilgan 59 500 000 so'mlik hisob-fakturni o'rganish natijasida hisob-faktura summasining 94 foizi ta'minotchiga to'lanmagani va 2026-01-03 kuni ta'minotchiga faqat 3 301 000 so'm o'tkazilgani ma'lum bo'ldi. Yakuniy xulosani xodim qabul qiladi.",
+  "report_flags": [],
   "demo_loans": {
    "tikuv": [
     "L1504130",
@@ -540,6 +549,6 @@
    "L1503497",
    "L1500884"
   ],
-  "finished": "2026-10-11 00:55:44 UTC"
+  "finished": "2026-10-11 04:31:21 UTC"
  }
 }

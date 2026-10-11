@@ -1,8 +1,10 @@
 """End-to-end check of the LIVE demo (read-mostly; writes only with officer_id "e2e-test"). Never calls /api/admin/*.
 
-    PYTHONPATH=. .venv/Scripts/python qa/e2e_live.py [--base URL]
+    PYTHONPATH=. .venv/Scripts/python qa/e2e_live.py [--base URL] [--lang uz|en|ru]
 
-Writes qa/e2e_results.json (rows + created objects); docs/e2e_check.md is rendered from it by qa/e2e_render.py.
+Writes qa/e2e_results.json (uz) or qa/e2e_results_<lang>.json (rows + created objects); docs/e2e_check.md is rendered from the uz file by
+qa/e2e_render.py. With --lang en|ru every request carries `Accept-Language`, error messages must come back in that language and the
+translated texts of the API (`text` / `top_reason_text` / `summary` / `label_i18n` / preset titles) are checked for that language.
 """
 from __future__ import annotations
 
@@ -20,13 +22,16 @@ from pathlib import Path
 
 import httpx
 
-from ml.eval.audit_texts import flags_of
+from ml.eval.audit_texts import flags_lang, flags_of
 
 ROOT = Path(__file__).resolve().parents[1]
 PH = ROOT / "ml" / "assets" / "photos"
 BASE = "https://maqsad-production-d704.up.railway.app"
 RANK = {"green": 0, "yellow": 1, "red": 2}
 ROWS, CREATED, DATA = [], {"audit_ids": [], "sandboxes": [], "loans_written": []}, {}
+LANG = "uz"
+CYR = re.compile(r"[А-Яа-яЁё]")
+PYDANTIC_EN = re.compile(r"Field required|Input should|valid datetime|valid integer|Value error|String should|Extra inputs", re.I)
 
 
 def row(section, name, ok, evidence="", ms=None):
@@ -38,7 +43,7 @@ class S:
     """One sandbox = one cookie."""
     def __init__(self, base, sid=None):
         self.sid = str(sid or uuid.uuid4())
-        self.c = httpx.Client(base_url=base, timeout=120, cookies={"sandbox_id": self.sid})
+        self.c = httpx.Client(base_url=base, timeout=120, cookies={"sandbox_id": self.sid}, headers={"Accept-Language": LANG})
         CREATED["sandboxes"].append(self.sid)
 
     def req(self, m, p, **kw):
@@ -59,16 +64,36 @@ def uz_text_ok(t):
 
 
 def detail_uz(body):
+    """The `detail` of an error response is a message in the language of the request (name kept from the uz-only version)."""
     d = body.get("detail") if isinstance(body, dict) else None
-    return isinstance(d, str) and len(d) > 8 and not re.search(r"\b(field required|invalid|error|not found|Traceback)\b", d, re.I), d
+    ok = isinstance(d, str) and len(d) > 8 and not PYDANTIC_EN.search(d) and "Traceback" not in d
+    if ok and LANG == "uz":
+        ok = not re.search(r"\b(field required|invalid|error|not found)\b", d, re.I) and not CYR.search(d)
+    if ok and LANG == "ru":
+        ok = bool(CYR.search(d))
+    if ok and LANG == "en":
+        ok = not CYR.search(d) and not re.search(r"[a-z]'[a-z]", d.replace("loan_id", ""))
+    return ok, d
+
+
+def lang_texts_ok(trio, kind="reason"):
+    """A {uz,en,ru} text of the API: present in the request language and clean."""
+    if LANG == "uz":
+        return True
+    t = trio.get(LANG) if isinstance(trio, dict) else None
+    return bool(t) and not flags_lang(t, kind, LANG) and bool(CYR.search(t)) == (LANG == "ru")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default=BASE)
+    ap.add_argument("--lang", default="uz", choices=["uz", "en", "ru"])
     a = ap.parse_args()
+    global LANG
+    LANG = a.lang
     started = dt.datetime.now(dt.timezone.utc)
     DATA["started"] = started.strftime("%Y-%m-%d %H:%M:%S UTC")
+    DATA["lang"] = LANG
     A = S(a.base)
 
     # ---------------------------------------------------------------- 1 health
@@ -92,6 +117,9 @@ def main():
         f"p1 last {pri[49]:.3f} p2 first {pri[50]:.3f}", ms)
     bad = [(x["loan_id"], x["top_reason"], flags_of(x["top_reason"], "reason")) for x in p1["items"] + p2["items"] if not uz_text_ok(x["top_reason"])]
     row("2 Queue", "top_reason present, Uzbek, no None/nan/{/English (100 items)", not bad, bad[:2] or f"e.g. {p1['items'][0]['top_reason']!r}")
+    badl = [x["loan_id"] for x in p1["items"] + p2["items"] if not (x.get("top_reason_text", {}).get("uz") == x["top_reason"] and lang_texts_ok(x.get("top_reason_text")))]
+    row("2 Queue", f"top_reason_text[{LANG}] present and clean (100 items)", not badl,
+        badl[:3] or f"e.g. {p1['items'][0].get('top_reason_text', {}).get(LANG)!r}")
     row("2 Queue", "colour >= base_color, colours valid", all(x["color"] in RANK and RANK[x["color"]] >= RANK[x["base_color"]] for x in p1["items"] + p2["items"]),
         f"counts {p1['counts']}")
     r, fac, _ = A.req("GET", "/api/queue/facets")
@@ -118,6 +146,10 @@ def main():
         row("2 Loan", f"GET /api/loan/{it['loan_id']} ({c}): colour = queue, top_reason == reasons[0], Uzbek reasons",
             ok and all(uz_text_ok(t) for t in txt) and (c != "red" or len(txt) >= 1),
             f"{len(txt)} reasons, {len(d['evidence'])} evidence, {len(d['transactions'])} tx, invoice={'yes' if d.get('invoice') else 'no'}, photos={len(d['photos'])}; reason0={txt[0] if txt else None!r}", ms)
+        row("2 Loan", f"{it['loan_id']} ({c}): reasons[].text and evidence[].summary in {LANG}, top_reason_text == reasons[0].text",
+            all(lang_texts_ok(r.get("text")) for r in d["reasons"]) and all(lang_texts_ok(e.get("summary"), "message") for e in d["evidence"])
+            and (c == "green" and not d["reasons"] or d["reasons"][0].get("text") == it.get("top_reason_text")),
+            f"reason0 {(d['reasons'][0].get('text') or {}).get(LANG) if d['reasons'] else None!r}")
         if c == "red":
             refs = [x for rr in d["reasons"] for x in rr.get("evidence_refs", [])]
             ev_ids = {e.get("ref") or e.get("id") for e in d["evidence"]}
@@ -158,6 +190,8 @@ def main():
         r.status_code == 200 and am and am["matches_purpose"] is False and am.get("label_uz"), f"{json.dumps(am, ensure_ascii=False)} server {ph.get('latency_ms')} ms", ms)
     r, d, _ = sbA.req("GET", f"/api/loan/{L1}")
     codes = [e["code"] for e in d.get("escalations", [])]
+    row("3 Photo", f"A: asset_match.label_i18n and escalation text in {LANG}", lang_texts_ok(am.get("label_i18n"), "message") and all(lang_texts_ok(e.get("text")) for e in d.get("escalations", [])),
+        f"label {(am.get('label_i18n') or {}).get(LANG)!r}; text {(d['escalations'][0].get('text') or {}).get(LANG) if d.get('escalations') else None!r}")
     row("3 Photo", f"A: {L1} colour in sandbox A >= yellow with PHOTO_ASSET_MISMATCH", RANK[d["color"]] >= 1 and "PHOTO_ASSET_MISMATCH" in codes, f"colour {d['color']} escalations {codes}; text: {[e['text_uz'] for e in d['escalations']]}")
     r, d, _ = sbB.req("GET", f"/api/loan/{L1}")
     row("3 Photo", f"B (new cookie): {L1} is still green, no escalation (isolation)", d["color"] == "green" and not d["escalations"], f"colour {d['color']} escalations {d['escalations']}")
@@ -233,11 +267,14 @@ def main():
     # ---------------------------------------------------------------- 4 scenario
     r, pres, ms = A.req("GET", "/api/scenario_presets")
     row("4 Scenario", "presets load (4)", r.status_code == 200 and len(pres) == 4 and all(p["title_uz"] and p["description_uz"] for p in pres), [p["id"] for p in pres], ms)
+    row("4 Scenario", f"preset titles / descriptions in {LANG}", all(lang_texts_ok(p.get("title"), "message") and lang_texts_ok(p.get("description"), "message") for p in pres),
+        pres[1].get("title", {}).get(LANG))
     scores = {}
     for p in pres:
         r, s, ms = A.req("POST", "/api/score_scenario", json=p["scenario"])
         scores[p["id"]] = s
-        row("4 Scenario", f"score preset {p['id']}", r.status_code == 200 and uz_text_ok(s["reasons"][0]["text_uz"] if s["reasons"] else "ok"),
+        row("4 Scenario", f"score preset {p['id']}", r.status_code == 200 and uz_text_ok(s["reasons"][0]["text_uz"] if s["reasons"] else "ok")
+            and all(lang_texts_ok(x.get("text")) for x in s["reasons"]),
             f"risk {s['risk']:.3f} colour {s['color']} percentile {s['percentile']} reason0 {s['reasons'][0]['text_uz'] if s['reasons'] else None!r}", ms)
     base = next(p for p in pres if p["id"] == "fast_cash_out")["scenario"]
 
@@ -320,7 +357,7 @@ def main():
     r, qc, _ = A.req("GET", "/api/queue", params=dict(purpose="chorva", color="green", limit=200))
     DATA["green_chorva"] = [x["loan_id"] for x in qc["items"] if not x["escalations"] and x["loan_id"] not in in_index][:2]
     DATA["finished"] = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    (ROOT / "qa" / "e2e_results.json").write_text(json.dumps(dict(rows=ROWS, created=CREATED, data=DATA), indent=1, ensure_ascii=False), encoding="utf-8")
+    (ROOT / "qa" / ("e2e_results.json" if LANG == "uz" else f"e2e_results_{LANG}.json")).write_text(json.dumps(dict(rows=ROWS, created=CREATED, data=DATA), indent=1, ensure_ascii=False), encoding="utf-8")
     print(sum(r["ok"] for r in ROWS), "pass /", len(ROWS))
 
 

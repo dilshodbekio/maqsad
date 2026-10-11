@@ -121,6 +121,7 @@ def apply_policy(base_color: str, signals: list[dict]) -> dict:
         text = {}
         for lang in LANGS:
             texts = [(g.get("text") or {}).get(lang) or g["text_uz"] for g in group]     # a signal without translations: its Uzbek text
+            texts = list(dict.fromkeys(texts))        # the same sentence from several photos is said once (order kept)
             text[lang] = "; ".join([texts[0]] + [t[:1].lower() + t[1:] for t in texts[1:]])
         esc.append(dict(code=code, min_color=POLICY[code]["min_color"], text_uz=text["uz"], text=text,
                         evidence_refs=list(dict.fromkeys(g["evidence_ref"] for g in group)),

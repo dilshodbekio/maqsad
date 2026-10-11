@@ -91,7 +91,9 @@ def test_photo_escalations_are_trilingual_and_joined_per_language():
     trio_ok(low)
     assert "ishonch past" in low["uz"] and "low confidence" in low["en"] and "низкая уверенность" in low["ru"]
     # two photos with the same code -> one escalation, texts joined in every language
-    e = fusion.apply_policy("green", [sig[1], dict(sig[1], evidence_ref="photo:y")])["escalations"]
+    other = fusion.photo_signals(ref="photo:y", photo_label="y", duplicates=[], geo_ok=False, distance_km=55.0, time_ok=None, asset_match=None,
+                                 uploaded=True, purpose="chorva")[0]
+    e = fusion.apply_policy("green", [sig[1], other])["escalations"]
     assert len(e) == 1 and all(e[0]["text"][l].count("; ") == 1 for l in LANGS) and e[0]["text_uz"] == e[0]["text"]["uz"]
 
 
@@ -139,3 +141,22 @@ def test_audit_checker_catches_what_it_is_meant_to_catch():
     assert flags_lang("", "reason", "ru") == ["empty translation"]
     assert flags_lang("The supplier Dala Ta'minot MChJ got money", "reason", "en") == []        # a company name is data, not prose
     assert _numbers("3 301 000 UZS, 2026-01-03, 6.8") == _numbers("3 301 000 сум, 2026-01-03, 6.8") != _numbers("3 301 001 сум, 2026-01-03, 6.8")
+
+
+def test_same_sentence_from_several_photos_is_said_once_in_every_language():
+    am = dict(label="other", score=0.9, matches_purpose=False, label_uz="avtomobil", label_i18n=asset.label_i18n("avtomobil"))
+    one = lambda ref, ids: fusion.photo_signals(ref=ref, photo_label=ref, duplicates=[dict(loan_id=i, similarity=1.0) for i in ids], geo_ok=None,
+                                                distance_km=None, time_ok=None, asset_match=None, uploaded=True, purpose="chorva")
+    mism = lambda ref, a: fusion.photo_signals(ref=ref, photo_label=ref, duplicates=[], geo_ok=None, distance_km=None, time_ok=None, asset_match=a,
+                                               uploaded=True, purpose="chorva")
+    am2 = dict(am, label_uz="bino", label_i18n=asset.label_i18n("bino"))
+    sigs = one("photo:a", ["L1500001"]) + one("photo:b", ["L1500001"]) + one("photo:c", ["L1500002"]) + mism("photo:d", am) + mism("photo:e", am) + mism("photo:f", am2)
+    esc = {e["code"]: e for e in fusion.apply_policy("green", sigs)["escalations"]}
+    for lang in LANGS:
+        dup = esc["PHOTO_DUPLICATE"]["text"][lang].split("; ")
+        assert len(dup) == len(set(dup)) == 2, dup                    # L1500001 (twice -> once) and L1500002
+        mm = esc["PHOTO_ASSET_MISMATCH"]["text"][lang].split("; ")
+        assert len(mm) == len(set(mm)) == 2, mm                       # car (twice -> once) and building
+    assert esc["PHOTO_DUPLICATE"]["text_uz"] == esc["PHOTO_DUPLICATE"]["text"]["uz"]
+    assert esc["PHOTO_DUPLICATE"]["evidence_refs"] == ["photo:a", "photo:b", "photo:c"]        # evidence items are all kept
+    assert esc["PHOTO_ASSET_MISMATCH"]["evidence_refs"] == ["photo:d", "photo:e", "photo:f"]

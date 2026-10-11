@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type CheckPhotoResult, type Color, type LoanDetail, type QueueItem } from "../api";
-import { COLOR_ICON, COLOR_UZ, formatRisk, formatUzs, purposeName } from "../format";
+import { COLOR_ICON, colorName, escalationText, formatRisk, formatUzs, purposeName } from "../format";
+import { localized, t } from "../i18n";
+import { tn } from "../i18n/jsx";
 import { onLinkClick } from "../router";
 import { BlockError, BlockLoading } from "./loan/evidence";
 import "./capture.css";
@@ -163,7 +165,7 @@ export function CapturePage({ search, ready }: { search: string; ready: boolean 
         if (after) setLoan(after);
         stopCamera();
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Rasmni tekshirib bo'lmadi. Qayta urinib ko'ring.");
+        setError(e instanceof Error ? e.message : t("capture.checkFailed"));
       } finally {
         setBusy(false);
       }
@@ -179,7 +181,7 @@ export function CapturePage({ search, ready }: { search: string; ready: boolean 
       setPreview(URL.createObjectURL(blob));
       await send(blob, "photo.jpg");
     } catch {
-      setError("Suratga olib bo'lmadi. Qayta urinib ko'ring yoki rasmni fayldan yuklang.");
+      setError(t("capture.shootFailed"));
     }
   }, [send]);
 
@@ -209,18 +211,15 @@ export function CapturePage({ search, ready }: { search: string; ready: boolean 
 
   return (
     <section className="card capture">
-      <h2>Rasm tekshirish</h2>
-      <p className="muted small">
-        Kredit hisobidan olingan aktivning (uskuna, chorva, issiqxona va h.k.) suratini oling. Tizim rasmni xodimga
-        ko'rsatish uchun tekshiradi; yakuniy qarorni bank xodimi qabul qiladi.
-      </p>
+      <h2>{t("capture.title")}</h2>
+      <p className="muted small">{t("capture.intro")}</p>
 
-      {!ready && <BlockLoading text="Model tayyorlanmoqda… Bir necha soniyadan keyin davom eting." />}
+      {!ready && <BlockLoading text={t("capture.warming")} />}
 
       {ready && !initialLoan && (
         <>
           <label className="capture-field">
-            Kredit
+            {t("capture.loan")}
             <select
               value={loanId}
               onChange={(e) => {
@@ -230,7 +229,7 @@ export function CapturePage({ search, ready }: { search: string; ready: boolean 
               disabled={!queue}
             >
               <option value="">
-                {queue ? "— kreditni tanlang —" : queueError ? "Ro'yxat yuklanmadi" : "Yuklanmoqda…"}
+                {queue ? t("capture.choose") : queueError ? t("capture.listError") : t("common.loading")}
               </option>
               {(queue ?? []).map((q) => (
                 <option key={q.loan_id} value={q.loan_id}>
@@ -241,10 +240,10 @@ export function CapturePage({ search, ready }: { search: string; ready: boolean 
           </label>
           {queueError && <p className="error small">{queueError}</p>}
           <label className="capture-field">
-            Yoki kredit raqamini kiriting
+            {t("capture.orEnter")}
             <input
               value={manualId}
-              placeholder="kredit raqami"
+              placeholder={t("capture.idPlaceholder")}
               autoCapitalize="characters"
               onChange={(e) => setManualId(e.target.value.trim())}
               onBlur={() => manualId && setLoanId(manualId)}
@@ -257,8 +256,10 @@ export function CapturePage({ search, ready }: { search: string; ready: boolean 
       {loanError && <BlockError message={loanError} onRetry={loadLoan} />}
       {loan && (
         <p className="capture-loan">
-          Kredit <strong>{loan.loan.loan_id}</strong> · maqsad:{" "}
-          <strong>{loan.loan.purpose ? purposeName(loan.loan.purpose) : "—"}</strong>
+          {tn("capture.loanLine", {
+            id: <strong>{loan.loan.loan_id}</strong>,
+            purpose: <strong>{loan.loan.purpose ? purposeName(loan.loan.purpose) : "—"}</strong>,
+          })}
           {typeof loan.loan.amount_uzs === "number" && <> · {formatUzs(loan.loan.amount_uzs)}</>}
         </p>
       )}
@@ -272,15 +273,15 @@ export function CapturePage({ search, ready }: { search: string; ready: boolean 
           )}
           {busy && preview && (
             <div className="cam-box">
-              <img src={preview} alt="Olingan rasm" />
+              <img src={preview} alt={t("capture.photoAlt")} />
             </div>
           )}
-          {busy && <BlockLoading text="Rasm tekshirilmoqda…" />}
+          {busy && <BlockLoading text={t("capture.checking")} />}
 
           <div className="capture-actions">
             {camera === "on" ? (
               <button type="button" className="shutter" onClick={shoot} disabled={!canShoot}>
-                📷 Suratga olish
+                {t("capture.shoot")}
               </button>
             ) : (
               <button
@@ -289,16 +290,16 @@ export function CapturePage({ search, ready }: { search: string; ready: boolean 
                 onClick={startCamera}
                 disabled={!canShoot || camera === "starting"}
               >
-                {camera === "starting" ? "Kamera yoqilmoqda…" : "📷 Kamerani yoqish"}
+                {camera === "starting" ? t("capture.cameraStarting") : t("capture.cameraOn")}
               </button>
             )}
             {camera === "unavailable" && (
               <p className="error small" role="alert">
-                Kameraga ruxsat berilmadi yoki kamera topilmadi. Rasmni fayldan yuklang.
+                {t("capture.cameraDenied")}
               </p>
             )}
             <label className={`secondary-file${canShoot ? "" : " disabled"}`}>
-              <span className="muted small">Yoki rasmni fayldan yuklang</span>
+              <span className="muted small">{t("capture.orFile")}</span>
               <input
                 type="file"
                 accept="image/*"
@@ -309,7 +310,7 @@ export function CapturePage({ search, ready }: { search: string; ready: boolean 
                 }}
               />
             </label>
-            {!loanId && ready && <p className="muted small">Avval kreditni tanlang.</p>}
+            {!loanId && ready && <p className="muted small">{t("capture.pickFirst")}</p>}
           </div>
           {error && <BlockError message={error} />}
         </>
@@ -325,43 +326,44 @@ function CaptureResult({ outcome, loanId, onAgain }: { outcome: Outcome; loanId:
   const am = r.asset_match;
   const geo =
     r.geo_ok === null
-      ? ["Joylashuv berilmadi", ""]
+      ? [t("capture.geoNone"), ""]
       : r.geo_ok
-        ? ["Joylashuv kredit hududiga mos", "ok"]
-        : ["Joylashuv kredit hududiga mos emas", "warn"];
+        ? [t("capture.geoOk"), "ok"]
+        : [t("capture.geoBad"), "warn"];
   const time =
     r.time_ok === null
-      ? ["Vaqt berilmadi", ""]
+      ? [t("capture.timeNone"), ""]
       : r.time_ok
-        ? ["Surat vaqti mos", "ok"]
-        : ["Surat vaqti mos emas", "warn"];
+        ? [t("capture.timeOk"), "ok"]
+        : [t("capture.timeBad"), "warn"];
   const changed: [Color, Color] | null =
     before && after && before.color !== after.color ? [before.color, after.color] : null;
   const reasons = (after?.escalations ?? []).filter((e) => e.raises_color);
 
   return (
     <div className="cap-result" aria-live="polite">
-      <h3 className="sub-h">Natija</h3>
+      <h3 className="sub-h">{t("capture.result")}</h3>
       <div className="cap-row">
-        <strong>Aktiv turi</strong>
+        <strong>{t("capture.assetType")}</strong>
         {am ? (
           <span>
-            {am.label_uz} <span className="muted">(baho {formatRisk(am.score)})</span>
+            {localized(am.label_i18n, am.label_uz)}{" "}
+            <span className="muted">{t("capture.score", { score: formatRisk(am.score) })}</span>
           </span>
         ) : (
-          <span>Aktiv turi aniqlanmadi</span>
+          <span>{t("capture.assetUnknown")}</span>
         )}
       </div>
       {am && am.matches_purpose === false && (
         <p className="cap-warning" role="alert">
-          Rasmdagi narsa kredit maqsadiga mos emas
+          {t("capture.assetMismatch")}
         </p>
       )}
       <div className={`cap-row ${r.duplicate_of.length ? "warn" : "ok"}`}>
-        <strong>Dublikat</strong>
+        <strong>{t("capture.duplicate")}</strong>
         {r.duplicate_of.length ? (
           <span>
-            Bu rasm boshqa kredit(lar) bilan o'xshash:{" "}
+            {t("capture.dupFound")}{" "}
             {r.duplicate_of.map((d, i) => (
               <span key={d.loan_id}>
                 {i > 0 && ", "}
@@ -372,43 +374,43 @@ function CaptureResult({ outcome, loanId, onAgain }: { outcome: Outcome; loanId:
             ))}
           </span>
         ) : (
-          <span>Boshqa kreditlarda o'xshash rasm topilmadi</span>
+          <span>{t("capture.dupNone")}</span>
         )}
       </div>
       <div className={`cap-row ${geo[1]}`}>
-        <strong>Joylashuv</strong>
+        <strong>{t("capture.location")}</strong>
         <span>{geo[0]}</span>
       </div>
       <div className={`cap-row ${time[1]}`}>
-        <strong>Vaqt</strong>
+        <strong>{t("capture.time")}</strong>
         <span>{time[0]}</span>
       </div>
       <div className="cap-row">
-        <strong>Maxfiylik</strong>
+        <strong>{t("capture.privacy")}</strong>
         <span>
           {r.faces_blurred
-            ? `Yuzlar xiralashtirildi${typeof r.faces_count === "number" ? ` (${r.faces_count} ta)` : ""}`
-            : "Rasmda yuz topilmadi"}
+            ? t("capture.facesBlurred", { count: typeof r.faces_count === "number" ? ` ${t("common.count", { n: r.faces_count })}` : "" })
+            : t("capture.noFaces")}
         </span>
       </div>
       {changed && (
         <div className="cap-row warn">
-          <strong>Navbatdagi rang o'zgardi</strong>
+          <strong>{t("capture.colorChanged")}</strong>
           <span className="cap-color">
-            {COLOR_ICON[changed[0]]} {COLOR_UZ[changed[0]]} → {COLOR_ICON[changed[1]]} {COLOR_UZ[changed[1]]}
+            {COLOR_ICON[changed[0]]} {colorName(changed[0])} → {COLOR_ICON[changed[1]]} {colorName(changed[1])}
           </span>
           {reasons.map((e) => (
-            <span key={e.code}>{e.text_uz}</span>
+            <span key={e.code}>{escalationText(e)}</span>
           ))}
-          <span className="muted small">Bu tekshirishda ustuvorlik berish belgisi; xodim yakuniy qaror qiladi.</span>
+          <span className="muted small">{t("capture.priorityNote")}</span>
         </div>
       )}
       <div className="capture-actions">
         <a className="capture-link" href={loanHref(loanId)} onClick={(e) => onLinkClick(e, loanHref(loanId))}>
-          Kredit sahifasini ochish
+          {t("capture.openLoan")}
         </a>
         <button type="button" className="secondary" onClick={onAgain}>
-          Yana rasm olish
+          {t("capture.again")}
         </button>
       </div>
     </div>

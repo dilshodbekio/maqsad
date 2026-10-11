@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, type Duplicate, type LoanDetail, type Photo } from "../../api";
 import { formatDateTime, formatSimilarity } from "../../format";
+import { t } from "../../i18n";
 import { onLinkClick } from "../../router";
 import { BlockError, BlockLoading, duplicatesOf, field, isSandboxPhotoRef, useFocus, type Load } from "./evidence";
 
@@ -15,12 +16,12 @@ export function Photos({ detail }: { detail: LoanDetail }) {
 
   return (
     <section className="card" aria-labelledby="h-photos">
-      <h2 id="h-photos">Rasmlar</h2>
-      {detail.photos.length === 0 && <p className="muted">Bu kredit bo'yicha rasm yo'q.</p>}
+      <h2 id="h-photos">{t("photos.title")}</h2>
+      {detail.photos.length === 0 && <p className="muted">{t("photos.none")}</p>}
       <div className="photo-columns">
         {portfolio.length > 0 && (
           <div>
-            <h3 className="sub-h">Portfel rasmlari</h3>
+            <h3 className="sub-h">{t("photos.portfolio")}</h3>
             <div className="photo-grid">
               {portfolio.map((p) => (
                 <PhotoCard key={p.photo_id} photo={p} detail={detail} />
@@ -30,7 +31,7 @@ export function Photos({ detail }: { detail: LoanDetail }) {
         )}
         {uploads.length > 0 && (
           <div id="photos-uploads" className={uploadsActive ? "is-active-group" : undefined}>
-            <h3 className="sub-h">Shu sandbox'da yuklangan rasmlar</h3>
+            <h3 className="sub-h">{t("photos.uploads")}</h3>
             <div className="photo-grid">
               {uploads.map((p) => (
                 <PhotoCard key={p.photo_id} photo={p} detail={detail} />
@@ -46,7 +47,7 @@ export function Photos({ detail }: { detail: LoanDetail }) {
 function okText(ok: boolean | null | undefined, yes: string, no: string): { text: string; cls: string } {
   if (ok === true) return { text: yes, cls: "ok" };
   if (ok === false) return { text: no, cls: "warn" };
-  return { text: "ma'lumot yo'q", cls: "muted" };
+  return { text: t("common.unknown"), cls: "muted" };
 }
 
 function PhotoCard({ photo, detail }: { photo: Photo; detail: LoanDetail }) {
@@ -63,8 +64,8 @@ function PhotoCard({ photo, detail }: { photo: Photo; detail: LoanDetail }) {
   const geoOk = upload ? photo.check?.geo_ok : field<boolean | null>(ev, "geo_ok");
   const timeOk = upload ? photo.check?.time_ok : field<boolean | null>(ev, "time_ok");
   const distance = field<number>(ev, "distance_km");
-  const geo = okText(geoOk, "joylashuv mos", "joylashuv mos emas");
-  const time = okText(timeOk, "vaqt mos", "vaqt mos emas");
+  const geo = okText(geoOk, t("photos.geoOk"), t("photos.geoBad"));
+  const time = okText(timeOk, t("photos.timeOk"), t("photos.timeBad"));
   const active = activeRef === `photo:${photo.photo_id}` || (upload && activeRef !== null && isSandboxPhotoRef(activeRef));
 
   return (
@@ -72,17 +73,17 @@ function PhotoCard({ photo, detail }: { photo: Photo; detail: LoanDetail }) {
       {photo.url && !imgFailed ? (
         <img
           src={photo.url}
-          alt={upload ? "Qarz oluvchi yuklagan rasm" : "Portfel rasmi"}
+          alt={upload ? t("photos.imgBorrower") : t("photos.imgPortfolio")}
           loading="lazy"
           onError={() => setImgFailed(true)}
         />
       ) : (
-        <div className="photo-missing">{photo.url ? "Rasm yuklanmadi" : "Rasm fayli yo'q"}</div>
+        <div className="photo-missing">{photo.url ? t("photos.imgFailed") : t("photos.imgNone")}</div>
       )}
       <figcaption className="small">
         <div className="muted">
-          {upload ? "Yuklangan" : "Olingan"}: {formatDateTime(photo.captured_at)}
-          {upload && photo.client_captured_at && ` (qurilma vaqti: ${formatDateTime(photo.client_captured_at)})`}
+          {upload ? t("photos.uploaded") : t("photos.taken")}: {formatDateTime(photo.captured_at)}
+          {upload && photo.client_captured_at && t("photos.deviceTime", { time: formatDateTime(photo.client_captured_at) })}
         </div>
         <div className="photo-flags">
           <span className={geo.cls}>
@@ -93,14 +94,14 @@ function PhotoCard({ photo, detail }: { photo: Photo; detail: LoanDetail }) {
           {upload && photo.check && (
             <span className="muted">
               {photo.check.faces_blurred
-                ? `yuzlar xiralashtirildi${photo.check.faces_count ? ` (${photo.check.faces_count} ta)` : ""}`
-                : "yuz topilmadi"}
+                ? t("photos.facesBlurred", { count: photo.check.faces_count ? ` ${t("common.count", { n: photo.check.faces_count })}` : "" })
+                : t("photos.noFaces")}
             </span>
           )}
         </div>
         {dups.length > 0 ? (
           <div className="dup-box">
-            <strong className="warn">⚠ Takroriy rasm</strong>
+            <strong className="warn">{t("photos.dup")}</strong>
             <ul>
               {dups.map((d) => (
                 <DuplicateRow key={d.loan_id} dup={d} self={detail.loan.loan_id} />
@@ -108,7 +109,7 @@ function PhotoCard({ photo, detail }: { photo: Photo; detail: LoanDetail }) {
             </ul>
           </div>
         ) : (
-          <div className="ok">Boshqa kreditlarda takror topilmadi</div>
+          <div className="ok">{t("photos.noDup")}</div>
         )}
       </figcaption>
     </figure>
@@ -131,23 +132,23 @@ function DuplicateRow({ dup, self }: { dup: Duplicate; self: string }) {
       <a href={loanHref(dup.loan_id)} onClick={(e) => onLinkClick(e, loanHref(dup.loan_id))}>
         {dup.loan_id}
       </a>{" "}
-      kreditidagi rasm bilan (o'xshashlik {formatSimilarity(dup.similarity)}){" "}
+      {t("photos.dupRow", { similarity: formatSimilarity(dup.similarity) })}{" "}
       {other === null && (
         <button type="button" className="link-button" onClick={load}>
-          solishtirish
+          {t("photos.compare")}
         </button>
       )}
-      {other?.kind === "loading" && <BlockLoading text="Yuklanmoqda…" />}
-      {other?.kind === "error" && <BlockError message={`Rasm yuklanmadi: ${other.message}`} onRetry={load} />}
+      {other?.kind === "loading" && <BlockLoading text={t("common.loading")} />}
+      {other?.kind === "error" && <BlockError message={t("photos.compareError", { message: other.message })} onRetry={load} />}
       {other?.kind === "ok" &&
         (other.data.length ? (
           <div className="dup-compare">
             {other.data.slice(0, 2).map((p) => (
-              <img key={p.photo_id} src={p.url!} alt={`${dup.loan_id} kreditidagi rasm`} loading="lazy" />
+              <img key={p.photo_id} src={p.url!} alt={t("photos.imgOfLoan", { id: dup.loan_id })} loading="lazy" />
             ))}
           </div>
         ) : (
-          <span className="muted"> — u kreditda ko'rsatiladigan rasm yo'q</span>
+          <span className="muted">{t("photos.noImgOfLoan")}</span>
         ))}
     </li>
   );

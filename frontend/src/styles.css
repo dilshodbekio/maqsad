@@ -48,6 +48,18 @@ body { margin: 0; min-width: 320px; background: var(--bg); }
 .health-bad { color: #ffd6d1; }
 .muted-on-brand { opacity: 0.8; }
 
+/* language switcher (top-right of the header) */
+.lang-switch { display: inline-flex; align-items: center; font-size: 0.85rem; }
+.lang-item { display: inline-flex; align-items: center; }
+.lang-sep { opacity: 0.5; margin: 0 2px; }
+.lang-btn {
+  min-height: 0; padding: 4px 8px; background: transparent; color: #fff; border: 1px solid transparent;
+  border-radius: 6px; font-weight: 600; font-size: inherit; opacity: 0.85; cursor: pointer;
+}
+.lang-btn:hover { opacity: 1; }
+.lang-btn.active { background: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.6); opacity: 1; }
+.footer { max-width: 1200px; margin: 0 auto; padding: 0 16px 24px; text-align: center; }
+
 .container { max-width: 1200px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
 
 .card {

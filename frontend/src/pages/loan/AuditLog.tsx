@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type AuditEntry } from "../../api";
-import { actorName, aiRecommendationText, DECISION_UZ, formatLocalDateTime } from "../../format";
+import { actorName, aiRecommendationText, decisionName, formatLocalDateTime } from "../../format";
+import { t } from "../../i18n";
 import { BlockError, BlockLoading, type Load } from "./evidence";
 
 /** Append-only audit log of this loan, as seen from the caller's sandbox. `version` changes -> reload. */
@@ -19,30 +20,27 @@ export function AuditLog({ loanId, version }: { loanId: string; version: number 
 
   return (
     <section className="card" aria-labelledby="h-audit">
-      <h2 id="h-audit">Audit jurnali</h2>
-      <p className="muted small">
-        Yozuvlar faqat qo'shiladi, o'zgartirib yoki o'chirib bo'lmaydi (hash-zanjir). Bu yerda faqat sizning sandbox'ingiz
-        yozuvlari ko'rinadi.
-      </p>
-      {state.kind === "loading" && <BlockLoading text="Jurnal yuklanmoqda…" />}
-      {state.kind === "error" && <BlockError message={`Jurnal yuklanmadi: ${state.message}`} onRetry={load} />}
-      {state.kind === "ok" && state.data.length === 0 && <p className="muted">Bu kredit bo'yicha hali yozuv yo'q.</p>}
+      <h2 id="h-audit">{t("audit.title")}</h2>
+      <p className="muted small">{t("audit.intro")}</p>
+      {state.kind === "loading" && <BlockLoading text={t("audit.loading")} />}
+      {state.kind === "error" && <BlockError message={t("audit.error", { message: state.message })} onRetry={load} />}
+      {state.kind === "ok" && state.data.length === 0 && <p className="muted">{t("audit.none")}</p>}
       {state.kind === "ok" && state.data.length > 0 && (
         <ol className="audit-list">
           {[...state.data].reverse().map((r) => (
             <li key={r.inputs_hash + r.ts} className="audit-row">
               <div className="audit-top">
-                <strong>{DECISION_UZ[r.action] ?? r.action}</strong>
+                <strong>{decisionName(r.action)}</strong>
                 <span className="muted small">{formatLocalDateTime(r.ts)}</span>
               </div>
               <dl className="kv small">
-                <dt>Kim</dt>
+                <dt>{t("audit.who")}</dt>
                 <dd>{actorName(r.actor)}</dd>
-                <dt>AI tavsiyasi</dt>
+                <dt>{t("audit.aiRec")}</dt>
                 <dd>{aiRecommendationText(r.ai_recommendation)}</dd>
-                <dt>Model</dt>
+                <dt>{t("audit.model")}</dt>
                 <dd>{r.model_version ?? "—"}</dd>
-                <dt>Kirish xeshi</dt>
+                <dt>{t("audit.hash")}</dt>
                 <dd className="hash" title={r.inputs_hash}>
                   {r.inputs_hash.slice(0, 12)}…
                 </dd>

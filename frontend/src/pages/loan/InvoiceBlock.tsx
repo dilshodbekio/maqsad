@@ -1,5 +1,6 @@
 import type { LoanDetail } from "../../api";
-import { formatUzs } from "../../format";
+import { evidenceSummary, formatUzs } from "../../format";
+import { t } from "../../i18n";
 import { field, useFocus } from "./evidence";
 
 /** Invoice (supplier, OKED, amount) + what the supplier graph evidence says about the supplier. */
@@ -16,39 +17,35 @@ export function InvoiceBlock({ detail }: { detail: LoanDetail }) {
 
   return (
     <section className="card" aria-labelledby="h-invoice">
-      <h2 id="h-invoice">Hisob-faktura</h2>
+      <h2 id="h-invoice">{t("invoice.title")}</h2>
       {!inv ? (
-        <p className="muted">Bu kredit bo'yicha hisob-faktura yo'q.</p>
+        <p className="muted">{t("invoice.none")}</p>
       ) : (
         <div id="ev-invoice" className={`invoice${invActive ? " is-active" : ""}`}>
           <dl className="kv">
-            <dt>Ta'minotchi</dt>
+            <dt>{t("invoice.supplier")}</dt>
             <dd>{inv.supplier_name ?? "—"}</dd>
             <dt>OKED</dt>
             <dd>{inv.supplier_oked ?? "—"}</dd>
-            <dt>Faktura summasi</dt>
+            <dt>{t("invoice.amount")}</dt>
             <dd>{typeof inv.invoice_amount_uzs === "number" ? formatUzs(inv.invoice_amount_uzs) : "—"}</dd>
             {typeof loanAmount === "number" && (
               <>
-                <dt>Kredit summasi</dt>
+                <dt>{t("invoice.loanAmount")}</dt>
                 <dd>{formatUzs(loanAmount)}</dd>
               </>
             )}
           </dl>
           <p className={`oked-badge ${matches === true ? "ok" : matches === false ? "warn" : "muted"}`}>
-            {matches === true
-              ? "✓ Ta'minotchining faoliyat turi (OKED) kredit maqsadiga mos"
-              : matches === false
-                ? "⚠ Ta'minotchining faoliyat turi (OKED) kredit maqsadiga mos emas"
-                : "OKED va kredit maqsadi mosligi noma'lum"}
+            {matches === true ? t("invoice.okedOk") : matches === false ? t("invoice.okedBad") : t("invoice.okedUnknown")}
           </p>
-          {invEv?.summary_uz && <p className="small muted">{invEv.summary_uz}</p>}
+          {invEv && evidenceSummary(invEv) && <p className="small muted">{evidenceSummary(invEv)}</p>}
         </div>
       )}
       {graphEv && (
         <div id="ev-graph" className={`supplier-graph${graphActive ? " is-active" : ""}`}>
-          <h3 className="sub-h">Ta'minotchi haqida (to'lovlar tarmog'i)</h3>
-          <p className="small">{graphEv.summary_uz ?? graphEv.ref}</p>
+          <h3 className="sub-h">{t("invoice.graphTitle")}</h3>
+          <p className="small">{evidenceSummary(graphEv) || graphEv.ref}</p>
         </div>
       )}
     </section>

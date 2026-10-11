@@ -1,0 +1,96 @@
+{
+ "tag": "after",
+ "n_strings": 37156,
+ "n_unique": 14471,
+ "counts": {},
+ "examples": {},
+ "n_translated_texts": 37156,
+ "n_strings_per_language": {
+  "uz": 37156,
+  "en": 37156,
+  "ru": 37156
+ },
+ "n_unique_per_language": {
+  "uz": 14471,
+  "en": 14471,
+  "ru": 14471
+ },
+ "sample_reasons_i18n": [
+  {
+   "uz": "Ta'minotchi pulni olgandan 2.1 kun o'tib naqd yechgan",
+   "en": "The supplier withdrew cash 2.1 days after receiving the money",
+   "ru": "Поставщик снял наличные через 2.1 дн. после получения денег"
+  },
+  {
+   "uz": "Ta'minotchi hisobi atigi 57 kun faol bo'lgan",
+   "en": "The supplier's account has been active for only 57 days",
+   "ru": "Счёт поставщика был активен лишь 57 дн."
+  },
+  {
+   "uz": "Ta'minotchining faoliyat turi (OKED 96.09) kredit maqsadiga mos kelmaydi",
+   "en": "The supplier's line of business (OKED 96.09) does not match the loan purpose",
+   "ru": "Вид деятельности поставщика (ОКЭД 96.09) не соответствует цели кредита"
+  },
+  {
+   "uz": "Ta'minotchining faoliyat turi (OKED 68.20) kredit maqsadiga mos kelmaydi",
+   "en": "The supplier's line of business (OKED 68.20) does not match the loan purpose",
+   "ru": "Вид деятельности поставщика (ОКЭД 68.20) не соответствует цели кредита"
+  },
+  {
+   "uz": "Hisobga kredit summasining 32 foiziga teng bitta yirik kirim tushgan",
+   "en": "One large inflow equal to 32% of the loan amount was received",
+   "ru": "Поступил один крупный платёж, равный 32% суммы кредита"
+  },
+  {
+   "uz": "Eng yirik kirim kredit tushgandan 6.7 kun o'tib kelgan",
+   "en": "The largest inflow arrived 6.7 days after disbursement",
+   "ru": "Самое крупное поступление пришло через 6.7 дн. после выдачи кредита"
+  },
+  {
+   "uz": "Kredit tushganidan beri mablag'ning 72 foizi naqd yechilgan",
+   "en": "72% of the funds have been withdrawn in cash since disbursement",
+   "ru": "С момента выдачи кредита снято наличными 72% средств"
+  },
+  {
+   "uz": "Ta'minotchining faoliyat turi (OKED 49.41) kredit maqsadiga mos kelmaydi",
+   "en": "The supplier's line of business (OKED 49.41) does not match the loan purpose",
+   "ru": "Вид деятельности поставщика (ОКЭД 49.41) не соответствует цели кредита"
+  },
+  {
+   "uz": "Kredit tushganidan beri mablag'ning 43 foizi naqd yechilgan",
+   "en": "43% of the funds have been withdrawn in cash since disbursement",
+   "ru": "С момента выдачи кредита снято наличными 43% средств"
+  },
+  {
+   "uz": "Ta'minotchi birinchi to'lovdan 1631 kun oldin ro'yxatdan o'tgan",
+   "en": "The supplier was registered 1631 days before the first payment",
+   "ru": "Поставщик зарегистрирован за 1631 дн. до первого платежа"
+  }
+ ],
+ "contradictions": [],
+ "sample_reasons": [
+  "Hisobga kredit summasining 42 foiziga teng bitta yirik kirim tushgan",
+  "Ta'minotchi hisobi atigi 6.8 kun faol bo'lgan",
+  "Yirik kirimdan keyingi 5 kunda uning 79 foizi hisobdan chiqarilgan",
+  "Eng yirik kirim kredit tushgandan 6.0 kun o'tib kelgan",
+  "Oxirgi tushumdan (yoki tushum kutilgan sanadan) beri 23 kun o'tgan",
+  "Hisob-fakturadagi summaning 92 foizi ta'minotchiga to'lanmagan",
+  "Ta'minotchi hisobi 121 kun faol bo'lgan",
+  "Yirik kirimdan keyingi 5 kunda uning 73 foizi hisobdan chiqarilgan",
+  "Ta'minotchi birinchi to'lovdan 668 kun oldin ro'yxatdan o'tgan",
+  "Ta'minotchi birinchi to'lovdan 952 kun oldin ro'yxatdan o'tgan"
+ ],
+ "sources": {
+  "queue.top_reason": 5000,
+  "queue.escalation": 28,
+  "loan.reason": 14982,
+  "loan.evidence": 16883,
+  "scenario.reason": 100,
+  "preset.title": 4,
+  "preset.description": 4,
+  "scenario.error": 25,
+  "photo.label_uz": 20,
+  "photo.escalation": 25,
+  "photo.reason": 85
+ }
+}

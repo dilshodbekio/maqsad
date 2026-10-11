@@ -1,0 +1,2288 @@
+{
+ "version": "photo_index_v1",
+ "portfolio": {
+  "split": "demo",
+  "seed": 7
+ },
+ "seed": 20260410,
+ "images": [
+  {
+   "file": "tikuv_dastgohi_02.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1504470",
+   "loans": [
+    "L1500951",
+    "L1504327"
+   ],
+   "hash": {
+    "p": "bcfa9385ac331ac8",
+    "d": "7c17190f174e9ed4",
+    "pc": "fddf9280a8231dd2",
+    "dc": "453f1b0b23168e92"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.8171,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_10.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1501806",
+   "loans": [
+    "L1502308",
+    "L1504235"
+   ],
+   "hash": {
+    "p": "94908acaed3d723b",
+    "d": "bcbc9ca6aee476c0",
+    "pc": "a4bcd0c3aaec713a",
+    "dc": "bcbc2ea7abc4e585"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.8994,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_15.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1504730",
+   "loans": [
+    "L1503448"
+   ],
+   "hash": {
+    "p": "ede71219b961cc34",
+    "d": "ca4a870347878f87",
+    "pc": "eae21693bb4ad12a",
+    "dc": "4b47030bc3c3831f"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.8386,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_11.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1501259",
+   "loans": [
+    "L1503269"
+   ],
+   "hash": {
+    "p": "f30b85e91ad46e98",
+    "d": "db5a1d19990fca6e",
+    "pc": "fa19816a92634cbf",
+    "dc": "d9593c2d2d0b4b8a"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.9515,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_13.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1503287",
+   "loans": [
+    "L1500293"
+   ],
+   "hash": {
+    "p": "fac2c7579da4cc10",
+    "d": "49091517180f0d01",
+    "pc": "fcc1e303b3c49d98",
+    "dc": "4a063637390c0f0c"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.8474,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_14.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1500124",
+   "loans": [
+    "L1501200"
+   ],
+   "hash": {
+    "p": "83074cac7e3f6b18",
+    "d": "e3ccc84cf8c89ca0",
+    "pc": "8000ddddbd7752ca",
+    "dc": "a494cdccbc88991c"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.93,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_18.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1502071",
+   "loans": [
+    "L1504250"
+   ],
+   "hash": {
+    "p": "bed0c3e060c7f331",
+    "d": "c8393d2f2f3f777b",
+    "pc": "bf07c17a6ec0b461",
+    "dc": "795e6e672f2ffef3"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.9271,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_01.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1500728",
+   "loans": [
+    "L1500062"
+   ],
+   "hash": {
+    "p": "ace4933d928fccc2",
+    "d": "3f0fa7a7271f5f8d",
+    "pc": "aeef393d100aec45",
+    "dc": "33474765671f378f"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.9691,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_03.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1500037",
+   "loans": [
+    "L1504610"
+   ],
+   "hash": {
+    "p": "edb1129cc8bc266e",
+    "d": "9e5a465657563617",
+    "pc": "e9f31392d8993466",
+    "dc": "9e8b979397771316"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.9167,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_09.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1501943",
+   "loans": [
+    "L1504322"
+   ],
+   "hash": {
+    "p": "994c66b1592ce477",
+    "d": "e2dc64f0d8dadaad",
+    "pc": "914d66b2590d4f6e",
+    "dc": "f0cef2d0988bbddd"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.8764,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_07.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1501207",
+   "loans": [
+    "L1503420"
+   ],
+   "hash": {
+    "p": "d4e8274cbae54c93",
+    "d": "c0e0ac146874cc4c",
+    "pc": "d5fae14cb26c88a3",
+    "dc": "c0282634686242ca"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.9005,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_00.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1500638",
+   "loans": [
+    "L1500766"
+   ],
+   "hash": {
+    "p": "e950966ac16ff131",
+    "d": "b3b193b383232bfc",
+    "pc": "ca5ca6c6556a3363",
+    "dc": "a1b1a1a921a96949"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.903,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_08.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1504059",
+   "loans": [
+    "L1501935"
+   ],
+   "hash": {
+    "p": "8dea75cda718a185",
+    "d": "62a3f8f1e16374da",
+    "pc": "8ff33ce2655a6182",
+    "dc": "637050e2e1e171f6"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.9189,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_06.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1502454",
+   "loans": [
+    "L1502886"
+   ],
+   "hash": {
+    "p": "ba8a85a5a36a6eb1",
+    "d": "cfa1adad1d0d4f0d",
+    "pc": "f7de8aa1904e64b8",
+    "dc": "6565664c1e1e0a8f"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.9397,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_19.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1500135",
+   "loans": [
+    "L1500053"
+   ],
+   "hash": {
+    "p": "af13d0e0e14c9e2f",
+    "d": "e07b73674f333377",
+    "pc": "af92def060964837",
+    "dc": "db7573c3cbd37d73"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.9283,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_17.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1502251",
+   "loans": [
+    "L1504447"
+   ],
+   "hash": {
+    "p": "b640d93fe0c99c63",
+    "d": "c4cce8ce4c3478e4",
+    "pc": "a5e09b3d608f4e71",
+    "dc": "ccece486966e7ecc"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.8729,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_04.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1500023",
+   "loans": [
+    "L1500413"
+   ],
+   "hash": {
+    "p": "e8da9293cbdc3321",
+    "d": "b1a5a12161250627",
+    "pc": "dddfb480c68e8391",
+    "dc": "64322a62ebab2626"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.9565,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "tikuv_dastgohi_05.jpg",
+   "purpose": "tikuv_dastgohi",
+   "photo_id": "P1503736",
+   "loans": [
+    "L1500420"
+   ],
+   "hash": {
+    "p": "e4ee81959c9b5c58",
+    "d": "d48517132706ded6",
+    "pc": "ede6c0e58ba2cc32",
+    "dc": "8616575367268e9e"
+   },
+   "asset": {
+    "label": "tikuv_dastgohi",
+    "score": 0.9703,
+    "matches_purpose": true,
+    "label_uz": "tikuv mashinasi",
+    "label_i18n": {
+     "uz": "tikuv mashinasi",
+     "en": "sewing machine",
+     "ru": "\u0448\u0432\u0435\u0439\u043d\u0430\u044f \u043c\u0430\u0448\u0438\u043d\u0430"
+    }
+   }
+  },
+  {
+   "file": "chorva_12.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1501223",
+   "loans": [
+    "L1501720",
+    "L1504693"
+   ],
+   "hash": {
+    "p": "c1437cbe397364a4",
+    "d": "68d0d4d0dca4b0f2",
+    "pc": "c1418fbe3a336e26",
+    "dc": "fad2d69098744cf8"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.8815,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_04.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1502245",
+   "loans": [
+    "L1500890",
+    "L1504670"
+   ],
+   "hash": {
+    "p": "a07e2f3f52edd100",
+    "d": "6e6f96b1d9dbf7ee",
+    "pc": "b0262e3706eaf1e9",
+    "dc": "27b796d4f89e938b"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9122,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_07.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1502676",
+   "loans": [
+    "L1501954"
+   ],
+   "hash": {
+    "p": "838b76747032dacb",
+    "d": "b8e3e1d9da26168c",
+    "pc": "81c28f7f39345476",
+    "dc": "cae1e0ba9b521e97"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9432,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_02.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1503836",
+   "loans": [
+    "L1504045"
+   ],
+   "hash": {
+    "p": "cd42b2b9ccccb3b0",
+    "d": "b058d862d65a5ec6",
+    "pc": "c14632b1cccef3b1",
+    "dc": "d0d0c4e556d9579a"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9207,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_13.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1502231",
+   "loans": [
+    "L1503973"
+   ],
+   "hash": {
+    "p": "87f459732499c473",
+    "d": "c0c0e0f6aa275970",
+    "pc": "a3dc11762b8dc732",
+    "dc": "8080c0c7ab4d59da"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.8691,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_03.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1502742",
+   "loans": [
+    "L1502890"
+   ],
+   "hash": {
+    "p": "d14d3432dacad467",
+    "d": "9296e2f1598cda1a",
+    "pc": "da4a2d3512de17d2",
+    "dc": "97a3e1b198ae981d"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9559,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_05.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1503138",
+   "loans": [
+    "L1501476"
+   ],
+   "hash": {
+    "p": "e4430b8f2b78f165",
+    "d": "e3c5a4a5a5a4a656",
+    "pc": "e45941830b9ebb8f",
+    "dc": "e6822626466624a5"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9239,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_01.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1502022",
+   "loans": [
+    "L1501105"
+   ],
+   "hash": {
+    "p": "c123f3cb1373c28d",
+    "d": "cbd3c69cf0e1027c",
+    "pc": "e822ebc82a7c76c9",
+    "dc": "93d7979cf3e00107"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.7375,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_15.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1501564",
+   "loans": [
+    "L1500121"
+   ],
+   "hash": {
+    "p": "c14f3a388466d3cf",
+    "d": "43cbc3c4b29797ef",
+    "pc": "c8427b3b8c6c8dce",
+    "dc": "29c9c2c6b21317d3"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9584,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_17.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1500496",
+   "loans": [
+    "L1503471"
+   ],
+   "hash": {
+    "p": "fb99c2d3c61e8470",
+    "d": "5811171e1c582d84",
+    "pc": "bb89dbd0e293e406",
+    "dc": "59133f1f1d1c5c0c"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9332,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_08.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1504876",
+   "loans": [
+    "L1504096"
+   ],
+   "hash": {
+    "p": "c14135fd3f832ce4",
+    "d": "42c0c1d981abe87e",
+    "pc": "d258a53f93833f44",
+    "dc": "d891e1d8a12ae8dc"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9071,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_14.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1501699",
+   "loans": [
+    "L1503344"
+   ],
+   "hash": {
+    "p": "badac292707b16b4",
+    "d": "b9213313175f5b17",
+    "pc": "bfcdd094f010c637",
+    "dc": "aa73713b5f6fdf0b"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9208,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_18.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1500633",
+   "loans": [
+    "L1503486"
+   ],
+   "hash": {
+    "p": "dbf717d2828e901c",
+    "d": "684850d1f9b070f0",
+    "pc": "d3e104f660f2dac6",
+    "dc": "8c9a50d8a8687470"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9323,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_16.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1502132",
+   "loans": [
+    "L1500644"
+   ],
+   "hash": {
+    "p": "e11e4f61bc0cf2d8",
+    "d": "e25c2cb51753834b",
+    "pc": "f91443718c275d76",
+    "dc": "c0f42eb71795d3c3"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9231,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_19.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1500826",
+   "loans": [
+    "L1501672"
+   ],
+   "hash": {
+    "p": "d3d1e1ac4c426cdb",
+    "d": "2198186c512c5848",
+    "pc": "93f0f08fc0264ff2",
+    "dc": "9c184c4ec8540c9c"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9143,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_06.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1501641",
+   "loans": [
+    "L1502898"
+   ],
+   "hash": {
+    "p": "c01b497178e6b69e",
+    "d": "98f2ed8eb8cca7e9",
+    "pc": "f39b085958f093b6",
+    "dc": "58e3cc062cdc872b"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9135,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_10.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1503784",
+   "loans": [
+    "L1502813"
+   ],
+   "hash": {
+    "p": "daf4b4c9809287b7",
+    "d": "243429f9eb534175",
+    "pc": "dab625499ed064f2",
+    "dc": "347d65796951d125"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9383,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "chorva_00.jpg",
+   "purpose": "chorva",
+   "photo_id": "P1502121",
+   "loans": [
+    "L1500434"
+   ],
+   "hash": {
+    "p": "938793b3a38acccc",
+    "d": "c8c8e5cc8d1c187b",
+    "pc": "b3861333b3b39686",
+    "dc": "4da4e44e1d1d189a"
+   },
+   "asset": {
+    "label": "chorva",
+    "score": 0.9089,
+    "matches_purpose": true,
+    "label_uz": "chorva (qoramol)",
+    "label_i18n": {
+     "uz": "chorva (qoramol)",
+     "en": "livestock (cattle)",
+     "ru": "\u0441\u043a\u043e\u0442 (\u043a\u0440\u0443\u043f\u043d\u044b\u0439 \u0440\u043e\u0433\u0430\u0442\u044b\u0439)"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_00.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1502438",
+   "loans": [
+    "L1501155",
+    "L1504307"
+   ],
+   "hash": {
+    "p": "d3c0c0b434b31fed",
+    "d": "c8c0f828140ccb0a",
+    "pc": "d3dbd224b4341739",
+    "dc": "80d85868145d9d89"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.7401,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_16.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1504225",
+   "loans": [
+    "L1500286",
+    "L1503478"
+   ],
+   "hash": {
+    "p": "e0e49f9b7263ae04",
+    "d": "0006e7c38063c3e5",
+    "pc": "e8ec8f95307262ce",
+    "dc": "00c3e393aa6ba3d3"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.8253,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_01.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1504045",
+   "loans": [
+    "L1504290"
+   ],
+   "hash": {
+    "p": "9b9d647843a75c68",
+    "d": "b8b8f8f8f9382f15",
+    "pc": "93996c5c63a748a7",
+    "dc": "78785058dab87f07"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.7881,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_17.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1503443",
+   "loans": [
+    "L1500422"
+   ],
+   "hash": {
+    "p": "c8d2a0f4fab1de21",
+    "d": "f1e1f3f1f174d2f1",
+    "pc": "c8d6a2f4929817f9",
+    "dc": "e0f1f171f074b1f3"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.9196,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_08.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1502290",
+   "loans": [
+    "L1500047"
+   ],
+   "hash": {
+    "p": "c5ecaf20407fdf20",
+    "d": "4360001280404c72",
+    "pc": "ddd182263d55c8f2",
+    "dc": "e2c0001000444473"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.6842,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_07.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1501146",
+   "loans": [
+    "L1503159"
+   ],
+   "hash": {
+    "p": "8db60c25996d39cd",
+    "d": "ffcf93ece847f370",
+    "pc": "8bb40f34852adddc",
+    "dc": "af4fb3cce8c36170"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.8451,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_11.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1504165",
+   "loans": [
+    "L1503515"
+   ],
+   "hash": {
+    "p": "91ca2f7801debf50",
+    "d": "f0e0f0b89056265e",
+    "pc": "9cc24f6810ebc76d",
+    "dc": "e0f4f0bcb2980366"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.7686,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_18.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1503062",
+   "loans": [
+    "L1502607"
+   ],
+   "hash": {
+    "p": "96bd9bc19cc2c30d",
+    "d": "787c7cbc7cdd6c7c",
+    "pc": "949c92989ef61e8e",
+    "dc": "7cfc7c7cb4d48c7c"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.8916,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_04.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1500528",
+   "loans": [
+    "L1504533"
+   ],
+   "hash": {
+    "p": "82f10fa18ca73c6f",
+    "d": "77f8eee8e3ecd365",
+    "pc": "81ff01dccfb01f21",
+    "dc": "dae4ad64c6bcafcb"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.9305,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_03.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1501974",
+   "loans": [
+    "L1501437"
+   ],
+   "hash": {
+    "p": "cc89fde772223071",
+    "d": "c232baed90662c2e",
+    "pc": "c7caafc8d6063c23",
+    "dc": "61d15ce4c8b6ce46"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.9085,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_14.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1502207",
+   "loans": [
+    "L1504246"
+   ],
+   "hash": {
+    "p": "c6ce333507b6889b",
+    "d": "e8a0a1e5d8e61cef",
+    "pc": "c6cf755026744d78",
+    "dc": "40606264cc731eae"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.9136,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_10.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1501262",
+   "loans": [
+    "L1504613"
+   ],
+   "hash": {
+    "p": "eafd14160aead127",
+    "d": "6d0603012baacdab",
+    "pc": "eaeda53614d4cf08",
+    "dc": "260b0305056d2dce"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.9263,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_12.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1503206",
+   "loans": [
+    "L1502205"
+   ],
+   "hash": {
+    "p": "d1c6ea79148ea971",
+    "d": "c0e0d0e55cf0c091",
+    "pc": "958e6a391786f03b",
+    "dc": "8050d0e45a98a8c0"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.792,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_19.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1501178",
+   "loans": [
+    "L1501111"
+   ],
+   "hash": {
+    "p": "c1a2dedc9118afe2",
+    "d": "c980c3c3c282c0c0",
+    "pc": "c0d2dfdf901813b3",
+    "dc": "a881818185814000"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.9511,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_06.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1503991",
+   "loans": [
+    "L1500263"
+   ],
+   "hash": {
+    "p": "c4ceacbc76841eb4",
+    "d": "24f0f0e02cb5d645",
+    "pc": "c4c3e8afed8132a9",
+    "dc": "52f0e4e20aacb2b3"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.8094,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_15.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1503075",
+   "loans": [
+    "L1503477"
+   ],
+   "hash": {
+    "p": "b68b8b2fe54320e5",
+    "d": "e779a8ac44350d15",
+    "pc": "b78a9a2ce4572761",
+    "dc": "e2794a54c6676c56"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.8093,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_05.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1501361",
+   "loans": [
+    "L1503739"
+   ],
+   "hash": {
+    "p": "aaf54d2a3ecc2135",
+    "d": "0500c8993df97373",
+    "pc": "9df14a3a1fd32819",
+    "dc": "2902ba587e9df1e3"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.8953,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "issiqxona_13.jpg",
+   "purpose": "issiqxona",
+   "photo_id": "P1504848",
+   "loans": [
+    "L1502065"
+   ],
+   "hash": {
+    "p": "e9c46eedc56025c9",
+    "d": "860494d0aa26899b",
+    "pc": "f8c575eec260f0d0",
+    "dc": "12e292d2ab4d2b59"
+   },
+   "asset": {
+    "label": "issiqxona",
+    "score": 0.8854,
+    "matches_purpose": true,
+    "label_uz": "issiqxona",
+    "label_i18n": {
+     "uz": "issiqxona",
+     "en": "greenhouse",
+     "ru": "\u0442\u0435\u043f\u043b\u0438\u0446\u0430"
+    }
+   }
+  },
+  {
+   "file": "parranda_09.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1501304",
+   "loans": [
+    "L1500696",
+    "L1501463"
+   ],
+   "hash": {
+    "p": "c8f594292dda9aa5",
+    "d": "860c68d1e371f1b4",
+    "pc": "ddf5b42f69509222",
+    "dc": "063888d3e3e9f030"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.7345,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_00.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1502215",
+   "loans": [
+    "L1501043",
+    "L1503660"
+   ],
+   "hash": {
+    "p": "d08de3b3b96434d4",
+    "d": "b2f9b0b2b81c8c81",
+    "pc": "dac9c19aca658d6c",
+    "dc": "f1b8b2b13d3d1d82"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.8791,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_07.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1503463",
+   "loans": [
+    "L1502181"
+   ],
+   "hash": {
+    "p": "c2fea50b66d0c917",
+    "d": "e0e0e005e1e0d0c8",
+    "pc": "d4ffa9022678c917",
+    "dc": "e0e0e004c4c0b0d0"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.8577,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_14.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1502885",
+   "loans": [
+    "L1501703"
+   ],
+   "hash": {
+    "p": "d389ee7d3f4a8101",
+    "d": "f0f8f8f858d0b168",
+    "pc": "d182fead354f8a82",
+    "dc": "fcf8f9f8dad0a070"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.7424,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_02.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1500079",
+   "loans": [
+    "L1504135"
+   ],
+   "hash": {
+    "p": "be70f4cf83c0343c",
+    "d": "f9171fa8612ca238",
+    "pc": "b57dfd80c0c276e0",
+    "dc": "90320eeae06f8939"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.7693,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_10.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1501854",
+   "loans": [
+    "L1503756"
+   ],
+   "hash": {
+    "p": "aa9dd090eb3fc4c2",
+    "d": "2f3f1b0be58c0d03",
+    "pc": "be9f9c940a3f6e00",
+    "dc": "3f190b5ba42c2a8d"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.9462,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_05.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1500327",
+   "loans": [
+    "L1501380"
+   ],
+   "hash": {
+    "p": "faa79799849b2c60",
+    "d": "1f07070717111907",
+    "pc": "f8e7838da291ec92",
+    "dc": "8707070327331819"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.896,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_06.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1500143",
+   "loans": [
+    "L1504073"
+   ],
+   "hash": {
+    "p": "af87c16fc168e470",
+    "d": "2b7f3f6b3f072313",
+    "pc": "af83e8215a4f647a",
+    "dc": "ebfd6f6b5d064323"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.8696,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_08.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1500590",
+   "loans": [
+    "L1503906"
+   ],
+   "hash": {
+    "p": "ea3aabc8b507983c",
+    "d": "212125e0aea14303",
+    "pc": "df3460df2bc09e30",
+    "dc": "21203ceb0b70c121"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.8005,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_17.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1500239",
+   "loans": [
+    "L1504815"
+   ],
+   "hash": {
+    "p": "9f81c0f94dc6463b",
+    "d": "39da6d661b3b3464",
+    "pc": "8341f0b8d9c7c7d2",
+    "dc": "d8deca769b7d7475"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.7845,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_11.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1500979",
+   "loans": [
+    "L1504498"
+   ],
+   "hash": {
+    "p": "eaf5b54a18316cd8",
+    "d": "1f0f071371012963",
+    "pc": "f8b9a745186249d7",
+    "dc": "0f0f02bbb0914029"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.9172,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_16.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1501017",
+   "loans": [
+    "L1503076"
+   ],
+   "hash": {
+    "p": "d425e50c1d18dbbe",
+    "d": "768c98383144a828",
+    "pc": "d625e6e40f600f6e",
+    "dc": "c61c383a70e48469"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.8523,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_12.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1504264",
+   "loans": [
+    "L1503751"
+   ],
+   "hash": {
+    "p": "c995a60c7e4603bf",
+    "d": "f4fcdfe03bd38785",
+    "pc": "c8b3a58a7e49113f",
+    "dc": "fefedae11da10186"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.8051,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_19.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1503413",
+   "loans": [
+    "L1500686"
+   ],
+   "hash": {
+    "p": "c1e43c590b72dea9",
+    "d": "fcf8f8c0eaf098eb",
+    "pc": "d2a43d1962746f9a",
+    "dc": "fcf8f082e9ea986b"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.6902,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_18.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1504328",
+   "loans": [
+    "L1501143"
+   ],
+   "hash": {
+    "p": "beb4800f6ef6914a",
+    "d": "e476150d717e4d9f",
+    "pc": "b5aca40b47363dc6",
+    "dc": "66f61e2ed253cd0c"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.8036,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_15.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1500820",
+   "loans": [
+    "L1503154"
+   ],
+   "hash": {
+    "p": "f064b29cc687e6e1",
+    "d": "0c068260b0789699",
+    "pc": "f962399c9786c3e0",
+    "dc": "0a0381e07028b51a"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.8302,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_13.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1503891",
+   "loans": [
+    "L1500629"
+   ],
+   "hash": {
+    "p": "ffa19f29244a4b45",
+    "d": "5f1ecc15162b2974",
+    "pc": "feb196a92436232b",
+    "dc": "1f180e14232b7175"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.9186,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "parranda_01.jpg",
+   "purpose": "parranda",
+   "photo_id": "P1504971",
+   "loans": [
+    "L1501070"
+   ],
+   "hash": {
+    "p": "993fb343f18c8c64",
+    "d": "5a5ab252c0e1e2d8",
+    "pc": "893bb3637188ccec",
+    "dc": "59593591c2e0e2cb"
+   },
+   "asset": {
+    "label": "parranda",
+    "score": 0.7611,
+    "matches_purpose": true,
+    "label_uz": "parranda (tovuq)",
+    "label_i18n": {
+     "uz": "parranda (tovuq)",
+     "en": "poultry (chickens)",
+     "ru": "\u043f\u0442\u0438\u0446\u0430 (\u043a\u0443\u0440\u044b)"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_05.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1504915",
+   "loans": [
+    "L1500245",
+    "L1503233"
+   ],
+   "hash": {
+    "p": "c05ab0b87c7e3e07",
+    "d": "1cc2e001d0d89686",
+    "pc": "c042f098fc7c3b3d",
+    "dc": "0981a820f18814d7"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.6985,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_18.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1500606",
+   "loans": [
+    "L1501441",
+    "L1502616"
+   ],
+   "hash": {
+    "p": "fb44e4c2c56a6a3c",
+    "d": "a0ac2b4838493b1d",
+    "pc": "9247bf90bcf2112e",
+    "dc": "2c6949c939b80d3b"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.826,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_16.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1503862",
+   "loans": [
+    "L1502721"
+   ],
+   "hash": {
+    "p": "cbc93c36014c3f37",
+    "d": "78d1f2e3d1653092",
+    "pc": "c0d87e36d0de839a",
+    "dc": "9091f1c0d0c4a235"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.9204,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_12.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1502374",
+   "loans": [
+    "L1502705"
+   ],
+   "hash": {
+    "p": "aa82e0e593e057f5",
+    "d": "c7e9c54b6c4787db",
+    "pc": "e096fa87b26c926c",
+    "dc": "ada687d9cee68785"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.7388,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_00.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1503393",
+   "loans": [
+    "L1504522"
+   ],
+   "hash": {
+    "p": "f915411d926eb6e2",
+    "d": "d0328c2392332381",
+    "pc": "da314b194b0fb4b6",
+    "dc": "5b11ae6332336331"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.9248,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_15.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1501621",
+   "loans": [
+    "L1503927"
+   ],
+   "hash": {
+    "p": "ed92bce785808adc",
+    "d": "6e6ab1ca6a030707",
+    "pc": "eb132c67a52b9c94",
+    "dc": "6f29318bea4b4317"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.9256,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_11.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1503064",
+   "loans": [
+    "L1500032"
+   ],
+   "hash": {
+    "p": "ff4de4e7e31840c0",
+    "d": "426290726a5a3ece",
+    "pc": "8349e7e2c309d3d6",
+    "dc": "c36418fbaaddbd6b"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.8979,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_08.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1502641",
+   "loans": [
+    "L1503720"
+   ],
+   "hash": {
+    "p": "8eaf933989c9c703",
+    "d": "722d66f175f7b0f0",
+    "pc": "85e7b13c9cc893e1",
+    "dc": "5a47c1f1727492d8"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.9016,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_13.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1502368",
+   "loans": [
+    "L1503793"
+   ],
+   "hash": {
+    "p": "9c1adb2c7cd306cc",
+    "d": "f9f8f874b676f2d6",
+    "pc": "8d92d22c78b3d0f3",
+    "dc": "f968f876b6f6eaf3"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.8742,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_17.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1501003",
+   "loans": [
+    "L1504938"
+   ],
+   "hash": {
+    "p": "a465719d86c2cb3b",
+    "d": "c78647e4a5b6d0d0",
+    "pc": "ac66798f26c4d952",
+    "dc": "8787a5e66666f392"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.8806,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_19.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1504492",
+   "loans": [
+    "L1502272"
+   ],
+   "hash": {
+    "p": "d10f6e5015fa80f7",
+    "d": "06e4ebd8da900f0c",
+    "pc": "f1026e11315e0ffb",
+    "dc": "e5e5c9989a92020f"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.8599,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_01.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1502056",
+   "loans": [
+    "L1501009"
+   ],
+   "hash": {
+    "p": "8235edea85fa3a84",
+    "d": "a6ea7854eba9e1e4",
+    "pc": "c22dffe8895236c8",
+    "dc": "53fdf5b4a92da94c"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.9446,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_10.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1502219",
+   "loans": [
+    "L1503769"
+   ],
+   "hash": {
+    "p": "edc1d03f9386658a",
+    "d": "8c86a6ca133737cc",
+    "pc": "efc1d539932ea00e",
+    "dc": "4243634f5707776b"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.604,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_06.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1502847",
+   "loans": [
+    "L1503935"
+   ],
+   "hash": {
+    "p": "838d87838f664773",
+    "d": "e8f2d0a699d9999b",
+    "pc": "d08fa3908f86a3f3",
+    "dc": "f3d283a2989c989c"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.9113,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_09.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1500177",
+   "loans": [
+    "L1502416"
+   ],
+   "hash": {
+    "p": "b5070a7a6ee59b11",
+    "d": "935e7a061a1a1e9e",
+    "pc": "bb0502776cec839b",
+    "dc": "cfbff9030a091f1f"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.6706,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_14.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1500580",
+   "loans": [
+    "L1500490"
+   ],
+   "hash": {
+    "p": "edada13a9ae8324a",
+    "d": "93c2b236610d0329",
+    "pc": "aaaaea02cafd155a",
+    "dc": "81b33362a5ac1a45"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.8872,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_03.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1504568",
+   "loans": [
+    "L1502244"
+   ],
+   "hash": {
+    "p": "8aaab535754b4a3a",
+    "d": "dbb971d931b1736a",
+    "pc": "dab6af2ca1e1091d",
+    "dc": "ab755149a1b1e179"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.86,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  },
+  {
+   "file": "asalarichilik_07.jpg",
+   "purpose": "asalarichilik",
+   "photo_id": "P1501769",
+   "loans": [
+    "L1500852"
+   ],
+   "hash": {
+    "p": "c0daecc9d9c8e661",
+    "d": "91858fd8dec7c6c6",
+    "pc": "e1166db3989ccccc",
+    "dc": "508e86b89acbc2c3"
+   },
+   "asset": {
+    "label": "asalarichilik",
+    "score": 0.8797,
+    "matches_purpose": true,
+    "label_uz": "ari uyasi",
+    "label_i18n": {
+     "uz": "ari uyasi",
+     "en": "beehive",
+     "ru": "\u0443\u043b\u0435\u0439"
+    }
+   }
+  }
+ ],
+ "reserved": [
+  "asalarichilik_02.jpg",
+  "asalarichilik_04.jpg",
+  "chorva_09.jpg",
+  "chorva_11.jpg",
+  "issiqxona_02.jpg",
+  "issiqxona_09.jpg",
+  "parranda_03.jpg",
+  "parranda_04.jpg",
+  "tikuv_dastgohi_12.jpg",
+  "tikuv_dastgohi_16.jpg"
+ ],
+ "stats": {
+  "images": 90,
+  "loans": 100,
+  "shared_images": 10,
+  "reuse_loans_in_groups": 10
+ }
+}

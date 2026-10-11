@@ -1,0 +1,53 @@
+{
+ "tag": "before",
+ "n_strings": 36103,
+ "n_unique": 14093,
+ "counts": {
+  "> 100% shown as percent": 12,
+  "0 foiz / 0 ta / 0.0 kun": 136
+ },
+ "examples": {
+  "> 100% shown as percent": [
+   "Dastlabki 30 kunda mablag'ning 106 foizi bankdan chiqarilgan (naqd, boshqa hisob yoki shaxs)",
+   "Kredit tushganidan beri mablag'ning 101 foizi naqd yechilgan",
+   "Kredit tushganidan beri mablag'ning 115 foizi naqd yechilgan",
+   "Yirik kirimdan keyingi 5 kunda uning 103 foizi hisobdan chiqarilgan",
+   "Yirik kirimdan keyingi 5 kunda uning 120 foizi hisobdan chiqarilgan",
+   "Yirik kirimdan keyingi 5 kunda uning 127 foizi hisobdan chiqarilgan"
+  ],
+  "0 foiz / 0 ta / 0.0 kun": [
+   "Ta'minotchi Bahor Agro MChJ: 2 ta kreditning hisob-fakturasida ko'rsatilgan; olgan mablag'ning 0 foizini naqd yechgan; hisobi 20 kun faol; bank xodimi bilan bog'lanish: yo'q",
+   "Ta'minotchi Bahor Invest XK: 3 ta kreditning hisob-fakturasida ko'rsatilgan; olgan mablag'ning 0 foizini naqd yechgan; hisobi 142 kun faol; bank xodimi bilan bog'lanish: yo'q",
+   "Ta'minotchi Bahor Plast MChJ: 1 ta kreditning hisob-fakturasida ko'rsatilgan; olgan mablag'ning 0 foizini naqd yechgan; hisobi 11 kun faol; bank xodimi bilan bog'lanish: yo'q",
+   "Ta'minotchi Bahor Plast YaTT: 1 ta kreditning hisob-fakturasida ko'rsatilgan; olgan mablag'ning 0 foizini naqd yechgan; hisobi 1.6 kun faol; bank xodimi bilan bog'lanish: yo'q",
+   "Ta'minotchi Bahor Servis XK: 1 ta kreditning hisob-fakturasida ko'rsatilgan; olgan mablag'ning 0 foizini naqd yechgan; hisobi 5.4 kun faol; bank xodimi bilan bog'lanish: yo'q",
+   "Ta'minotchi Bahor Ta'minot XK: 1 ta kreditning hisob-fakturasida ko'rsatilgan; olgan mablag'ning 0 foizini naqd yechgan; hisobi 0.8 kun faol; bank xodimi bilan bog'lanish: yo'q"
+  ]
+ },
+ "contradictions": [],
+ "sample_reasons": [
+  "Hisobga kredit summasining 42 foiziga teng bitta yirik kirim tushgan",
+  "Ta'minotchi hisobi atigi 6.6 kun faol bo'lgan",
+  "Yirik kirimdan keyingi 5 kunda uning 69 foizi hisobdan chiqarilgan",
+  "Eng yirik kirim kredit tushgandan 6.0 kun o'tib kelgan",
+  "Oxirgi tushumdan (yoki tushum kutilgan sanadan) beri 20 kun o'tgan",
+  "Hisob-fakturadagi summaning 92 foizi ta'minotchiga to'lanmagan",
+  "Ta'minotchi hisobi 119 kun faol bo'lgan",
+  "Yirik kirimdan keyingi 5 kunda uning 63 foizi hisobdan chiqarilgan",
+  "Ta'minotchi birinchi to'lovdan 649 kun oldin ro'yxatdan o'tgan",
+  "Ta'minotchi birinchi to'lovdan 948 kun oldin ro'yxatdan o'tgan"
+ ],
+ "sources": {
+  "queue.top_reason": 5000,
+  "queue.escalation": 28,
+  "loan.reason": 14982,
+  "loan.evidence": 15830,
+  "scenario.reason": 100,
+  "preset.title": 4,
+  "preset.description": 4,
+  "scenario.error": 25,
+  "photo.label_uz": 20,
+  "photo.escalation": 25,
+  "photo.reason": 85
+ }
+}

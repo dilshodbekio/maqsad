@@ -1,0 +1,104 @@
+{
+ "single_thread": {
+  "warm_up": {
+   "cpu_s": 16.15625,
+   "wall_s": 20.158113699988462,
+   "portfolio_s": 6.09,
+   "face_detector_s": 0.11,
+   "clip_s": 13.92,
+   "total_s": 20.12,
+   "clip_loaded": true,
+   "clip_error": null
+  },
+  "score_loan": {
+   "cpu_ms": 3.28125,
+   "wall_ms": 3.4223489998839796,
+   "n": 100
+  },
+  "score_scenario": {
+   "cpu_ms": 101.953125,
+   "wall_ms": 105.01453499891795,
+   "n": 40
+  },
+  "check_photo": {
+   "cpu_ms": 360.6770833333333,
+   "wall_ms": 374.42351000014844,
+   "n": 60
+  },
+  "check_photo_parts": {
+   "decode_and_hash": {
+    "cpu_ms": 34.765625,
+    "wall_ms": 35.356070000852924,
+    "n": 40
+   },
+   "face_detect_and_blur": {
+    "cpu_ms": 85.9375,
+    "wall_ms": 88.27225749992067,
+    "n": 40
+   },
+   "clip_asset_check": {
+    "cpu_ms": 202.734375,
+    "wall_ms": 208.46736499952385,
+    "n": 40
+   }
+  },
+  "rss_mb": 1179.390625,
+  "machine": {
+   "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+   "logical_cores": 12,
+   "python": "3.13.15",
+   "threads": "1 thread (OpenCV, torch, OpenMP)"
+  }
+ },
+ "all_cores": {
+  "warm_up": {
+   "cpu_s": 45.40625,
+   "wall_s": 13.851215900038369,
+   "portfolio_s": 3.09,
+   "face_detector_s": 0.05,
+   "clip_s": 10.62,
+   "total_s": 13.77,
+   "clip_loaded": true,
+   "clip_error": null
+  },
+  "score_loan": {
+   "cpu_ms": 51.71875,
+   "wall_ms": 5.770428000250831,
+   "n": 100
+  },
+  "score_scenario": {
+   "cpu_ms": 961.71875,
+   "wall_ms": 147.14126750041032,
+   "n": 40
+  },
+  "check_photo": {
+   "cpu_ms": 2254.9479166666665,
+   "wall_ms": 280.37491333282867,
+   "n": 60
+  },
+  "check_photo_parts": {
+   "decode_and_hash": {
+    "cpu_ms": 51.5625,
+    "wall_ms": 38.582712500647176,
+    "n": 40
+   },
+   "face_detect_and_blur": {
+    "cpu_ms": 537.890625,
+    "wall_ms": 66.75186000065878,
+    "n": 40
+   },
+   "clip_asset_check": {
+    "cpu_ms": 1112.890625,
+    "wall_ms": 143.24881999928039,
+    "n": 40
+   }
+  },
+  "rss_mb": 1202.57421875,
+  "machine": {
+   "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+   "logical_cores": 12,
+   "python": "3.13.15",
+   "threads": "all cores"
+  }
+ }
+}

@@ -24,7 +24,7 @@ Only edit files in your own folder. Shared files (`README.md`, `data/README.md`,
 - The system never says someone is "guilty". It says "check this loan first, here is why".
 
 ## Integration (ml ↔ backend)
-- Python 3.11. `ml/` is an importable package; backend imports it directly (single deployed service).
+- Python 3.13. `ml/` is an importable package; backend imports it directly (single deployed service).
 - Public interface lives in `ml/api.py` and must match `docs/api_contract.md`:
   - `score_loan(loan_id: str) -> dict`  → `{risk, color, reasons[{code, text_uz, weight}], model_version, latency_ms}`
   - `check_photo(loan_id: str, image_bytes: bytes, lat=None, lon=None, captured_at=None) -> dict`

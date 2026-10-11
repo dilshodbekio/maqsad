@@ -1,0 +1,57 @@
+{
+ "model": "ViT-B-32",
+ "pretrained": "openai",
+ "classes": [
+  "tikuv_dastgohi",
+  "chorva",
+  "issiqxona",
+  "parranda",
+  "asalarichilik",
+  "other"
+ ],
+ "tau": 0.33,
+ "C": 10.0,
+ "n_train": 139,
+ "counts": {
+  "tikuv_dastgohi": 20,
+  "chorva": 20,
+  "issiqxona": 20,
+  "parranda": 20,
+  "asalarichilik": 20,
+  "other": 39
+ },
+ "cv": {
+  "acc": {
+   "mean": 0.9482014388489208,
+   "min": 0.9280575539568345,
+   "max": 0.9568345323741008
+  },
+  "binary": {
+   "precision": {
+    "mean": 0.9485557367276807,
+    "min": 0.9270833333333334,
+    "max": 0.9693877551020408
+   },
+   "recall": {
+    "mean": 0.924,
+    "min": 0.89,
+    "max": 0.95
+   },
+   "f1": {
+    "mean": 0.9361011963622552,
+    "min": 0.9081632653061225,
+    "max": 0.9595959595959596
+   }
+  },
+  "folds": 5,
+  "seeds": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "grouped_by": "author"
+ },
+ "note": "logistic regression on L2-normalised CLIP embeddings; tau = best F1 on all-data grouped out-of-fold probabilities"
+}

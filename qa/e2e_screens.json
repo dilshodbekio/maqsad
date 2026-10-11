@@ -1,0 +1,98 @@
+[
+ {
+  "page": "queue",
+  "path": "/",
+  "size": "mobile",
+  "console_errors": [],
+  "http_errors": [],
+  "scroll_w": 390,
+  "inner_w": 390,
+  "hscroll": false,
+  "bad_text": [],
+  "chars": 7938
+ },
+ {
+  "page": "loan_red",
+  "path": "/loan/L1504044",
+  "size": "mobile",
+  "console_errors": [],
+  "http_errors": [],
+  "scroll_w": 390,
+  "inner_w": 390,
+  "hscroll": false,
+  "bad_text": [],
+  "chars": 2981
+ },
+ {
+  "page": "capture",
+  "path": "/capture?loan=L1504130",
+  "size": "mobile",
+  "console_errors": [],
+  "http_errors": [],
+  "scroll_w": 390,
+  "inner_w": 390,
+  "hscroll": false,
+  "bad_text": [],
+  "chars": 411
+ },
+ {
+  "page": "scenario",
+  "path": "/scenario",
+  "size": "mobile",
+  "console_errors": [],
+  "http_errors": [],
+  "scroll_w": 390,
+  "inner_w": 390,
+  "hscroll": false,
+  "bad_text": [],
+  "chars": 1326
+ },
+ {
+  "page": "queue",
+  "path": "/",
+  "size": "desktop",
+  "console_errors": [],
+  "http_errors": [],
+  "scroll_w": 1366,
+  "inner_w": 1366,
+  "hscroll": false,
+  "bad_text": [],
+  "chars": 7357
+ },
+ {
+  "page": "loan_red",
+  "path": "/loan/L1504044",
+  "size": "desktop",
+  "console_errors": [],
+  "http_errors": [],
+  "scroll_w": 1366,
+  "inner_w": 1366,
+  "hscroll": false,
+  "bad_text": [],
+  "chars": 2981
+ },
+ {
+  "page": "capture",
+  "path": "/capture?loan=L1504130",
+  "size": "desktop",
+  "console_errors": [],
+  "http_errors": [],
+  "scroll_w": 1366,
+  "inner_w": 1366,
+  "hscroll": false,
+  "bad_text": [],
+  "chars": 411
+ },
+ {
+  "page": "scenario",
+  "path": "/scenario",
+  "size": "desktop",
+  "console_errors": [],
+  "http_errors": [],
+  "scroll_w": 1366,
+  "inner_w": 1366,
+  "hscroll": false,
+  "bad_text": [],
+  "chars": 1326
+ }
+]

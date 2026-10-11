@@ -142,10 +142,16 @@ def test_photo_check_is_more_expensive_than_score_and_parts_are_below_total(res)
     assert all(v["n"] >= 30 for v in p.values()) and m["check_photo"]["n"] >= 40
 
 
-def test_llm_cost_is_a_parameter_not_an_invented_number(text):
+def test_llm_cost_in_the_doc_comes_from_the_json_not_from_typed_text(text):
+    """Section 5 quotes the measured /draft_report cost: every number must be in ml/artifacts/eval_llm_cost.json (copied from docs/metrics_api.md)."""
+    g = json.loads((ROOT / "ml" / "artifacts" / "eval_llm_cost.json").read_text(encoding="utf-8"))
     s5 = section(text, 5)
-    assert "LLM_COST_USD_PER_REPORT" in s5 and "(parameter" in s5
-    assert "it is not estimated here" in s5
+    samples = g["railway_log"]["cost_usd"] + g["live_check_three_languages"]["cost_usd"]
+    assert len(samples) == 6 and all(f"{x:.6f}" in s5 for x in samples)
+    assert f"{min(samples):.4f}–{max(samples):.4f} USD in these 6 samples" in s5      # the range is computed, no average is claimed
+    assert "no average is claimed" in s5 and "A cache hit costs 0" in s5
+    assert g["free_tier_actual_charge_usd"] == 0 and "actual charge was $0" in s5
+    assert "LLM_SECONDS_PER_REPORT" in s5 and "(parameter, to be measured" in s5            # the local-LLM time is still a parameter
 
 
 def test_doc_matches_a_fresh_render_of_the_json(text, res):

@@ -1,0 +1,29 @@
+{
+ "note": "Measured Gemini cost of /draft_report, copied exactly from docs/cost.md section 5 (sources and per-call values: docs/metrics_api.md). Not re-measured.",
+ "model": "gemini-3.6-flash",
+ "reasoning_effort": "minimal",
+ "railway_log": {
+  "cost_usd": [
+   0.002494,
+   0.003622,
+   0.004185
+  ],
+  "input_tokens_range": [
+   835,
+   1635
+  ],
+  "output_tokens_range": [
+   498,
+   789
+  ]
+ },
+ "live_check_three_languages": {
+  "cost_usd": [
+   0.003571,
+   0.003654,
+   0.003704
+  ],
+  "loans": 1
+ },
+ "free_tier_actual_charge_usd": 0
+}

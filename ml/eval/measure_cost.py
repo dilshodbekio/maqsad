@@ -26,6 +26,7 @@ from ml.photo import config, imageio
 ROOT = Path(__file__).resolve().parents[2]
 RES = ROOT / "ml" / "artifacts" / "eval_cost.json"
 DOC = ROOT / "docs" / "cost.md"
+LLM_RES = ROOT / "ml" / "artifacts" / "eval_llm_cost.json"      # measured /draft_report cost (copied from docs/metrics_api.md, not re-measured)
 N = 100
 
 # ---- public prices (read 2026-10-10). Nothing here is a guess; leave a value None if it cannot be sourced.
@@ -166,8 +167,17 @@ def render(multi: dict, m: dict) -> str:
     w("")
     w("## 5. LLM report (`/draft_report`)")
     w("")
-    w("- Prototype: an external LLM is called only in `/draft_report`; the cost per report is **`LLM_COST_USD_PER_REPORT` = (parameter)** - take it from the backend's "
-      "logged `cost_usd` (Oybek logs it); it is not estimated here.")
+    g = json.loads(LLM_RES.read_text(encoding="utf-8"))
+    log, live = g["railway_log"], g["live_check_three_languages"]
+    six = log["cost_usd"] + live["cost_usd"]
+    fmt = lambda xs: " / ".join(f"{x:.6f}" for x in xs)
+    w(f"- Prototype: an external LLM is called only in `/draft_report`. Measured on production (Gemini `{g['model']}`, reasoning `{g['reasoning_effort']}`), "
+      f"from the backend's logged `cost_usd` (official price per token): **{fmt(log['cost_usd'])} USD per report** in three Railway log lines "
+      f"(n = {len(log['cost_usd'])}; {log['input_tokens_range'][0]}\u2013{log['input_tokens_range'][1]} input and {log['output_tokens_range'][0]}\u2013"
+      f"{log['output_tokens_range'][1]} output tokens), and {fmt(live['cost_usd'])} USD in the three-language live check (n = {len(live['cost_usd'])}, "
+      f"one loan). Both samples are small, so no average is claimed; `LLM_COST_USD_PER_REPORT` is therefore a range of about "
+      f"{min(six):.4f}\u2013{max(six):.4f} USD in these {len(six)} samples. The key is on the free tier, so the **actual charge was "
+      f"${g['free_tier_actual_charge_usd']}**. A cache hit costs 0 (no call). Sources and per-call values: `docs/metrics_api.md`.")
     w("- Production design: a local LLM (vLLM / Ollama) on the bank's own server, so cost = server time: **`LLM_SECONDS_PER_REPORT` = (parameter, to be measured with the chosen model)** "
       f"x the core-second price above (Railway ${R['cpu_usd_per_vcpu_minute'] / 60:.3e} per vCPU-second; dedicated {core_hour_eur / 3600:.3e} EUR per core-second; a GPU server needs its own price).")
     w("")
